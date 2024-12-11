@@ -27,11 +27,11 @@ export default function Layout() {
                     Testing
                   </Link>
                 </li>
-		<li>
-		  <Link to="/admin" className="block p-2 hover:bg-gray-700 rounded">
-		    Admin
-		  </Link>
-		</li>
+                <li>
+                  <Link to="/type-category-admin" className="block p-2 hover:bg-gray-700 rounded">
+                    Type/Category Admin
+                  </Link>
+                </li>
               </ul>
             </nav>
           </div>

@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import Home from './pages/Home'
 import Testing from './pages/Testing'
-import Admin from './pages/Admin'
+import TypeCategoryAdmin from './pages/TypeCategoryAdmin'
 
 function App() {
   return (
@@ -11,7 +11,7 @@ function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
           <Route path="testing" element={<Testing />} />
-          <Route path="admin" element={<Admin />} />
+          <Route path="type-category-admin" element={<TypeCategoryAdmin />} />
         </Route>
       </Routes>
     </BrowserRouter>
