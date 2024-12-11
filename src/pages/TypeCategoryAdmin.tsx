@@ -4,7 +4,6 @@ import type { MiniType } from '../lib/supabase'
 import AddTypeModal from '../components/AddTypeModal'
 import EditTypeModal from '../components/EditTypeModal'
 import ManageCategoriesModal from '../components/ManageCategoriesModal'
-import { supabase } from '../lib/supabase'
 import DeleteTypeConfirmationModal from '../components/DeleteTypeConfirmationModal'
 
 export default function TypeCategoryAdmin() {
@@ -13,9 +12,9 @@ export default function TypeCategoryAdmin() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
   const [searchType, setSearchType] = useState('')
   const [selectedType, setSelectedType] = useState<MiniType | null>(null)
-  const [inUseOnly, setInUseOnly] = useState(false)
+  const [] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [pageInput, setPageInput] = useState('')
+  const [pageInput] = useState('')
   const [typeToDelete, setTypeToDelete] = useState<MiniType | null>(null)
   const [deleteError, setDeleteError] = useState('')
   
@@ -51,20 +50,7 @@ export default function TypeCategoryAdmin() {
     setCurrentPage(1)
   }
 
-  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    setPageInput(value)
-  }
 
-  const handlePageInputSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      const pageNumber = parseInt(pageInput)
-      if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages) {
-        setCurrentPage(pageNumber)
-        setPageInput('')
-      }
-    }
-  }
 
   const getPageNumbers = () => {
     const pageNumbers: (number | string)[] = []
@@ -122,9 +108,9 @@ export default function TypeCategoryAdmin() {
 
     if (!canDelete) {
       setDeleteError(`Cannot delete "${type.name}" because it is in use by ${
-        inUseBy.minis ? 'minis' : ''
-      }${inUseBy.minis && inUseBy.categories ? ' and ' : ''}${
-        inUseBy.categories ? 'categories' : ''
+        inUseBy?.minis ? 'minis' : ''
+      }${inUseBy?.minis && inUseBy?.categories ? ' and ' : ''}${
+        inUseBy?.categories ? 'categories' : ''
       }`)
       return
     }

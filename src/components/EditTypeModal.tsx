@@ -26,11 +26,13 @@ export default function EditTypeModal({ isOpen, onClose, onEdit, type }: EditTyp
     setIsSubmitting(true)
 
     try {
-      const result = await onEdit(type.id, name)
-      if (!result.error) {
-        onClose()
+      await onEdit(type.id, name)
+      onClose()
+    } catch (error) {
+      if (error instanceof Error) {
+        setError(error.message)
       } else {
-        setError(result.error)
+        setError('An unknown error occurred')
       }
     } finally {
       setIsSubmitting(false)

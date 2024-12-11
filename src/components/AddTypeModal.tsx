@@ -17,13 +17,11 @@ export default function AddTypeModal({ isOpen, onClose, onAdd }: AddTypeModalPro
     setIsSubmitting(true)
 
     try {
-      const result = await onAdd(name)
-      if (!result.error) {
-        setName('')
-        onClose()
-      } else {
-        setError(result.error)
-      }
+      await onAdd(name)
+      setName('')
+      onClose()
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {
       setIsSubmitting(false)
     }

@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import Modal from './Modal'
-import { supabase } from '../lib/supabase'
 
 interface ManageCategoriesModalProps {
   isOpen: boolean

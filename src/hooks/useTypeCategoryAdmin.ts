@@ -62,7 +62,7 @@ export function useTypeCategoryAdmin() {
       .single()
 
     console.log('Checking for existing type:', name.trim())
-    const { data: existingType, error: checkError } = await checkQuery
+    const { data: existingType } = await checkQuery
 
     if (existingType) {
       const error = 'A type with this name already exists'
@@ -160,9 +160,9 @@ export function useTypeCategoryAdmin() {
 
     if (!canDelete) {
       const errorMessage = `Cannot delete type because it is in use by ${
-        inUseBy.minis ? 'minis' : ''
-      }${inUseBy.minis && inUseBy.categories ? ' and ' : ''}${
-        inUseBy.categories ? 'categories' : ''
+        inUseBy?.minis ? 'minis' : ''
+      }${inUseBy?.minis && inUseBy?.categories ? ' and ' : ''}${
+        inUseBy?.categories ? 'categories' : ''
       }`
       setError(errorMessage)
       return { error: errorMessage, canDelete: false, inUseBy }
