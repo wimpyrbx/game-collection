@@ -6,7 +6,7 @@ interface TableHeaderProps {
 
 export function TableHeader({ title, actionWidth = "w-20", className = '' }: TableHeaderProps) {
   return (
-    <div className={`bg-gray-700 p-2 rounded-t flex justify-between items-center mb-1 ${className}`}>
+    <div className={`bgTableHeader p-2 rounded-t flex justify-between items-center mb-1 ${className}`}>
       <div className="font-medium">{title}</div>
       <div className={actionWidth}></div>
     </div>
@@ -33,8 +33,8 @@ export function TableRow({
   return (
     <div 
       onClick={onSelect}
-      className={`flex items-center justify-between p-2 rounded cursor-pointer ${
-        isSelected ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'
+      className={`flex items-center justify-between p-1 pl-2 pr-2 rounded cursor-pointer ${
+        isSelected ? 'bgSelected' : 'bgRow hover:bgRowHover'
       } ${className}`}
     >
       <span>{title}</span>

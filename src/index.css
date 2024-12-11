@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --focus-color: #556677;
+}
+
 /* Global styles */
 @layer base {
   body {
@@ -15,16 +19,49 @@
   h1 {
     @apply text-2xl font-bold mb-4;
   }
+
+  input:focus,
+  input:active,
+  textarea:focus,
+  textarea:active,
+  select:focus,
+  select:active {
+    outline: none !important;
+    border-color: var(--focus-color) !important;
+    --tw-ring-color: var(--focus-color) !important;
+    --tw-ring-opacity: 1 !important;
+    --tw-ring-offset-width: 0px !important;
+    --tw-ring-offset-color: transparent !important;
+    box-shadow: 0 0 0 1px var(--focus-color) !important;
+  }
+
+  /* Additional specific override for search inputs */
+  [type="search"]:focus,
+  [type="text"]:focus {
+    outline: none !important;
+    border-color: var(--focus-color) !important;
+    --tw-ring-color: var(--focus-color) !important;
+    --tw-ring-opacity: 1 !important;
+    --tw-ring-offset-width: 0px !important;
+    --tw-ring-offset-color: transparent !important;
+    box-shadow: 0 0 0 1px var(--focus-color) !important;
+  }
 }
 
 /* Custom component classes */
 @layer components {
+
+  INPUT, TEXTAREA, SELECT {
+    background-color: #1C2128 !important;
+    border: 1px solid #333333 !important;
+  }
+
   .bgCardBody {
-    background-color: #121c23;
+    background-color: #22272E;
   }
 
   .bgCardHeader {
-    background-color: #1c2730;
+    background-color: #2D333B;
   }
 
   .btnSuccess, .btnDanger, .btnWarning, .btnPrimary {
@@ -51,5 +88,35 @@
 
   .btnPrimary {
     background-color: #445566;
+  }
+
+  .bgTableHeader {
+    background-color: #3C4148;
+  }
+
+  .bgSelected {
+    background-color: #445566;
+  }
+
+  .bgRow {
+    background-color: #1C2128;
+  }
+
+  .bgRowHover {
+    background-color: #344556;
+  }
+
+  .bgBody {
+    background-color: #13161B;
+  }
+
+  .bgSidebar {
+    background-color: #191B22;
+    border-right: 1px solid #333333 !important;
+  }
+
+  .bgTopBar {
+    background-color: #1F2228;
+    border-bottom: 1px solid #333333 !important;
   }
 }
