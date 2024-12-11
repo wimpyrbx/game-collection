@@ -32,6 +32,11 @@ export default function Layout() {
                     Type/Category Admin
                   </Link>
                 </li>
+                <li>
+                  <Link to="/product-admin" className="block p-2 hover:bg-gray-700 rounded">
+                    Product Admin
+                  </Link>
+                </li>
               </ul>
             </nav>
           </div>

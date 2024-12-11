@@ -14,13 +14,12 @@ export function useTypeCategoryAdmin() {
   }, [])
 
   async function loadData(page: number = 1, pageSize: number = 10, search: string = '') {
-    // First get total count
+    
     const { count } = await supabase
       .from('mini_types')
       .select('*', { count: 'exact', head: true })
       .ilike('name', `%${search}%`)
 
-    // Then get paginated data
     const { data: types } = await supabase
       .from('mini_types')
       .select('*')
@@ -36,6 +35,12 @@ export function useTypeCategoryAdmin() {
     if (types) setMiniTypes(types)
     if (cats) setCategories(cats)
     if (count !== null) setTotalCount(count)
+
+    const result = {
+      miniTypes: types || [],
+      totalCount: count || 0
+    }
+    return result
   }
 
   async function loadTypeCategoryIds(typeId: number) {
@@ -61,7 +66,6 @@ export function useTypeCategoryAdmin() {
       .ilike('name', name.trim())
       .single()
 
-    console.log('Checking for existing type:', name.trim())
     const { data: existingType } = await checkQuery
 
     if (existingType) {
@@ -74,22 +78,13 @@ export function useTypeCategoryAdmin() {
       .from('mini_types')
       .insert([{ name: name.trim() }])
 
-    console.log('Inserting new type:', { name: name.trim() })
     const { data, error } = await insertQuery
     
     if (error) {
-      console.error('Insert error:', error)
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      })
       setError(error.message)
       return { error: error.message }
     }
 
-    console.log('Insert result:', data)
     loadData()
     return { error: null }
   }
@@ -124,7 +119,6 @@ export function useTypeCategoryAdmin() {
       .limit(1)
 
     if (miniError) {
-      console.error('Error checking mini usage:', miniError)
       return { error: miniError.message }
     }
 
@@ -136,7 +130,6 @@ export function useTypeCategoryAdmin() {
       .limit(1)
 
     if (categoryError) {
-      console.error('Error checking category usage:', categoryError)
       return { error: categoryError.message }
     }
 

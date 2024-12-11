@@ -16,3 +16,40 @@
     @apply text-2xl font-bold mb-4;
   }
 }
+
+/* Custom component classes */
+@layer components {
+  .bgCardBody {
+    background-color: #121c23;
+  }
+
+  .bgCardHeader {
+    background-color: #1c2730;
+  }
+
+  .btnSuccess, .btnDanger, .btnWarning, .btnPrimary {
+    border: 1px solid #333333;
+    color: #ccc;
+  }
+
+  .btnSuccess:hover, .btnDanger:hover, .btnWarning:hover, .btnPrimary:hover {
+    border: 1px solid #555555;
+    color: #eee;
+  }
+
+  .btnSuccess {
+    background-color: #226622;
+  }
+
+  .btnDanger {
+    background-color: #662222;
+  }
+
+  .btnWarning {
+    background-color: #666622;
+  }
+
+  .btnPrimary {
+    background-color: #445566;
+  }
+}

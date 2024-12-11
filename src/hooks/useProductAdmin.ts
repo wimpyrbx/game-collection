@@ -1,199 +1,359 @@
 // src/hooks/useProductAdmin.ts
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-interface ProductGroup {
+interface Company {
   id: number
   name: string
-  description: string | null
+  description?: string
 }
 
-interface ProductType {
+interface ProductLine {
   id: number
   name: string
-  description: string | null
+  company_id: number
+  description?: string
+}
+
+interface ProductSet {
+  id: number
+  name: string
+  product_line_id: number
+  description?: string
 }
 
 export function useProductAdmin() {
-  const [productGroups, setProductGroups] = useState<ProductGroup[]>([])
-  const [productTypes, setProductTypes] = useState<ProductType[]>([])
   const [error, setError] = useState<string>('')
 
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  async function loadData() {
-    const { data: groups } = await supabase.from('product_groups').select('*')
-    const { data: types } = await supabase.from('product_types').select('*')
-    if (groups) setProductGroups(groups)
-    if (types) setProductTypes(types)
+  const loadCompanies = async () => {
+    const { data, error } = await supabase
+      .from('product_companies')
+      .select('id, name')
+      .order('name')
+    
+    if (error) throw error
+    return data
   }
 
-  async function addProductGroup(name: string, description: string) {
+  const loadProductLines = async (companyId: number) => {
+    const { data, error } = await supabase
+      .from('product_lines')
+      .select('id, name, company_id')
+      .eq('company_id', companyId)
+      .order('name')
+    
+    if (error) throw error
+    return data
+  }
+
+  const loadProductSets = async (lineId: number) => {
+    const { data, error } = await supabase
+      .from('product_sets')
+      .select('id, name, product_line_id')
+      .eq('product_line_id', lineId)
+      .order('name')
+    
+    if (error) throw error
+    return data
+  }
+
+  const addCompany = async (name: string, description?: string) => {
     setError('')
     if (!name.trim()) {
       setError('Name is required')
       return { error: 'Name is required' }
     }
 
-    const { error } = await supabase
-      .from('product_groups')
-      .insert([{
-        name: name.trim(),
-        description: description?.trim() || null,
-        is_active: true
-      }])
+    const { data, error } = await supabase
+      .from('product_companies')
+      .insert([{ name: name.trim(), description: description?.trim() }])
       .select()
-    
+      .single()
+
     if (error) {
       setError(error.message)
       return { error: error.message }
     }
 
-    loadData()
-    return { error: null }
+    return { data }
   }
 
-  async function addProductType(name: string, description: string) {
+  const addProductLine = async (name: string, companyId: number, description?: string) => {
     setError('')
     if (!name.trim()) {
       setError('Name is required')
       return { error: 'Name is required' }
     }
 
-    const { error } = await supabase
-      .from('product_types')
-      .insert([{
-        name: name.trim(),
-        description: description?.trim() || null,
-        is_active: true
+    const { data, error } = await supabase
+      .from('product_lines')
+      .insert([{ 
+        name: name.trim(), 
+        company_id: companyId,
+        description: description?.trim()
       }])
       .select()
-    
+      .single()
+
     if (error) {
       setError(error.message)
       return { error: error.message }
     }
 
-    loadData()
-    return { error: null }
+    return { data }
   }
 
-  async function deleteGroup(id: number) {
+  const addProductSet = async (name: string, lineId: number, description?: string) => {
     setError('')
-    const { data: products } = await supabase
-      .from('products')
-      .select('id')
-      .eq('product_group_id', id)
-    
-    if (products && products.length > 0) {
-      const error = `Cannot delete: ${products.length} products are using this group`
-      setError(error)
-      return { error }
-    }
-
-    const { error } = await supabase
-      .from('product_groups')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      setError(error.message)
-      return { error: error.message }
-    }
-
-    loadData()
-    return { error: null }
-  }
-
-  async function deleteType(id: number) {
-    setError('')
-    const { data: products } = await supabase
-      .from('products')
-      .select('id')
-      .eq('product_type_id', id)
-    
-    if (products && products.length > 0) {
-      const error = `Cannot delete: ${products.length} products are using this type`
-      setError(error)
-      return { error }
-    }
-
-    const { error } = await supabase
-      .from('product_types')
-      .delete()
-      .eq('id', id)
-    
-    if (error) {
-      setError(error.message)
-      return { error: error.message }
-    }
-
-    loadData()
-    return { error: null }
-  }
-
-  async function updateGroup(id: number, updates: Partial<ProductGroup>) {
-    setError('')
-    if (!updates.name?.trim()) {
+    if (!name.trim()) {
       setError('Name is required')
       return { error: 'Name is required' }
     }
 
-    const { error } = await supabase
-      .from('product_groups')
-      .update({
-        name: updates.name.trim(),
-        description: updates.description?.trim() || null
-      })
-      .eq('id', id)
-    
+    const { data, error } = await supabase
+      .from('product_sets')
+      .insert([{ 
+        name: name.trim(), 
+        product_line_id: lineId,
+        description: description?.trim()
+      }])
+      .select()
+      .single()
+
     if (error) {
       setError(error.message)
       return { error: error.message }
     }
 
-    loadData()
-    return { error: null }
+    return { data }
   }
 
-  async function updateType(id: number, updates: Partial<ProductType>) {
+  const editCompany = async (id: number, name: string, description?: string) => {
     setError('')
-    if (!updates.name?.trim()) {
+    if (!name.trim()) {
       setError('Name is required')
       return { error: 'Name is required' }
     }
 
-    const { error } = await supabase
-      .from('product_types')
-      .update({
-        name: updates.name.trim(),
-        description: updates.description?.trim() || null
+    const { data, error } = await supabase
+      .from('product_companies')
+      .update({ 
+        name: name.trim(), 
+        description: description?.trim() 
       })
       .eq('id', id)
-    
+      .select()
+      .single()
+
     if (error) {
       setError(error.message)
       return { error: error.message }
     }
 
-    loadData()
+    return { data }
+  }
+
+  const editProductLine = async (id: number, name: string, description?: string) => {
+    setError('')
+    if (!name.trim()) {
+      setError('Name is required')
+      return { error: 'Name is required' }
+    }
+
+    const { data, error } = await supabase
+      .from('product_lines')
+      .update({ 
+        name: name.trim(), 
+        description: description?.trim() 
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      setError(error.message)
+      return { error: error.message }
+    }
+
+    return { data }
+  }
+
+  const editProductSet = async (id: number, name: string, description?: string) => {
+    setError('')
+    if (!name.trim()) {
+      setError('Name is required')
+      return { error: 'Name is required' }
+    }
+
+    const { data, error } = await supabase
+      .from('product_sets')
+      .update({ 
+        name: name.trim(), 
+        description: description?.trim() 
+      })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (error) {
+      setError(error.message)
+      return { error: error.message }
+    }
+
+    return { data }
+  }
+
+  const checkCompanyUsage = async (companyId: number) => {
+    const { data, error } = await supabase
+      .from('product_lines')
+      .select('id')
+      .eq('company_id', companyId)
+      .limit(1)
+
+    if (error) {
+      setError(error.message)
+      return { canDelete: false, error: error.message }
+    }
+
+    return {
+      canDelete: !data?.length,
+      inUseBy: data?.length ? { lines: true } : null
+    }
+  }
+
+  const checkLineUsage = async (lineId: number) => {
+    const { data, error } = await supabase
+      .from('product_sets')
+      .select('id')
+      .eq('product_line_id', lineId)
+      .limit(1)
+
+    if (error) {
+      setError(error.message)
+      return { canDelete: false, error: error.message }
+    }
+
+    return {
+      canDelete: !data?.length,
+      inUseBy: data?.length ? { sets: true } : null
+    }
+  }
+
+  const checkSetUsage = async (setId: number) => {
+    const { data, error } = await supabase
+      .from('minis')
+      .select('id')
+      .eq('product_set_id', setId)
+      .limit(1)
+
+    if (error) {
+      setError(error.message)
+      return { canDelete: false, error: error.message }
+    }
+
+    return {
+      canDelete: !data?.length,
+      inUseBy: data?.length ? { minis: true } : null
+    }
+  }
+
+  const deleteCompany = async (id: number) => {
+    const { canDelete, inUseBy, error: checkError } = await checkCompanyUsage(id)
+    
+    if (checkError) {
+      setError(checkError)
+      return { error: checkError }
+    }
+
+    if (!canDelete) {
+      const errorMessage = `Cannot delete company because it has product lines`
+      setError(errorMessage)
+      return { error: errorMessage }
+    }
+
+    const { error } = await supabase
+      .from('product_companies')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      setError(error.message)
+      return { error: error.message }
+    }
+
+    return { error: null }
+  }
+
+  const deleteProductLine = async (id: number) => {
+    const { canDelete, inUseBy, error: checkError } = await checkLineUsage(id)
+    
+    if (checkError) {
+      setError(checkError)
+      return { error: checkError }
+    }
+
+    if (!canDelete) {
+      const errorMessage = `Cannot delete product line because it has product sets`
+      setError(errorMessage)
+      return { error: errorMessage }
+    }
+
+    const { error } = await supabase
+      .from('product_lines')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      setError(error.message)
+      return { error: error.message }
+    }
+
+    return { error: null }
+  }
+
+  const deleteProductSet = async (id: number) => {
+    const { canDelete, inUseBy, error: checkError } = await checkSetUsage(id)
+    
+    if (checkError) {
+      setError(checkError)
+      return { error: checkError }
+    }
+
+    if (!canDelete) {
+      const errorMessage = `Cannot delete product set because it has minis`
+      setError(errorMessage)
+      return { error: errorMessage }
+    }
+
+    const { error } = await supabase
+      .from('product_sets')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      setError(error.message)
+      return { error: error.message }
+    }
+
     return { error: null }
   }
 
   return {
-    productGroups,
-    productTypes,
     error,
-    setError,
-    addProductGroup,
-    addProductType,
-    deleteGroup,
-    deleteType,
-    updateGroup,
-    updateType
+    loadCompanies,
+    loadProductLines,
+    loadProductSets,
+    addCompany,
+    addProductLine,
+    addProductSet,
+    editCompany,
+    editProductLine,
+    editProductSet,
+    checkCompanyUsage,
+    checkLineUsage,
+    checkSetUsage,
+    deleteCompany,
+    deleteProductLine,
+    deleteProductSet
   }
 }
-
-export type { ProductGroup, ProductType }

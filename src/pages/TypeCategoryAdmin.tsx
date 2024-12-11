@@ -5,24 +5,24 @@ import AddTypeModal from '../components/AddTypeModal'
 import EditTypeModal from '../components/EditTypeModal'
 import ManageCategoriesModal from '../components/ManageCategoriesModal'
 import DeleteTypeConfirmationModal from '../components/DeleteTypeConfirmationModal'
+import * as UI from '../components/ui'
+import { FaAd, FaAdjust, FaAlgolia, FaArchive, FaList, FaListAlt, FaListOl, FaListUl, FaThList, FaUserCog, FaUsers } from 'react-icons/fa'
 
 export default function TypeCategoryAdmin() {
   const [isAddTypeModalOpen, setIsAddTypeModalOpen] = useState(false)
   const [typeToEdit, setTypeToEdit] = useState<MiniType | null>(null)
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false)
-  const [searchType, setSearchType] = useState('')
   const [selectedType, setSelectedType] = useState<MiniType | null>(null)
-  const [] = useState(false)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [pageInput] = useState('')
   const [typeToDelete, setTypeToDelete] = useState<MiniType | null>(null)
   const [deleteError, setDeleteError] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
   
   const {
     miniTypes,
     categories,
     selectedTypeCategories,
-    totalCount,
     error,
     loadData,
     addType,
@@ -33,35 +33,27 @@ export default function TypeCategoryAdmin() {
     checkTypeUsage
   } = useTypeCategoryAdmin()
 
-  const ITEMS_PER_PAGE = 10
-  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
-
   useEffect(() => {
-    loadData(currentPage, ITEMS_PER_PAGE, searchType)
-  }, [currentPage, searchType])
+    const fetchData = async () => {
+      setIsLoading(true)
+      await loadData(currentPage, 10, searchTerm)
+      setIsLoading(false)
+    }
+    fetchData()
+  }, [currentPage, searchTerm])
+
+  const handleSearch = (term: string) => {
+    setSearchTerm(term)
+    setCurrentPage(1)
+  }
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+  }
 
   const handleTypeSelect = async (type: MiniType) => {
     setSelectedType(type)
     await loadTypeCategoryIds(type.id)
-  }
-
-  const handleSearch = (value: string) => {
-    setSearchType(value)
-    setCurrentPage(1)
-  }
-
-
-
-  const getPageNumbers = () => {
-    const pageNumbers: (number | string)[] = []
-    const startPage = Math.max(1, currentPage - 2)
-    const endPage = Math.min(totalPages, currentPage + 2)
-
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i)
-    }
-
-    return pageNumbers
   }
 
   // Add styles to head of document for custom scrollbar
@@ -134,145 +126,80 @@ export default function TypeCategoryAdmin() {
   return (
     <div className="flex gap-6">
       {/* Left Column - Types */}
-      <div className="flex-1">
-        <div className="mb-4 flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-bold">Character Types</h2>
-            <div className="text-sm text-gray-400">
-              Select a character type to set category relationship(s).
-            </div>
-            <div className="text-sm italic text-gray-500">
-              * Each type can have 0 or any number of categories assigned
+      <UI.Card className="flex-1">
+        <UI.CardHeader>
+          <div className="flex">
+            <UI.CardIcon size="big" className="text-green-700">
+              <FaArchive />
+            </UI.CardIcon>
+            <div>
+              <UI.CardHeaderText>
+                Character Type
+              </UI.CardHeaderText>
+              <UI.CardHeaderSubText>
+                Select a character type to set category relationship(s).
+              </UI.CardHeaderSubText>
+              <UI.CardHeaderItalicText>
+                * Each type can have 0 or any number of categories assigned
+              </UI.CardHeaderItalicText>
             </div>
           </div>
-          <button 
-            className="bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700"
-            onClick={() => setIsAddTypeModalOpen(true)}
-          >
-            + Add Type
-          </button>
-        </div>
-
-        <div className="mb-4">
-          <input
-            type="text"
-            placeholder="Filter types..."
-            value={searchType}
-            onChange={(e) => {
-              handleSearch(e.target.value)
-            }}
-            className="bg-gray-700 p-2 rounded w-64"
-          />
-        </div>
-
-        {/* Table Header */}
-        <div className="bg-gray-700 p-2 rounded-t flex justify-between items-center mb-1">
-          <div className="font-medium">Type Name</div>
-          <div className="w-20"></div>
-        </div>
-
-        {/* Table Content */}
-        <div className="space-y-1">
-          {miniTypes.map(type => (
-            <div 
-              key={type.id}
-              onClick={() => handleTypeSelect(type)}
-              className={`flex items-center justify-between p-2 rounded cursor-pointer ${
-                selectedType?.id === type.id ? 'bg-blue-600' : 'bg-gray-800 hover:bg-gray-700'
-              }`}
+          <UI.CardHeaderRightSide>
+            <UI.Button 
+              variant="btnSuccess"
+              onClick={() => setIsAddTypeModalOpen(true)}
             >
-              <div className="flex items-center gap-2">
-                <span>{type.name}</span>
-              </div>
-              <div className="flex gap-1 w-20 justify-end">
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setTypeToEdit(type);
-                  }}
-                  className="p-1 rounded hover:bg-gray-600"
-                >
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button 
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleDeleteClick(type)
-                  }}
-                  className="p-1 rounded hover:bg-gray-600"
-                >
-                  <svg className="h-4 w-4 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+              + Add Type
+            </UI.Button>
+          </UI.CardHeaderRightSide>
+        </UI.CardHeader>
 
-        {/* Pagination */}
-        {totalCount > ITEMS_PER_PAGE && (
-          <div className="flex justify-between items-center mt-4 text-sm">
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(1)}
-                disabled={currentPage === 1}
-                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                First
-              </button>
-              <button
-                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                «
-              </button>
-            </div>
-            <div className="flex gap-2">
-              {getPageNumbers().map((pageNum, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentPage(Number(pageNum))}
-                  disabled={pageNum === currentPage}
-                  className={`px-3 py-1 rounded ${
-                    pageNum === currentPage
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-700 hover:bg-gray-600'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                »
-              </button>
-              <button
-                onClick={() => setCurrentPage(totalPages)}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Last
-              </button>
-            </div>
+        <UI.CardBody>
+          <div className="mb-4">
+            <UI.SearchInput
+              value={searchTerm}
+              onChange={handleSearch}
+              placeholder="Filter types..."
+              className="w-full"
+            />
           </div>
-        )}
 
-        {/* Optional error message for invalid page input */}
-        {pageInput && parseInt(pageInput) > totalPages && (
-          <div className="text-red-500 text-sm mt-2 text-center">
-            Please enter a page number between 1 and {totalPages}
-          </div>
-        )}
-      </div>
+          {isLoading ? (
+            <UI.LoadingSpinner message="Loading types..." />
+          ) : error ? (
+            <UI.ErrorState 
+              message="Failed to load types" 
+              onRetry={() => handlePageChange(currentPage)} 
+            />
+          ) : (
+            <>
+              <UI.TableHeader title="Type Name" />
+              <div className="space-y-1 min-h-[200px]">
+                {miniTypes.length === 0 ? (
+                  <div className="p-4 text-gray-400 text-center">
+                    No types found
+                  </div>
+                ) : (
+                  miniTypes.map(type => (
+                    <UI.TableRow
+                      key={type.id}
+                      title={type.name}
+                      isSelected={selectedType?.id === type.id}
+                      onSelect={() => handleTypeSelect(type)}
+                      onEdit={() => setTypeToEdit(type)}
+                      onDelete={() => handleDeleteClick(type)}
+                    />
+                  ))
+                )}
+              </div>
+            </>
+          )}
+        </UI.CardBody>
+
+      </UI.Card>
+
+
+
 
       {/* Right Column - Categories */}
       <div className="flex-1">
@@ -350,12 +277,9 @@ export default function TypeCategoryAdmin() {
         onSave={(categoryIds) => updateTypeCategories(selectedType?.id || 0, categoryIds)}
       />
 
-      {/* Error toast */}
-      {deleteError && (
-        <div className="fixed bottom-4 right-4 bg-red-900/90 text-white px-4 py-2 rounded shadow-lg">
-          {deleteError}
-        </div>
-      )}
+      {/* Error states */}
+      {deleteError && <UI.Toast message={deleteError} type="warning" />}
+      {error && <UI.ErrorState message={error} />}
 
       {/* Confirmation Modal */}
       <DeleteTypeConfirmationModal
@@ -367,12 +291,6 @@ export default function TypeCategoryAdmin() {
         onConfirm={handleDeleteConfirm}
         typeName={typeToDelete?.name || ''}
       />
-
-      {error && (
-        <div className="fixed bottom-4 right-4 bg-red-500 text-white p-3 rounded shadow-lg">
-          {error}
-        </div>
-      )}
     </div>
   )
 } 
