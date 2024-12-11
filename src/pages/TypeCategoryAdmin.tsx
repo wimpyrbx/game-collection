@@ -13,6 +13,7 @@ export default function TypeCategoryAdmin() {
   const [searchType, setSearchType] = useState('')
   const [selectedType, setSelectedType] = useState<MiniType | null>(null)
   const [inUseOnly, setInUseOnly] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
   
   const {
     miniTypes,
@@ -31,17 +32,20 @@ export default function TypeCategoryAdmin() {
     await loadTypeCategoryIds(type.id)
   }
 
+  const ITEMS_PER_PAGE = 10
+  
   const filteredTypes = miniTypes
     .filter(type => 
       type.name.toLowerCase().includes(searchType.toLowerCase())
     )
     .sort((a, b) => a.name.localeCompare(b.name))
 
-  const getTypeCategoryCount = (typeId: number): number => {
-    return selectedType?.id === typeId 
-      ? selectedTypeCategories.length 
-      : 0 // Default to 0 for now, adjust as needed
-  }
+  const paginatedTypes = filteredTypes.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  )
+
+  const totalPages = Math.ceil(filteredTypes.length / ITEMS_PER_PAGE)
 
   return (
     <div className="flex gap-6">
@@ -57,15 +61,34 @@ export default function TypeCategoryAdmin() {
           </div>
         </div>
 
+        <div className="flex justify-between items-center mb-4">
+          <input
+            type="text"
+            placeholder="Filter types..."
+            value={searchType}
+            onChange={(e) => {
+              setSearchType(e.target.value)
+              setCurrentPage(1) // Reset to first page when filtering
+            }}
+            className="bg-gray-700 p-2 rounded w-64"
+          />
+          <button 
+            className="bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700"
+            onClick={() => setIsAddTypeModalOpen(true)}
+          >
+            + Add Type
+          </button>
+        </div>
+
         {/* Table Header */}
         <div className="bg-gray-700 p-2 rounded-t flex justify-between items-center mb-1">
           <div className="font-medium">Type Name</div>
-          <div className="w-20"></div> {/* Space for action buttons */}
+          <div className="w-20"></div>
         </div>
 
         {/* Table Content */}
         <div className="space-y-1">
-          {filteredTypes.map(type => (
+          {paginatedTypes.map(type => (
             <div 
               key={type.id}
               onClick={() => handleTypeSelect(type)}
@@ -103,47 +126,82 @@ export default function TypeCategoryAdmin() {
             </div>
           ))}
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-between items-center mt-4 text-sm">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <span className="text-gray-400">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Right Column - Categories */}
       <div className="flex-1">
-        <div className="mb-4">
-          <h2 className="text-xl font-bold">Categories</h2>
-          <div className="text-sm text-gray-400">
-            Selected type: <strong>{selectedType?.name || 'None'}</strong>
+        <div className="mb-4 flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-bold">Categories</h2>
+            <div className="text-sm text-gray-400">
+              Selected type: <strong>{selectedType?.name || 'None'}</strong>
+            </div>
+            <div className="text-sm italic text-gray-500">
+              {!selectedType 
+                ? '* Please select a type to manage its category relationship(s).'
+                : selectedTypeCategories.length === 0
+                  ? '* There is no category relationship setup yet'
+                  : `This type has ${selectedTypeCategories.length} category ${
+                      selectedTypeCategories.length === 1 ? 'relationship' : 'relationships'
+                    }.`}
+            </div>
           </div>
-          <div className="text-sm italic text-gray-500">
-            {!selectedType 
-              ? '* Please select a type to manage its category relationship(s).'
-              : selectedTypeCategories.length === 0
-                ? '* There is no category relationship setup yet'
-                : `This type has ${selectedTypeCategories.length} category ${
-                    selectedTypeCategories.length === 1 ? 'relationship' : 'relationships'
-                  }.`}
-          </div>
+          {selectedType && (
+            <button 
+              className="bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700"
+              onClick={() => setIsCategoryModalOpen(true)}
+            >
+              + Manage Categories
+            </button>
+          )}
         </div>
 
-        {/* Table Header */}
-        <div className="bg-gray-700 p-2 rounded-t flex justify-between items-center mb-1">
-          <div className="font-medium">Category Name</div>
-          <div className="w-10"></div> {/* Space for action buttons */}
-        </div>
+        {selectedType && selectedTypeCategories.length > 0 && (
+          <>
+            {/* Table Header */}
+            <div className="bg-gray-700 p-2 rounded-t flex justify-between items-center mb-1">
+              <div className="font-medium">Category Name</div>
+              <div className="w-10"></div>
+            </div>
 
-        {/* Table Content */}
-        {selectedType && (
-          <div className="space-y-1">
-            {categories
-              .filter(cat => selectedTypeCategories.includes(cat.id))
-              .map(category => (
-                <div 
-                  key={category.id}
-                  className="bg-gray-800 p-2 rounded flex justify-between items-center"
-                >
-                  <span>{category.name}</span>
-                  <div className="w-10"></div>
-                </div>
-              ))}
-          </div>
+            {/* Table Content */}
+            <div className="space-y-1">
+              {categories
+                .filter(cat => selectedTypeCategories.includes(cat.id))
+                .map(category => (
+                  <div 
+                    key={category.id}
+                    className="bg-gray-800 p-2 rounded flex justify-between items-center"
+                  >
+                    <span>{category.name}</span>
+                    <div className="w-10"></div>
+                  </div>
+                ))}
+            </div>
+          </>
         )}
       </div>
 
