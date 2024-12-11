@@ -1,16 +1,15 @@
 import { useState, useEffect } from 'react'
-import { Modal } from './Modal'
-import type { MiniType } from '../lib/supabase'
+import Modal from './Modal'
 
 interface EditTypeModalProps {
-  type: MiniType | null
   isOpen: boolean
   onClose: () => void
-  onEdit: (id: number, name: string) => Promise<{ error: string | null }>
+  onEdit: (id: number, name: string) => void
+  type: { id: number; name: string } | null
 }
 
-export function EditTypeModal({ type, isOpen, onClose, onEdit }: EditTypeModalProps) {
-  const [name, setName] = useState('')
+export default function EditTypeModal({ isOpen, onClose, onEdit, type }: EditTypeModalProps) {
+  const [name, setName] = useState(type?.name || '')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -20,8 +19,7 @@ export function EditTypeModal({ type, isOpen, onClose, onEdit }: EditTypeModalPr
     }
   }, [type])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async () => {
     if (!type) return
 
     setError('')
@@ -39,46 +37,70 @@ export function EditTypeModal({ type, isOpen, onClose, onEdit }: EditTypeModalPr
     }
   }
 
+  const modalFooter = (
+    <div className="flex justify-end gap-4">
+      <button
+        onClick={onClose}
+        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
+      >
+        Cancel
+      </button>
+      <button
+        onClick={handleSubmit}
+        disabled={isSubmitting || !name.trim() || name === type?.name}
+        className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {isSubmitting ? 'Saving...' : 'Save Changes'}
+      </button>
+    </div>
+  )
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Edit Type">
-      <form onSubmit={handleSubmit}>
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-2">
-            Type Name
-          </label>
-          <input
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full bg-gray-700 rounded p-2"
-            placeholder="Enter type name"
-            required
-          />
-        </div>
-
-        {error && (
-          <div className="mb-4 text-red-500 text-sm">
-            {error}
+    <Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
+      <div>
+        {/* Header */}
+        <div className="bg-gray-800 px-6 py-4 rounded-t-lg border-b border-gray-700">
+          <div className="flex justify-between items-start">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-100">
+                Edit Type
+              </h2>
+              <div className="text-sm text-gray-400 mt-1">
+                Type: {type?.name}
+              </div>
+            </div>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-300 -mt-1">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
-        )}
-
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting || !name.trim() || name === type?.name}
-            className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSubmitting ? 'Saving...' : 'Save Changes'}
-          </button>
         </div>
-      </form>
+
+        {/* Body */}
+        <div className="px-6 py-4">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Type Name
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                placeholder="Enter type name"
+              />
+            </div>
+
+            {error && (
+              <div className="text-red-500 text-sm">
+                {error}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </Modal>
   )
 } 

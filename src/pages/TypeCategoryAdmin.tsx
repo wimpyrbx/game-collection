@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 import type { MiniType } from '../lib/supabase'
-import { AddTypeModal } from '../components/AddTypeModal'
-import { EditTypeModal } from '../components/EditTypeModal'
-import { ManageCategoriesModal } from '../components/ManageCategoriesModal'
+import AddTypeModal from '../components/AddTypeModal'
+import EditTypeModal from '../components/EditTypeModal'
+import ManageCategoriesModal from '../components/ManageCategoriesModal'
 import { supabase } from '../lib/supabase'
+import DeleteTypeConfirmationModal from '../components/DeleteTypeConfirmationModal'
 
 export default function TypeCategoryAdmin() {
   const [isAddTypeModalOpen, setIsAddTypeModalOpen] = useState(false)
@@ -14,70 +15,168 @@ export default function TypeCategoryAdmin() {
   const [selectedType, setSelectedType] = useState<MiniType | null>(null)
   const [inUseOnly, setInUseOnly] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pageInput, setPageInput] = useState('')
+  const [typeToDelete, setTypeToDelete] = useState<MiniType | null>(null)
+  const [deleteError, setDeleteError] = useState('')
   
   const {
     miniTypes,
     categories,
     selectedTypeCategories,
+    totalCount,
     error,
+    loadData,
     addType,
     editType,
     deleteType,
     loadTypeCategoryIds,
-    updateTypeCategories
+    updateTypeCategories,
+    checkTypeUsage
   } = useTypeCategoryAdmin()
+
+  const ITEMS_PER_PAGE = 10
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE)
+
+  useEffect(() => {
+    loadData(currentPage, ITEMS_PER_PAGE, searchType)
+  }, [currentPage, searchType])
 
   const handleTypeSelect = async (type: MiniType) => {
     setSelectedType(type)
     await loadTypeCategoryIds(type.id)
   }
 
-  const ITEMS_PER_PAGE = 10
-  
-  const filteredTypes = miniTypes
-    .filter(type => 
-      type.name.toLowerCase().includes(searchType.toLowerCase())
-    )
-    .sort((a, b) => a.name.localeCompare(b.name))
+  const handleSearch = (value: string) => {
+    setSearchType(value)
+    setCurrentPage(1)
+  }
 
-  const paginatedTypes = filteredTypes.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
-  )
+  const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value
+    setPageInput(value)
+  }
 
-  const totalPages = Math.ceil(filteredTypes.length / ITEMS_PER_PAGE)
+  const handlePageInputSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const pageNumber = parseInt(pageInput)
+      if (!isNaN(pageNumber) && pageNumber >= 1 && pageNumber <= totalPages) {
+        setCurrentPage(pageNumber)
+        setPageInput('')
+      }
+    }
+  }
+
+  const getPageNumbers = () => {
+    const pageNumbers: (number | string)[] = []
+    const startPage = Math.max(1, currentPage - 2)
+    const endPage = Math.min(totalPages, currentPage + 2)
+
+    for (let i = startPage; i <= endPage; i++) {
+      pageNumbers.push(i)
+    }
+
+    return pageNumbers
+  }
+
+  // Add styles to head of document for custom scrollbar
+  useEffect(() => {
+    const style = document.createElement('style')
+    style.textContent = `
+      .custom-select::-webkit-scrollbar {
+        width: 8px;
+      }
+      .custom-select::-webkit-scrollbar-track {
+        background: #1a1a1a;
+        border-radius: 4px;
+      }
+      .custom-select::-webkit-scrollbar-thumb {
+        background: #4a5568;
+        border-radius: 4px;
+      }
+      .custom-select::-webkit-scrollbar-thumb:hover {
+        background: #718096;
+      }
+      .custom-select option {
+        padding: 8px;
+        background: #2d3748;
+      }
+      .custom-select option:hover {
+        background: #4a5568;
+      }
+    `
+    document.head.appendChild(style)
+    return () => {
+      document.head.removeChild(style)
+    }
+  }, [])
+
+  // Separate check and confirmation flow
+  const handleDeleteClick = async (type: MiniType) => {
+    setDeleteError('') // Clear any previous errors
+    const { canDelete, error, inUseBy } = await checkTypeUsage(type.id)
+    
+    if (error) {
+      setDeleteError(error)
+      return
+    }
+
+    if (!canDelete) {
+      setDeleteError(`Cannot delete "${type.name}" because it is in use by ${
+        inUseBy.minis ? 'minis' : ''
+      }${inUseBy.minis && inUseBy.categories ? ' and ' : ''}${
+        inUseBy.categories ? 'categories' : ''
+      }`)
+      return
+    }
+
+    // If we can delete, show the confirmation modal
+    setTypeToDelete(type)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!typeToDelete) return
+
+    const { error } = await deleteType(typeToDelete.id)
+    if (error) {
+      setDeleteError(error)
+    } else {
+      setTypeToDelete(null)
+      setDeleteError('')
+    }
+  }
 
   return (
     <div className="flex gap-6">
       {/* Left Column - Types */}
       <div className="flex-1">
-        <div className="mb-4">
-          <h2 className="text-xl font-bold">Character Types</h2>
-          <div className="text-sm text-gray-400">
-            Select a character type to set category relationship(s).
+        <div className="mb-4 flex justify-between items-start">
+          <div>
+            <h2 className="text-xl font-bold">Character Types</h2>
+            <div className="text-sm text-gray-400">
+              Select a character type to set category relationship(s).
+            </div>
+            <div className="text-sm italic text-gray-500">
+              * Each type can have 0 or any number of categories assigned
+            </div>
           </div>
-          <div className="text-sm italic text-gray-500">
-            * Each type can have 0 or any number of categories assigned
-          </div>
-        </div>
-
-        <div className="flex justify-between items-center mb-4">
-          <input
-            type="text"
-            placeholder="Filter types..."
-            value={searchType}
-            onChange={(e) => {
-              setSearchType(e.target.value)
-              setCurrentPage(1) // Reset to first page when filtering
-            }}
-            className="bg-gray-700 p-2 rounded w-64"
-          />
           <button 
             className="bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700"
             onClick={() => setIsAddTypeModalOpen(true)}
           >
             + Add Type
           </button>
+        </div>
+
+        <div className="mb-4">
+          <input
+            type="text"
+            placeholder="Filter types..."
+            value={searchType}
+            onChange={(e) => {
+              handleSearch(e.target.value)
+            }}
+            className="bg-gray-700 p-2 rounded w-64"
+          />
         </div>
 
         {/* Table Header */}
@@ -88,7 +187,7 @@ export default function TypeCategoryAdmin() {
 
         {/* Table Content */}
         <div className="space-y-1">
-          {paginatedTypes.map(type => (
+          {miniTypes.map(type => (
             <div 
               key={type.id}
               onClick={() => handleTypeSelect(type)}
@@ -113,8 +212,8 @@ export default function TypeCategoryAdmin() {
                 </button>
                 <button 
                   onClick={(e) => {
-                    e.stopPropagation();
-                    deleteType(type.id);
+                    e.stopPropagation()
+                    handleDeleteClick(type)
                   }}
                   className="p-1 rounded hover:bg-gray-600"
                 >
@@ -128,25 +227,63 @@ export default function TypeCategoryAdmin() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
+        {totalCount > ITEMS_PER_PAGE && (
           <div className="flex justify-between items-center mt-4 text-sm">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Previous
-            </button>
-            <span className="text-gray-400">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                First
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                «
+              </button>
+            </div>
+            <div className="flex gap-2">
+              {getPageNumbers().map((pageNum, index) => (
+                <button
+                  key={index}
+                  onClick={() => setCurrentPage(Number(pageNum))}
+                  disabled={pageNum === currentPage}
+                  className={`px-3 py-1 rounded ${
+                    pageNum === currentPage
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-700 hover:bg-gray-600'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                »
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Last
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Optional error message for invalid page input */}
+        {pageInput && parseInt(pageInput) > totalPages && (
+          <div className="text-red-500 text-sm mt-2 text-center">
+            Please enter a page number between 1 and {totalPages}
           </div>
         )}
       </div>
@@ -223,8 +360,26 @@ export default function TypeCategoryAdmin() {
         isOpen={isCategoryModalOpen}
         onClose={() => setIsCategoryModalOpen(false)}
         categories={categories}
-        selectedCategoryIds={selectedTypeCategories}
+        selectedCategories={selectedTypeCategories}
         onSave={(categoryIds) => updateTypeCategories(selectedType?.id || 0, categoryIds)}
+      />
+
+      {/* Error toast */}
+      {deleteError && (
+        <div className="fixed bottom-4 right-4 bg-red-900/90 text-white px-4 py-2 rounded shadow-lg">
+          {deleteError}
+        </div>
+      )}
+
+      {/* Confirmation Modal */}
+      <DeleteTypeConfirmationModal
+        isOpen={!!typeToDelete}
+        onClose={() => {
+          setTypeToDelete(null)
+          setDeleteError('')
+        }}
+        onConfirm={handleDeleteConfirm}
+        typeName={typeToDelete?.name || ''}
       />
 
       {error && (

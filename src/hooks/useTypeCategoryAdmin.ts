@@ -6,17 +6,27 @@ export function useTypeCategoryAdmin() {
   const [miniTypes, setMiniTypes] = useState<MiniType[]>([])
   const [categories, setCategories] = useState<MiniCategory[]>([])
   const [selectedTypeCategories, setSelectedTypeCategories] = useState<number[]>([])
+  const [totalCount, setTotalCount] = useState(0)
   const [error, setError] = useState('')
 
   useEffect(() => {
     loadData()
   }, [])
 
-  async function loadData() {
+  async function loadData(page: number = 1, pageSize: number = 10, search: string = '') {
+    // First get total count
+    const { count } = await supabase
+      .from('mini_types')
+      .select('*', { count: 'exact', head: true })
+      .ilike('name', `%${search}%`)
+
+    // Then get paginated data
     const { data: types } = await supabase
       .from('mini_types')
       .select('*')
+      .ilike('name', `%${search}%`)
       .order('name')
+      .range((page - 1) * pageSize, page * pageSize - 1)
     
     const { data: cats } = await supabase
       .from('mini_categories')
@@ -25,6 +35,7 @@ export function useTypeCategoryAdmin() {
     
     if (types) setMiniTypes(types)
     if (cats) setCategories(cats)
+    if (count !== null) setTotalCount(count)
   }
 
   async function loadTypeCategoryIds(typeId: number) {
@@ -43,15 +54,42 @@ export function useTypeCategoryAdmin() {
       return { error: 'Name is required' }
     }
 
-    const { error } = await supabase
+    // First check if name already exists
+    const checkQuery = supabase
+      .from('mini_types')
+      .select('name')
+      .ilike('name', name.trim())
+      .single()
+
+    console.log('Checking for existing type:', name.trim())
+    const { data: existingType, error: checkError } = await checkQuery
+
+    if (existingType) {
+      const error = 'A type with this name already exists'
+      setError(error)
+      return { error }
+    }
+
+    const insertQuery = supabase
       .from('mini_types')
       .insert([{ name: name.trim() }])
+
+    console.log('Inserting new type:', { name: name.trim() })
+    const { data, error } = await insertQuery
     
     if (error) {
+      console.error('Insert error:', error)
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      })
       setError(error.message)
       return { error: error.message }
     }
 
+    console.log('Insert result:', data)
     loadData()
     return { error: null }
   }
@@ -77,33 +115,71 @@ export function useTypeCategoryAdmin() {
     return { error: null }
   }
 
-  async function deleteType(id: number) {
-    setError('')
-    
-    // First check if type has any category relationships
-    const { data: relationships } = await supabase
+  async function checkTypeUsage(typeId: number) {
+    // Check mini_to_types
+    const { data: miniUsage, error: miniError } = await supabase
+      .from('mini_to_types')
+      .select('mini_id')
+      .eq('type_id', typeId)
+      .limit(1)
+
+    if (miniError) {
+      console.error('Error checking mini usage:', miniError)
+      return { error: miniError.message }
+    }
+
+    // Check type_to_categories
+    const { data: categoryUsage, error: categoryError } = await supabase
       .from('type_to_categories')
       .select('category_id')
-      .eq('type_id', id)
+      .eq('type_id', typeId)
+      .limit(1)
+
+    if (categoryError) {
+      console.error('Error checking category usage:', categoryError)
+      return { error: categoryError.message }
+    }
+
+    return {
+      canDelete: !miniUsage?.length && !categoryUsage?.length,
+      inUseBy: {
+        minis: miniUsage?.length > 0,
+        categories: categoryUsage?.length > 0
+      }
+    }
+  }
+
+  async function deleteType(typeId: number) {
+    // First check if type can be deleted
+    const { canDelete, inUseBy, error: checkError } = await checkTypeUsage(typeId)
     
-    if (relationships && relationships.length > 0) {
-      const error = `Cannot delete: This type has ${relationships.length} category relationship${relationships.length === 1 ? '' : 's'}`
-      setError(error)
-      return { error }
+    if (checkError) {
+      setError(checkError)
+      return { error: checkError, canDelete: false, inUseBy }
+    }
+
+    if (!canDelete) {
+      const errorMessage = `Cannot delete type because it is in use by ${
+        inUseBy.minis ? 'minis' : ''
+      }${inUseBy.minis && inUseBy.categories ? ' and ' : ''}${
+        inUseBy.categories ? 'categories' : ''
+      }`
+      setError(errorMessage)
+      return { error: errorMessage, canDelete: false, inUseBy }
     }
 
     const { error } = await supabase
       .from('mini_types')
       .delete()
-      .eq('id', id)
-    
+      .eq('id', typeId)
+
     if (error) {
       setError(error.message)
-      return { error: error.message }
+      return { error: error.message, canDelete: false }
     }
 
     loadData()
-    return { error: null }
+    return { error: null, canDelete: true }
   }
 
   async function updateTypeCategories(typeId: number, categoryIds: number[]) {
@@ -140,11 +216,14 @@ export function useTypeCategoryAdmin() {
     miniTypes,
     categories,
     selectedTypeCategories,
+    totalCount,
     error,
+    loadData,
     addType,
     editType,
     deleteType,
     loadTypeCategoryIds,
-    updateTypeCategories
+    updateTypeCategories,
+    checkTypeUsage
   }
 } 
