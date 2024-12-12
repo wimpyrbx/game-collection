@@ -43,34 +43,48 @@ export function useProductAdmin() {
     return { data, count }
   }
 
-  const loadProductLines = async (companyId: number) => {
-    const { data, error } = await supabase
+  const loadProductLines = async (companyId: number, offset: number, limit: number, search = '') => {
+    let query = supabase
       .from('product_lines')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('company_id', companyId)
+      
+    if (search) {
+      query = query.ilike('name', `%${search}%`)
+    }
+    
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
       .order('name')
     
     if (error) {
       console.error('Error loading product lines:', error)
-      return []
+      return { data: [], count: 0 }
     }
 
-    return data || []
+    return { data, count }
   }
 
-  const loadProductSets = async (lineId: number) => {
-    const { data, error } = await supabase
+  const loadProductSets = async (lineId: number, offset: number, limit: number, search = '') => {
+    let query = supabase
       .from('product_sets')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('product_line_id', lineId)
+      
+    if (search) {
+      query = query.ilike('name', `%${search}%`)
+    }
+    
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
       .order('name')
     
     if (error) {
       console.error('Error loading product sets:', error)
-      return []
+      return { data: [], count: 0 }
     }
 
-    return data || []
+    return { data, count }
   }
 
   const addCompany = async (name: string) => {
@@ -283,7 +297,7 @@ export function useProductAdmin() {
     }
 
     if (!canDelete) {
-      const errorMessage = `Cannot delete product set because it has minis`
+      const errorMessage = `Cannot delete product set because it is in use`
       setError(errorMessage)
       return { error: errorMessage }
     }

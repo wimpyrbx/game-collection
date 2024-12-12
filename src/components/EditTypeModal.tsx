@@ -1,106 +1,75 @@
 import { useState, useEffect } from 'react'
 import * as UI from './ui'
+import { FaArchive } from 'react-icons/fa'
 
 interface EditTypeModalProps {
   isOpen: boolean
   onClose: () => void
-  onEdit: (id: number, name: string) => void
-  type: { id: number; name: string } | null
+  onSubmit: (name: string) => Promise<void>
+  initialName: string
+  isLoading?: boolean
 }
 
-export default function EditTypeModal({ isOpen, onClose, onEdit, type }: EditTypeModalProps) {
-  const [name, setName] = useState(type?.name || '')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState('')
+export default function EditTypeModal({ 
+  isOpen, 
+  onClose, 
+  onSubmit,
+  initialName,
+  isLoading 
+}: EditTypeModalProps) {
+  const [name, setName] = useState(initialName)
 
   useEffect(() => {
-    if (type) {
-      setName(type.name)
-    }
-  }, [type])
+    setName(initialName)
+  }, [initialName])
 
-  const handleSubmit = async () => {
-    if (!type) return
-
-    setError('')
-    setIsSubmitting(true)
-
-    try {
-      await onEdit(type.id, name)
-      onClose()
-    } catch (error) {
-      if (error instanceof Error) {
-        setError(error.message)
-      } else {
-        setError('An unknown error occurred')
-      }
-    } finally {
-      setIsSubmitting(false)
-    }
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim() || name === initialName) return
+    await onSubmit(name.trim())
   }
 
-  const modalFooter = (
-    <div className="flex justify-end gap-4">
-      <button
-        onClick={onClose}
-        className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
-      >
-        Cancel
-      </button>
-      <button
-        onClick={handleSubmit}
-        disabled={isSubmitting || !name.trim() || name === type?.name}
-        className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {isSubmitting ? 'Saving...' : 'Save Changes'}
-      </button>
-    </div>
-  )
-
   return (
-    <UI.Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
-      <div>
-        {/* Header */}
-        <div className="bg-gray-800 px-6 py-4 rounded-t-lg border-b border-gray-700">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-100">
-                Edit Type
-              </h2>
-              <div className="text-sm text-gray-400 mt-1">
-                Type: {type?.name}
-              </div>
+    <UI.Modal isOpen={isOpen} onClose={onClose}>
+      <form onSubmit={handleSubmit}>
+        <UI.ModalHeader>
+          <div className="flex items-center gap-3">
+            <div className="text-xl text-blue-600">
+              <FaArchive />
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-300 -mt-1">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <h2 className="text-xl font-semibold">Edit Mini Type</h2>
           </div>
-        </div>
+        </UI.ModalHeader>
 
-        {/* Body */}
-        <div className="px-6 py-4">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Type Name
-              </label>
-              <UI.SearchInput
-                value={name}
-                onChange={(value) => setName(value)}
-                placeholder="Enter type name"
-              />
-            </div>
+        <UI.ModalBody>
+          <UI.Input
+            label="Type Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter type name"
+            required
+            autoFocus
+          />
+        </UI.ModalBody>
 
-            {error && (
-              <div className="text-red-500 text-sm">
-                {error}
-              </div>
-            )}
+        <UI.ModalFooter>
+          <div className="flex justify-end gap-2">
+            <UI.Button
+              variant="btnPrimary"
+              onClick={onClose}
+            >
+              Cancel
+            </UI.Button>
+            <UI.Button
+              variant="btnSuccess"
+              type="submit"
+              disabled={isLoading || !name.trim() || name === initialName}
+            >
+              {isLoading ? 'Saving...' : 'Save Changes'}
+            </UI.Button>
           </div>
-        </div>
-      </div>
+        </UI.ModalFooter>
+      </form>
     </UI.Modal>
   )
 } 

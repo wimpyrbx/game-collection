@@ -45,7 +45,7 @@ export function DeleteConfirmModal({
 
         <UI.ModalBody>
           <p className="text-gray-300">{message}</p>
-          <p className="mt-2 font-semibold text-gray-300">"{itemName}"</p>
+          <p className="mt-2 font-semibold text-gray-300"><strong>"{itemName}"</strong></p>
         </UI.ModalBody>
 
         <UI.ModalFooter>

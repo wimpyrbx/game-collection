@@ -1,35 +1,39 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import * as UI from './ui'
+import { FaListAlt } from 'react-icons/fa'
+
+interface Category {
+  id: number
+  name: string
+}
 
 interface ManageCategoriesModalProps {
   isOpen: boolean
   onClose: () => void
-  type: { id: number; name: string } | null
-  selectedCategories: number[]
-  onSave: (categoryIds: number[]) => void
-  categories: { id: number; name: string }[]
+  onSubmit: (categoryIds: number[]) => Promise<void>
+  categories: Category[]
+  selectedCategoryIds: number[]
+  isLoading?: boolean
 }
 
 export default function ManageCategoriesModal({ 
   isOpen, 
   onClose, 
-  type,
-  selectedCategories = [],
-  onSave,
-  categories = []
+  onSubmit,
+  categories = [],
+  selectedCategoryIds = [],
+  isLoading
 }: ManageCategoriesModalProps) {
   const [selected, setSelected] = useState<number[]>([])
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
-    if (isOpen) {
-      setSelected(selectedCategories)
-    }
-  }, [isOpen])
+    setSelected(selectedCategoryIds)
+  }, [selectedCategoryIds])
 
-  const handleSave = async () => {
-    await onSave(selected)
-    onClose()  // Close modal after saving
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await onSubmit(selected)
   }
 
   const filteredCategories = useMemo(() => 
@@ -47,61 +51,27 @@ export default function ManageCategoriesModal({
     )
   }, [])
 
-  const modalFooter = (
-    <div className="flex justify-between items-center">
-      <div className="text-sm text-gray-500 italic">
-        {selected.length} categories selected
-      </div>
-      <div className="flex gap-4">
-        <button
-          onClick={onClose}
-          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={handleSave}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded"
-        >
-          Save Changes
-        </button>
-      </div>
-    </div>
-  )
-
   return (
-    <UI.Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
-      <div>
-        {/* Header */}
-        <div className="bg-gray-800 px-6 py-4 rounded-t-lg border-b border-gray-700">
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-100">
-                Manage Categories
-              </h2>
-              <div className="text-sm text-gray-400 mt-1">
-                Type: {type?.name}
-              </div>
+    <UI.Modal isOpen={isOpen} onClose={onClose}>
+      <form onSubmit={handleSubmit}>
+        <UI.ModalHeader>
+          <div className="flex items-center gap-3">
+            <div className="text-xl text-blue-600">
+              <FaListAlt />
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-300 -mt-1">
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            <h2 className="text-xl font-semibold">Manage Categories</h2>
           </div>
-        </div>
+        </UI.ModalHeader>
 
-        {/* Body */}
-        <div className="px-6 py-4">
-          <input
-            type="text"
-            placeholder="Search categories..."
+        <UI.ModalBody>
+          <UI.SearchInput
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            placeholder="Search categories..."
+            className="w-full mb-4"
           />
 
-          <div className="mt-4 max-h-[400px] overflow-y-auto">
+          <div className="max-h-[400px] overflow-y-auto">
             {filteredCategories.map(category => {
               const isSelected = selected.includes(category.id)
               
@@ -136,8 +106,31 @@ export default function ManageCategoriesModal({
               )
             })}
           </div>
-        </div>
-      </div>
+        </UI.ModalBody>
+
+        <UI.ModalFooter>
+          <div className="flex justify-between items-center w-full">
+            <div className="text-sm text-gray-500 italic">
+              {selected.length} categories selected
+            </div>
+            <div className="flex gap-2">
+              <UI.Button
+                variant="btnPrimary"
+                onClick={onClose}
+              >
+                Cancel
+              </UI.Button>
+              <UI.Button
+                variant="btnSuccess"
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Saving...' : 'Save Changes'}
+              </UI.Button>
+            </div>
+          </div>
+        </UI.ModalFooter>
+      </form>
     </UI.Modal>
   )
 } 

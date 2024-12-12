@@ -13,34 +13,39 @@ export function useTypeCategoryAdmin() {
     loadData()
   }, [])
 
-  async function loadData(page: number = 1, pageSize: number = 10, search: string = '') {
-    
-    const { count } = await supabase
-      .from('mini_types')
-      .select('*', { count: 'exact', head: true })
-      .ilike('name', `%${search}%`)
+  async function loadData(offset: number = 0, limit: number = 10, search: string = '') {
+    try {
+      let query = supabase
+        .from('mini_types')
+        .select('*', { count: 'exact' })
+      
+      if (search) {
+        query = query.ilike('name', `%${search}%`)
+      }
+      
+      const { data: types, error: typesError, count } = await query
+        .range(offset, offset + limit - 1)
+        .order('name')
 
-    const { data: types } = await supabase
-      .from('mini_types')
-      .select('*')
-      .ilike('name', `%${search}%`)
-      .order('name')
-      .range((page - 1) * pageSize, page * pageSize - 1)
-    
-    const { data: cats } = await supabase
-      .from('mini_categories')
-      .select('*')
-      .order('name')
-    
-    if (types) setMiniTypes(types)
-    if (cats) setCategories(cats)
-    if (count !== null) setTotalCount(count)
+      if (typesError) throw typesError
 
-    const result = {
-      miniTypes: types || [],
-      totalCount: count || 0
+      const { data: cats, error: catsError } = await supabase
+        .from('mini_categories')
+        .select('*')
+        .order('name')
+
+      if (catsError) throw catsError
+
+      if (types) setMiniTypes(types)
+      if (cats) setCategories(cats)
+      if (count !== null) setTotalCount(count)
+
+      return { data: types || [], count }
+    } catch (err) {
+      console.error('Error loading data:', err)
+      setError(err instanceof Error ? err.message : 'An error occurred')
+      return { data: [], count: 0 }
     }
-    return result
   }
 
   async function loadTypeCategoryIds(typeId: number) {

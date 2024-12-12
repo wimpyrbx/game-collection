@@ -80,7 +80,7 @@ export function AdminTableSection<T extends { id: number }>({
               <UI.Button 
                 variant="btnSuccess"
                 onClick={onAdd}
-                disabled={addButtonDisabled}
+                disabled={addButtonDisabled || loading}
               >
                 {addButtonLabel}
               </UI.Button>
@@ -96,28 +96,29 @@ export function AdminTableSection<T extends { id: number }>({
                 onChange={(e) => searchProps.onChange(e.target.value)}
                 placeholder={searchProps.placeholder}
                 className="w-full"
+                disabled={loading}
               />
             </div>
           )}
 
           <UI.TableHeader title={title} />
 
-          {loading ? (
-            <UI.LoadingSpinner message={`Loading ${title.toLowerCase()}...`} />
-          ) : items.length === 0 ? (
-            <UI.EmptyTableState icon={<Icon />} message={emptyMessage} />
-          ) : (
-            items.map((item) => (
-              <UI.TableRow
-                key={item.id}
-                title={getItemName(item)}
-                isSelected={selectedItem?.id === item.id}
-                onSelect={onSelect ? () => onSelect(item) : undefined}
-                onEdit={onEdit ? () => onEdit(item) : undefined}
-                onDelete={onDelete ? () => onDelete(item) : undefined}
-              />
-            ))
-          )}
+          <div className={loading ? 'opacity-50 pointer-events-none' : ''}>
+            {items.length === 0 ? (
+              <UI.EmptyTableState icon={<Icon />} message={emptyMessage} />
+            ) : (
+              items.map((item) => (
+                <UI.TableRow
+                  key={item.id}
+                  title={getItemName(item)}
+                  isSelected={selectedItem?.id === item.id}
+                  onSelect={onSelect ? () => onSelect(item) : undefined}
+                  onEdit={onEdit ? () => onEdit(item) : undefined}
+                  onDelete={onDelete ? () => onDelete(item) : undefined}
+                />
+              ))
+            )}
+          </div>
         </UI.CardBody>
       </UI.Card>
 
@@ -127,6 +128,7 @@ export function AdminTableSection<T extends { id: number }>({
           totalItems={pagination.totalItems}
           itemsPerPage={pagination.itemsPerPage}
           onPageChange={pagination.onPageChange}
+          disabled={loading}
         />
       )}
     </div>
