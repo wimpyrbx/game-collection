@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react'
 import { useProductAdmin } from '../hooks/useProductAdmin'
 import * as UI from '../components/ui'
-import { AddCompanyModal, EditCompanyModal, DeleteCompanyModal } from '../components/companies'
+import { AddProductCompanyModal, EditProductCompanyModal, DeleteProductCompanyModal } from '../components/product-companies'
+import { AddProductLineModal, EditProductLineModal, DeleteProductLineModal } from '../components/product-lines'
+import { AddProductSetModal, EditProductSetModal, DeleteProductSetModal } from '../components/product-sets'
 import { FaBuilding, FaList, FaListAlt } from 'react-icons/fa'
 
 interface Company {
   id: number
   name: string
-  description?: string
 }
 
 interface ProductLine {
@@ -57,6 +58,8 @@ export default function ProductAdmin() {
   const [showEditLine, setShowEditLine] = useState(false)
   const [showEditSet, setShowEditSet] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDeleteLine, setShowDeleteLine] = useState(false)
+  const [showDeleteSet, setShowDeleteSet] = useState(false)
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null)
 
   // Search state
@@ -106,9 +109,9 @@ export default function ProductAdmin() {
     refreshCompanies(page, searchCompany)
   }
 
-  const handleAddCompany = async (name: string, description: string) => {
+  const handleAddCompany = async (name: string) => {
     setLoadingCompanies(true)
-    const { error } = await addCompany(name, description)
+    const { error } = await addCompany(name)
     if (!error) {
       setShowAddCompany(false)
       refreshCompanies(companyPage, searchCompany)
@@ -116,9 +119,9 @@ export default function ProductAdmin() {
     setLoadingCompanies(false)
   }
 
-  const handleEditCompany = async (id: number, name: string, description: string) => {
+  const handleEditCompany = async (id: number, name: string) => {
     setLoadingCompanies(true)
-    const { error } = await editCompany(id, name, description)
+    const { error } = await editCompany(id, name)
     if (!error) {
       setShowEditCompany(false)
       refreshCompanies(companyPage, searchCompany)
@@ -160,10 +163,88 @@ export default function ProductAdmin() {
     }
   }
 
+  const handleAddProductLine = async (name: string) => {
+    if (!selectedCompany) return
+    setLoadingProductLines(true)
+    const { error } = await addProductLine(name, selectedCompany.id)
+    if (!error) {
+      setShowAddLine(false)
+      refreshProductLines(selectedCompany.id)
+    }
+    setLoadingProductLines(false)
+  }
+
+  const handleEditProductLine = async (id: number, name: string) => {
+    if (!selectedCompany) return
+    setLoadingProductLines(true)
+    const { error } = await editProductLine(id, name)
+    if (!error) {
+      setShowEditLine(false)
+      refreshProductLines(selectedCompany.id)
+    }
+    setLoadingProductLines(false)
+  }
+
+  const handleDeleteProductLine = async (line: ProductLine) => {
+    setSelectedLine(line)
+    setShowDeleteLine(true)
+  }
+
+  const confirmDeleteLine = async () => {
+    if (!selectedLine || !selectedCompany) return
+    setLoadingProductLines(true)
+    const { error } = await deleteProductLine(selectedLine.id)
+    if (!error) {
+      setShowDeleteLine(false)
+      setSelectedLine(null)
+      refreshProductLines(selectedCompany.id)
+    }
+    setLoadingProductLines(false)
+  }
+
   // Product Sets handlers
   const refreshProductSets = async (lineId: number) => {
     const data = await loadProductSets(lineId)
     setProductSets(data)
+  }
+
+  const handleAddProductSet = async (name: string) => {
+    if (!selectedLine) return
+    setLoadingProductSets(true)
+    const { error } = await addProductSet(name, selectedLine.id)
+    if (!error) {
+      setShowAddSet(false)
+      refreshProductSets(selectedLine.id)
+    }
+    setLoadingProductSets(false)
+  }
+
+  const handleEditProductSet = async (id: number, name: string) => {
+    if (!selectedLine) return
+    setLoadingProductSets(true)
+    const { error } = await editProductSet(id, name)
+    if (!error) {
+      setShowEditSet(false)
+      refreshProductSets(selectedLine.id)
+    }
+    setLoadingProductSets(false)
+  }
+
+  const handleDeleteProductSet = async (set: ProductSet) => {
+    setSelectedSet(set)
+    setShowDeleteSet(true)
+  }
+
+  const confirmDeleteSet = async () => {
+    if (!selectedSet || !selectedLine) return
+    setLoadingProductSets(true)
+    const { error } = await deleteProductSet(selectedSet.id)
+    if (!error) {
+      setShowDeleteSet(false)
+      setSelectedSet(null)
+      refreshProductSets(selectedLine.id)
+    }
+    setLoadingProductSets(false)
   }
 
   // Effects
@@ -391,14 +472,14 @@ export default function ProductAdmin() {
       </div>
 
       {/* Company Modals */}
-      <AddCompanyModal
+      <AddProductCompanyModal
         isOpen={showAddCompany}
         onClose={() => setShowAddCompany(false)}
         onAdd={handleAddCompany}
         isLoading={loadingCompanies}
       />
 
-      <EditCompanyModal
+      <EditProductCompanyModal
         isOpen={showEditCompany}
         onClose={() => setShowEditCompany(false)}
         onEdit={handleEditCompany}
@@ -406,7 +487,7 @@ export default function ProductAdmin() {
         isLoading={loadingCompanies}
       />
 
-      <DeleteCompanyModal
+      <DeleteProductCompanyModal
         isOpen={showDeleteConfirm}
         onClose={() => {
           setShowDeleteConfirm(false)
@@ -415,6 +496,54 @@ export default function ProductAdmin() {
         onConfirm={confirmDelete}
         company={companyToDelete}
         isLoading={loadingCompanies}
+      />
+
+      {/* Product Line Modals */}
+      <AddProductLineModal
+        isOpen={showAddLine}
+        onClose={() => setShowAddLine(false)}
+        onAdd={handleAddProductLine}
+        isLoading={loadingProductLines}
+      />
+
+      <EditProductLineModal
+        isOpen={showEditLine}
+        onClose={() => setShowEditLine(false)}
+        onEdit={handleEditProductLine}
+        productLine={selectedLine}
+        isLoading={loadingProductLines}
+      />
+
+      <DeleteProductLineModal
+        isOpen={showDeleteLine}
+        onClose={() => setShowDeleteLine(false)}
+        onConfirm={confirmDeleteLine}
+        productLine={selectedLine}
+        isLoading={loadingProductLines}
+      />
+
+      {/* Product Set Modals */}
+      <AddProductSetModal
+        isOpen={showAddSet}
+        onClose={() => setShowAddSet(false)}
+        onAdd={handleAddProductSet}
+        isLoading={loadingProductSets}
+      />
+
+      <EditProductSetModal
+        isOpen={showEditSet}
+        onClose={() => setShowEditSet(false)}
+        onEdit={handleEditProductSet}
+        productSet={selectedSet}
+        isLoading={loadingProductSets}
+      />
+
+      <DeleteProductSetModal
+        isOpen={showDeleteSet}
+        onClose={() => setShowDeleteSet(false)}
+        onConfirm={confirmDeleteSet}
+        productSet={selectedSet}
+        isLoading={loadingProductSets}
       />
     </>
   )
