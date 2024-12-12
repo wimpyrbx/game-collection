@@ -198,62 +198,62 @@ export default function TypeCategoryAdmin() {
 
       </UI.Card>
 
-
-
-
       {/* Right Column - Categories */}
-      <div className="flex-1">
-        <div className="mb-4 flex justify-between items-start">
-          <div>
-            <h2 className="text-xl font-bold">Categories</h2>
-            <div className="text-sm text-gray-400">
-              Selected type: <strong>{selectedType?.name || 'None'}</strong>
-            </div>
-            <div className="text-sm italic text-gray-500">
-              {!selectedType 
-                ? '* Please select a type to manage its category relationship(s).'
-                : selectedTypeCategories.length === 0
-                  ? '* There is no category relationship setup yet'
-                  : `This type has ${selectedTypeCategories.length} category ${
-                      selectedTypeCategories.length === 1 ? 'relationship' : 'relationships'
-                    }.`}
+      <UI.Card className="flex-1">
+        <UI.CardHeader>
+          <div className="flex">
+            <UI.CardIcon size="big" className="text-blue-700">
+              <FaListAlt />
+            </UI.CardIcon>
+            <div>
+              <UI.CardHeaderText>
+                Categories
+              </UI.CardHeaderText>
+              <UI.CardHeaderSubText>
+                Selected type: <strong>{selectedType?.name || 'None'}</strong>
+              </UI.CardHeaderSubText>
+              <UI.CardHeaderItalicText>
+                {!selectedType 
+                  ? '* Please select a type to manage its category relationship(s).'
+                  : selectedTypeCategories.length === 0
+                    ? '* There is no category relationship setup yet'
+                    : `This type has ${selectedTypeCategories.length} category ${
+                        selectedTypeCategories.length === 1 ? 'relationship' : 'relationships'
+                      }.`}
+              </UI.CardHeaderItalicText>
             </div>
           </div>
-          {selectedType && (
-            <button 
-              className="bg-green-600 px-3 py-1 rounded text-sm hover:bg-green-700"
-              onClick={() => setIsCategoryModalOpen(true)}
-            >
-              + Manage Categories
-            </button>
+          <UI.CardHeaderRightSide>
+            {selectedType && (
+              <UI.Button 
+                variant="btnSuccess"
+                onClick={() => setIsCategoryModalOpen(true)}
+              >
+                + Manage Categories
+              </UI.Button>
+            )}
+          </UI.CardHeaderRightSide>
+        </UI.CardHeader>
+
+        <UI.CardBody>
+          {selectedType && selectedTypeCategories.length > 0 && (
+            <>
+              <UI.TableHeader title="Category Name" />
+              <div className="space-y-1">
+                {categories
+                  .filter(cat => selectedTypeCategories.includes(cat.id))
+                  .map(category => (
+                    <UI.TableRow
+                      key={category.id}
+                      title={category.name}
+                      hideActions
+                    />
+                  ))}
+              </div>
+            </>
           )}
-        </div>
-
-        {selectedType && selectedTypeCategories.length > 0 && (
-          <>
-            {/* Table Header */}
-            <div className="bg-gray-700 p-2 rounded-t flex justify-between items-center mb-1">
-              <div className="font-medium">Category Name</div>
-              <div className="w-10"></div>
-            </div>
-
-            {/* Table Content */}
-            <div className="space-y-1">
-              {categories
-                .filter(cat => selectedTypeCategories.includes(cat.id))
-                .map(category => (
-                  <div 
-                    key={category.id}
-                    className="bg-gray-800 p-2 rounded flex justify-between items-center"
-                  >
-                    <span>{category.name}</span>
-                    <div className="w-10"></div>
-                  </div>
-                ))}
-            </div>
-          </>
-        )}
-      </div>
+        </UI.CardBody>
+      </UI.Card>
 
       <AddTypeModal
         isOpen={isAddTypeModalOpen}
