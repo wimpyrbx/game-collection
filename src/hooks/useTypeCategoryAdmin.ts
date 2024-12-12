@@ -14,6 +14,8 @@ export function useTypeCategoryAdmin() {
   }, [])
 
   async function loadData(offset: number = 0, limit: number = 10, search: string = '') {
+    setCurrentPaginationState({ offset, limit, search })
+    
     try {
       let query = supabase
         .from('mini_types')
@@ -43,8 +45,9 @@ export function useTypeCategoryAdmin() {
       return { data: types || [], count }
     } catch (err) {
       console.error('Error loading data:', err)
-      setError(err instanceof Error ? err.message : 'An error occurred')
-      return { data: [], count: 0 }
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      setError(errorMessage)
+      return { data: [], count: 0, error: errorMessage }
     }
   }
 
@@ -58,40 +61,40 @@ export function useTypeCategoryAdmin() {
   }
 
   async function addType(name: string) {
-    setError('')
-    if (!name.trim()) {
-      setError('Name is required')
-      return { error: 'Name is required' }
+    try {
+      // First check if name already exists
+      const { data: existingType, error: checkError } = await supabase
+        .from('mini_types')
+        .select('id')
+        .ilike('name', name.trim())
+        .maybeSingle()
+
+      if (checkError) {
+        return { error: checkError.message }
+      }
+
+      if (existingType) {
+        return { error: 'A type with this name already exists' }
+      }
+
+      const { data, error: insertError } = await supabase
+        .from('mini_types')
+        .insert([{ name: name.trim() }])
+        .select()
+        .single()
+
+      if (insertError) {
+        return { error: insertError.message }
+      }
+
+      // Reload data with current pagination state
+      const { offset, limit, search } = getCurrentPaginationState()
+      await loadData(offset, limit, search)
+      return { data }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      return { error: errorMessage }
     }
-
-    // First check if name already exists
-    const checkQuery = supabase
-      .from('mini_types')
-      .select('name')
-      .ilike('name', name.trim())
-      .single()
-
-    const { data: existingType } = await checkQuery
-
-    if (existingType) {
-      const error = 'A type with this name already exists'
-      setError(error)
-      return { error }
-    }
-
-    const insertQuery = supabase
-      .from('mini_types')
-      .insert([{ name: name.trim() }])
-
-    const { data, error } = await insertQuery
-    
-    if (error) {
-      setError(error.message)
-      return { error: error.message }
-    }
-
-    loadData()
-    return { error: null }
   }
 
   async function editType(id: number, name: string) {
@@ -111,7 +114,9 @@ export function useTypeCategoryAdmin() {
       return { error: error.message }
     }
 
-    loadData()
+    // Reload data with current pagination state
+    const { offset, limit, search } = getCurrentPaginationState()
+    await loadData(offset, limit, search)
     return { error: null }
   }
 
@@ -176,7 +181,9 @@ export function useTypeCategoryAdmin() {
       return { error: error.message, canDelete: false }
     }
 
-    loadData()
+    // Reload data with current pagination state
+    const { offset, limit, search } = getCurrentPaginationState()
+    await loadData(offset, limit, search)
     return { error: null, canDelete: true }
   }
 
@@ -208,6 +215,17 @@ export function useTypeCategoryAdmin() {
 
     loadTypeCategoryIds(typeId)
     return { error: null }
+  }
+
+  // Add state for current pagination
+  const [currentPaginationState, setCurrentPaginationState] = useState({
+    offset: 0,
+    limit: 10,
+    search: ''
+  })
+
+  function getCurrentPaginationState() {
+    return currentPaginationState
   }
 
   return {

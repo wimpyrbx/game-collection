@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useProductAdmin } from '../hooks/useProductAdmin'
-import { useNotification } from '../hooks/useNotification'
+import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
 import { ProductLineModal, ProductSetModal, ProductCompanyModal } from '../components/productadmin'
@@ -24,8 +24,19 @@ interface ProductSet {
 }
 
 export default function ProductAdmin() {
+  // Data state
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [productLines, setProductLines] = useState<ProductLine[]>([])
+  const [productSets, setProductSets] = useState<ProductSet[]>([])
+  const [totalCompanies, setTotalCompanies] = useState(0)
+  const [totalLines, setTotalLines] = useState(0)
+  const [totalSets, setTotalSets] = useState(0)
+
   // Admin hooks
-  const companyPagination = useAdminPagination({ itemsPerPage: 10 })
+  const companyPagination = useAdminPagination({ 
+    itemsPerPage: 10,
+    totalItems: totalCompanies 
+  })
   const companySearch = useAdminSearch({ searchFields: ['name'] })
   const linePagination = useAdminPagination({ itemsPerPage: 10 })
   const lineSearch = useAdminSearch({ searchFields: ['name'] })
@@ -49,13 +60,7 @@ export default function ProductAdmin() {
     deleteProductSet
   } = useProductAdmin()
 
-  const { showSuccess, showError, notification } = useNotification()
-
-  // Data state
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [productLines, setProductLines] = useState<ProductLine[]>([])
-  const [productSets, setProductSets] = useState<ProductSet[]>([])
-  const [totalCompanies, setTotalCompanies] = useState(0)
+  const { showSuccess, showError, showWarning } = useNotifications()
 
   // Selection state
   const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
@@ -115,6 +120,12 @@ export default function ProductAdmin() {
     if (data) {
       setCompanies(data)
       setTotalCompanies(count || 0)
+      
+      // Keep current page within bounds when total changes
+      const maxPage = Math.ceil((count || 0) / companyPagination.itemsPerPage)
+      if (maxPage > 0 && page > maxPage) {
+        companyPagination.handlePageChange(maxPage)
+      }
     }
   }
 
@@ -134,6 +145,7 @@ export default function ProductAdmin() {
     }
     if (data) {
       setProductLines(data)
+      setTotalLines(count || 0)
     }
   }
 
@@ -153,6 +165,7 @@ export default function ProductAdmin() {
     }
     if (data) {
       setProductSets(data)
+      setTotalSets(count || 0)
     }
   }
 
@@ -160,7 +173,11 @@ export default function ProductAdmin() {
   const handleAddCompany = async (name: string) => {
     const { error } = await loading.withLoading(addCompany(name))
     if (error) {
-      showError(`Failed to add company: ${error}`)
+      if (error.includes('duplicate')) {
+        showError('A company with this name already exists')
+      } else {
+        showError(`Failed to add company: ${error}`)
+      }
       return
     }
     
@@ -216,7 +233,11 @@ export default function ProductAdmin() {
 
     const { error } = await loading.withLoading(addProductLine(name, selectedCompany.id))
     if (error) {
-      showError(`Failed to add product line: ${error}`)
+      if (error.includes('duplicate')) {
+        showError('A product line with this name already exists')
+      } else {
+        showError(`Failed to add product line: ${error}`)
+      }
       return
     }
     
@@ -271,7 +292,11 @@ export default function ProductAdmin() {
 
     const { error } = await loading.withLoading(addProductSet(name, selectedLine.id))
     if (error) {
-      showError(`Failed to add product set: ${error}`)
+      if (error.includes('duplicate')) {
+        showError('A product set with this name already exists')
+      } else {
+        showError(`Failed to add product set: ${error}`)
+      }
       return
     }
     
@@ -315,15 +340,7 @@ export default function ProductAdmin() {
   }
 
   // Filter and paginate items
-  const filteredCompanies = companySearch.filterItems(companies)
-  const paginatedCompanies = companyPagination.getPageItems(filteredCompanies)
-  
-  const filteredLines = lineSearch.filterItems(productLines)
-  const paginatedLines = linePagination.getPageItems(filteredLines)
-  
-  const filteredSets = setSearch.filterItems(productSets)
-  const paginatedSets = setPagination.getPageItems(filteredSets)
-
+  // Remove client-side filtering and pagination
   return (
     <>
       <div className="grid grid-cols-3 gap-4">
@@ -331,7 +348,7 @@ export default function ProductAdmin() {
         <UI.AdminTableSection
           title="Companies"
           icon={FaBuilding}
-          items={paginatedCompanies}
+          items={companies}
           selectedItem={selectedCompany}
           onSelect={(company) => {
             setSelectedCompany(company)
@@ -352,8 +369,13 @@ export default function ProductAdmin() {
             placeholder: "Search companies..."
           }}
           pagination={{
-            ...companyPagination.paginationProps,
-            totalItems: totalCompanies
+            currentPage: companyPagination.currentPage,
+            totalItems: totalCompanies,
+            itemsPerPage: companyPagination.itemsPerPage,
+            onPageChange: (page) => {
+              companyPagination.handlePageChange(page)
+              setSelectedCompany(null)
+            }
           }}
           getItemName={(item) => item.name}
         />
@@ -362,7 +384,7 @@ export default function ProductAdmin() {
         <UI.AdminTableSection
           title="Product Lines"
           icon={FaList}
-          items={paginatedLines}
+          items={productLines}
           selectedItem={selectedLine}
           onSelect={(line) => {
             setSelectedLine(line)
@@ -385,8 +407,13 @@ export default function ProductAdmin() {
             placeholder: "Search product lines..."
           }}
           pagination={{
-            ...linePagination.paginationProps,
-            totalItems: filteredLines.length
+            currentPage: linePagination.currentPage,
+            totalItems: totalLines,
+            itemsPerPage: linePagination.itemsPerPage,
+            onPageChange: (page) => {
+              linePagination.handlePageChange(page)
+              setSelectedLine(null)
+            }
           }}
           getItemName={(item) => item.name}
         />
@@ -395,7 +422,7 @@ export default function ProductAdmin() {
         <UI.AdminTableSection
           title="Product Sets"
           icon={FaListAlt}
-          items={paginatedSets}
+          items={productSets}
           selectedItem={selectedSet}
           onSelect={setSelectedSet}
           onAdd={() => setShowAddSet(true)}
@@ -414,8 +441,13 @@ export default function ProductAdmin() {
             placeholder: "Search product sets..."
           }}
           pagination={{
-            ...setPagination.paginationProps,
-            totalItems: filteredSets.length
+            currentPage: setPagination.currentPage,
+            totalItems: totalSets,
+            itemsPerPage: setPagination.itemsPerPage,
+            onPageChange: (page) => {
+              setPagination.handlePageChange(page)
+              setSelectedSet(null)
+            }
           }}
           getItemName={(item) => item.name}
         />
@@ -525,13 +557,6 @@ export default function ProductAdmin() {
         <UI.Toast
           message={error}
           type="error"
-        />
-      )}
-
-      {notification.isVisible && (
-        <UI.Toast
-          message={notification.message}
-          type={notification.type}
         />
       )}
     </>

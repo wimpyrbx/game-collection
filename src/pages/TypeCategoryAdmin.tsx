@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
-import { useNotification } from '../hooks/useNotification'
+import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import type { MiniType } from '../lib/supabase'
 import AddTypeModal from '../components/AddTypeModal'
@@ -12,7 +12,11 @@ import { FaArchive, FaListAlt } from 'react-icons/fa'
 
 export default function TypeCategoryAdmin() {
   // Admin hooks
-  const pagination = useAdminPagination({ itemsPerPage: 10 })
+  const [totalTypes, setTotalTypes] = useState(0)
+  const pagination = useAdminPagination({ 
+    itemsPerPage: 10,
+    totalItems: totalTypes 
+  })
   const search = useAdminSearch({ searchFields: ['name'] })
   const loading = useAdminLoading()
 
@@ -23,8 +27,7 @@ export default function TypeCategoryAdmin() {
   const [selectedType, setSelectedType] = useState<MiniType | null>(null)
   const [typeToDelete, setTypeToDelete] = useState<MiniType | null>(null)
   const [deleteError, setDeleteError] = useState('')
-  const [totalTypes, setTotalTypes] = useState(0)
-  
+
   const {
     miniTypes,
     categories,
@@ -39,18 +42,22 @@ export default function TypeCategoryAdmin() {
     checkTypeUsage
   } = useTypeCategoryAdmin()
 
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showWarning } = useNotifications()
 
   // Load data with pagination and search
   useEffect(() => {
     const fetchData = async () => {
-      const { data, count } = await loading.withLoading(
+      const { data, count, error } = await loading.withLoading(
         loadData(
           (pagination.currentPage - 1) * pagination.itemsPerPage,
           pagination.itemsPerPage,
           search.searchTerm
         )
       )
+      if (error) {
+        showError(error)
+        return
+      }
       if (count !== undefined) {
         setTotalTypes(count)
       }
@@ -58,9 +65,24 @@ export default function TypeCategoryAdmin() {
     fetchData()
   }, [pagination.currentPage, search.searchTerm])
 
+  // Keep current page within bounds when total changes
+  useEffect(() => {
+    const maxPage = Math.ceil(totalTypes / pagination.itemsPerPage)
+    if (maxPage > 0 && pagination.currentPage > maxPage) {
+      pagination.handlePageChange(maxPage)
+    }
+  }, [totalTypes, pagination.itemsPerPage])
+
   const handleTypeSelect = async (type: MiniType) => {
-    setSelectedType(type)
-    await loading.withLoading(loadTypeCategoryIds(type.id))
+    try {
+      setSelectedType(type)
+      const result = await loading.withLoading(loadTypeCategoryIds(type.id))
+      if (result?.error) {
+        showError(result.error)
+      }
+    } catch (error) {
+      showError('An error occurred while loading categories')
+    }
   }
 
   // Delete handling
@@ -112,9 +134,31 @@ export default function TypeCategoryAdmin() {
     }.`
   }
 
-  // Filter and paginate items
-  const filteredTypes = search.filterItems(miniTypes)
-  const paginatedTypes = pagination.getPageItems(filteredTypes)
+  const handleAddType = async (name: string) => {
+    if (!name.trim()) {
+      showError('Name is required')
+      return
+    }
+
+    const result = await loading.withLoading(addType(name))
+    
+    if (result.error) {
+      showError(result.error)
+      return
+    }
+    
+    showSuccess('Type added successfully')
+    setIsAddTypeModalOpen(false)
+  }
+
+  const handleDeleteType = async (id: number) => {
+    try {
+      await deleteType(id)
+      showSuccess('Type deleted successfully')
+    } catch (error) {
+      showWarning('Cannot delete type that has categories')
+    }
+  }
 
   return (
     <div className="grid grid-cols-12 gap-4">
@@ -123,7 +167,7 @@ export default function TypeCategoryAdmin() {
         <UI.AdminTableSection
           title="Mini Types"
           icon={FaArchive}
-          items={paginatedTypes}
+          items={miniTypes}
           selectedItem={selectedType}
           onSelect={handleTypeSelect}
           onAdd={() => setIsAddTypeModalOpen(true)}
@@ -139,8 +183,13 @@ export default function TypeCategoryAdmin() {
             placeholder: "Search mini types..."
           }}
           pagination={{
-            ...pagination.paginationProps,
-            totalItems: totalTypes
+            currentPage: pagination.currentPage,
+            totalItems: totalTypes,
+            itemsPerPage: pagination.itemsPerPage,
+            onPageChange: (page) => {
+              pagination.handlePageChange(page)
+              setSelectedType(null) // Clear selection when changing pages
+            }
           }}
           getItemName={(item) => item.name}
         />
@@ -179,13 +228,7 @@ export default function TypeCategoryAdmin() {
         <AddTypeModal
           isOpen={isAddTypeModalOpen}
           onClose={() => setIsAddTypeModalOpen(false)}
-          onSubmit={async (name) => {
-            const result = await loading.withLoading(addType(name))
-            if (!result.error) {
-              showSuccess('Type added successfully')
-              setIsAddTypeModalOpen(false)
-            }
-          }}
+          onSubmit={handleAddType}
           isLoading={loading.isLoading}
         />
       )}
@@ -232,19 +275,7 @@ export default function TypeCategoryAdmin() {
         typeName={typeToDelete?.name || ''}
       />
 
-      {deleteError && (
-        <UI.Toast
-          message={deleteError}
-          type="error"
-        />
-      )}
-
-      {error && (
-        <UI.Toast
-          message={error}
-          type="error"
-        />
-      )}
+      {error && showError(error)}
     </div>
   )
 } 

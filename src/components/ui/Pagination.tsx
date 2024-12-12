@@ -3,6 +3,7 @@ interface PaginationProps {
   totalItems: number
   itemsPerPage: number
   onPageChange: (page: number) => void
+  disabled?: boolean
   className?: string
 }
 
@@ -11,6 +12,7 @@ export function Pagination({
   totalItems,
   itemsPerPage,
   onPageChange,
+  disabled = false,
   className = ''
 }: PaginationProps) {
   const totalPages = Math.ceil(totalItems / itemsPerPage)
@@ -18,88 +20,75 @@ export function Pagination({
   // Don't render if there's only 1 page or no items
   if (totalPages <= 1) return null
 
-  const getPageNumbers = (current: number, total: number) => {
-    const pageNumbers: (number | string)[] = []
-    const startPage = Math.max(1, current - 2)
-    const endPage = Math.min(total, current + 2)
-
-    // Add first page with ellipsis if there's a gap at the start
-    if (startPage > 2) {
-      pageNumbers.push(1)
-      pageNumbers.push('...')
-    } else if (startPage === 2) {
-      pageNumbers.push(1)
+  const getPageNumbers = () => {
+    const pages: number[] = []
+    
+    // Add pages from current-2 to current+2
+    for (let i = -2; i <= 2; i++) {
+      const pageNum = currentPage + i
+      if (pageNum > 0 && pageNum <= totalPages) {
+        pages.push(pageNum)
+      }
     }
-
-    // Add the center range of pages
-    for (let i = startPage; i <= endPage; i++) {
-      pageNumbers.push(i)
-    }
-
-    // Add last page with ellipsis if there's a gap at the end
-    if (endPage < total - 1) {
-      pageNumbers.push('...')
-      pageNumbers.push(total)
-    } else if (endPage === total - 1) {
-      pageNumbers.push(total)
-    }
-
-    return pageNumbers
+    
+    return pages
   }
 
   const PageButton = ({ 
     page, 
-    disabled = false, 
+    isDisabled = false, 
+    isCurrent = false,
     children 
   }: { 
-    page: number | string, 
-    disabled?: boolean, 
+    page: number, 
+    isDisabled?: boolean, 
+    isCurrent?: boolean,
     children: React.ReactNode 
-  }) => {
-    // If page is ellipsis, render it without click handler
-    if (page === '...') {
-      return <span className="px-3 py-1">{page}</span>
-    }
-
-    return (
-      <button
-        onClick={() => onPageChange(page as number)}
-        disabled={disabled}
-        className={`px-3 py-1 rounded ${
-          page === currentPage
-            ? 'bg-blue-600 text-white'
-            : 'bg-gray-700 hover:bg-gray-600'
-        } disabled:opacity-50 disabled:cursor-not-allowed`}
-      >
-        {children}
-      </button>
-    )
-  }
+  }) => (
+    <button
+      onClick={() => onPageChange(page)}
+      disabled={isDisabled || disabled}
+      className={`
+        px-2 py-1 rounded
+        ${isCurrent ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}
+        disabled:opacity-50 disabled:cursor-not-allowed
+      `}
+    >
+      {children}
+    </button>
+  )
 
   return (
     <div className={`flex justify-between items-center text-sm ${className}`}>
+      {/* Left section - First and Previous */}
       <div className="flex gap-2">
-        <PageButton page={1} disabled={currentPage === 1}>
+        <PageButton page={1} isDisabled={currentPage === 1}>
           First
         </PageButton>
-        <PageButton page={currentPage - 1} disabled={currentPage === 1}>
+        <PageButton page={currentPage - 1} isDisabled={currentPage === 1}>
           «
         </PageButton>
       </div>
 
+      {/* Center section - Page numbers */}
       <div className="flex gap-2">
-        {getPageNumbers(currentPage, totalPages).map((pageNum, idx) => (
-          <PageButton key={`${pageNum}-${idx}`} page={pageNum}>
+        {getPageNumbers().map(pageNum => (
+          <PageButton
+            key={pageNum}
+            page={pageNum}
+            isCurrent={pageNum === currentPage}
+          >
             {pageNum}
           </PageButton>
         ))}
       </div>
 
+      {/* Right section - Next and Last */}
       <div className="flex gap-2">
-        <PageButton page={currentPage + 1} disabled={currentPage === totalPages}>
+        <PageButton page={currentPage + 1} isDisabled={currentPage === totalPages}>
           »
         </PageButton>
-        <PageButton page={totalPages} disabled={currentPage === totalPages}>
+        <PageButton page={totalPages} isDisabled={currentPage === totalPages}>
           Last ({totalPages})
         </PageButton>
       </div>

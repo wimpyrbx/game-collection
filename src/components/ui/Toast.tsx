@@ -4,36 +4,23 @@ import { useEffect, useState } from 'react'
 interface ToastProps {
   message: string
   type?: 'error' | 'warning' | 'success'
-  duration?: number // duration in seconds
 }
 
-export function Toast({ message, type = 'error', duration = 2 }: ToastProps) {
+export function Toast({ message, type = 'error' }: ToastProps) {
   const [isVisible, setIsVisible] = useState(true)
-  const [shouldRender, setShouldRender] = useState(true)
 
   useEffect(() => {
+    // Start fade out animation after 2.7s (total duration 3s with 0.3s animation)
     const timer = setTimeout(() => {
       setIsVisible(false)
-    }, duration * 1000)
+    }, 2700)
 
     return () => clearTimeout(timer)
-  }, [duration])
-
-  useEffect(() => {
-    if (!isVisible) {
-      const timer = setTimeout(() => {
-        setShouldRender(false)
-      }, 300) // match this with transition duration
-
-      return () => clearTimeout(timer)
-    }
-  }, [isVisible])
-
-  if (!shouldRender) return null
+  }, [])
 
   const bgColor = {
     error: 'bg-red-500',
-    warning: 'bg-red-900',
+    warning: 'bg-yellow-500',
     success: 'bg-green-500'
   }[type]
 
@@ -44,17 +31,16 @@ export function Toast({ message, type = 'error', duration = 2 }: ToastProps) {
   }[type]
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999]">
-      <div 
-        className={`
-          ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg border border-red-950 
-          flex items-center gap-3 transition-opacity duration-300
-          ${isVisible ? 'opacity-100' : 'opacity-0'}
-        `}
-      >
-        {icon}
-        <span>{message}</span>
-      </div>
+    <div 
+      className={`
+        ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg
+        flex items-center gap-3 min-w-[300px] max-w-[500px]
+        transform transition-all duration-300 ease-in-out
+        ${isVisible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}
+      `}
+    >
+      {icon}
+      <span className="text-sm font-medium">{message}</span>
     </div>
   )
 } 

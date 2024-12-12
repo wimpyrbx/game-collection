@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface UseAdminPaginationProps {
   itemsPerPage?: number
   defaultPage?: number
+  totalItems?: number
 }
 
 interface UseAdminPaginationReturn {
@@ -22,21 +23,28 @@ interface UseAdminPaginationReturn {
 
 export function useAdminPagination({
   itemsPerPage = 10,
-  defaultPage = 1
+  defaultPage = 1,
+  totalItems = 0
 }: UseAdminPaginationProps = {}): UseAdminPaginationReturn {
   const [currentPage, setCurrentPage] = useState(defaultPage)
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage))
+
+  // Ensure current page is within valid range
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(Math.max(1, totalPages))
+    }
+  }, [totalPages, currentPage])
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page)
+    // Ensure page is within valid range
+    const validPage = Math.max(1, Math.min(page, totalPages))
+    setCurrentPage(validPage)
   }
 
   const getPageItems = <T>(items: T[]): T[] => {
     const startIndex = (currentPage - 1) * itemsPerPage
-    return items.slice(startIndex, startIndex + itemsPerPage)
-  }
-
-  const getTotalPages = (totalItems: number): number => {
-    return Math.ceil(totalItems / itemsPerPage)
+    return items.slice(startIndex, Math.min(startIndex + itemsPerPage, items.length))
   }
 
   return {
@@ -44,11 +52,11 @@ export function useAdminPagination({
     setCurrentPage,
     itemsPerPage,
     getPageItems,
-    totalPages: 0, // This will be calculated when items are passed to getPageItems
+    totalPages,
     handlePageChange,
     paginationProps: {
       currentPage,
-      totalItems: 0, // This will be updated when used
+      totalItems,
       itemsPerPage,
       onPageChange: handlePageChange
     }
