@@ -24,28 +24,56 @@ interface ProductSet {
 }
 
 export default function ProductAdmin() {
-  // Data state
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [productLines, setProductLines] = useState<ProductLine[]>([])
-  const [productSets, setProductSets] = useState<ProductSet[]>([])
-  const [totalCompanies, setTotalCompanies] = useState(0)
-  const [totalLines, setTotalLines] = useState(0)
-  const [totalSets, setTotalSets] = useState(0)
+  // Consolidated state
+  const [state, setState] = useState<{
+    companies: Company[]
+    productLines: ProductLine[]
+    productSets: ProductSet[]
+    totals: {
+      companies: number
+      lines: number
+      sets: number
+    }
+    selected: {
+      company: Company | null
+      line: ProductLine | null
+      set: ProductSet | null
+    }
+    modal: {
+      type: 'addCompany' | 'editCompany' | 'deleteCompany' | 
+            'addLine' | 'editLine' | 'deleteLine' |
+            'addSet' | 'editSet' | 'deleteSet' | null
+      isOpen: boolean
+      data?: any
+    }
+  }>({
+    companies: [],
+    productLines: [],
+    productSets: [],
+    totals: { companies: 0, lines: 0, sets: 0 },
+    selected: { company: null, line: null, set: null },
+    modal: { type: null, isOpen: false }
+  })
 
   // Admin hooks
   const companyPagination = useAdminPagination({ 
     itemsPerPage: 10,
-    totalItems: totalCompanies 
+    totalItems: state.totals.companies 
   })
   const companySearch = useAdminSearch({ searchFields: ['name'] })
-  const linePagination = useAdminPagination({ itemsPerPage: 10 })
+  const linePagination = useAdminPagination({ 
+    itemsPerPage: 10,
+    totalItems: state.totals.lines 
+  })
   const lineSearch = useAdminSearch({ searchFields: ['name'] })
-  const setPagination = useAdminPagination({ itemsPerPage: 10 })
+  const setPagination = useAdminPagination({ 
+    itemsPerPage: 10,
+    totalItems: state.totals.sets 
+  })
   const setSearch = useAdminSearch({ searchFields: ['name'] })
   const loading = useAdminLoading()
 
   const {
-    error,
     loadCompanies,
     loadProductLines,
     loadProductSets,
@@ -60,505 +88,363 @@ export default function ProductAdmin() {
     deleteProductSet
   } = useProductAdmin()
 
-  const { showSuccess, showError, showWarning } = useNotifications()
+  const { showSuccess, showError } = useNotifications()
 
-  // Selection state
-  const [selectedCompany, setSelectedCompany] = useState<Company | null>(null)
-  const [selectedLine, setSelectedLine] = useState<ProductLine | null>(null)
-  const [selectedSet, setSelectedSet] = useState<ProductSet | null>(null)
+  // Generic refresh function
+  const refresh = async (type: 'companies' | 'lines' | 'sets', params?: any) => {
+    try {
+      let result
+      switch (type) {
+        case 'companies':
+          result = await loading.withLoading(
+            loadCompanies(
+              (companyPagination.currentPage - 1) * companyPagination.itemsPerPage,
+              companyPagination.itemsPerPage,
+              companySearch.searchTerm
+            )
+          )
+          if (result.error) throw new Error(result.error)
+          setState(prev => ({
+            ...prev,
+            companies: result.data || [],
+            totals: { ...prev.totals, companies: result.count || 0 }
+          }))
+          break
 
-  // Modal states
-  const [showAddCompany, setShowAddCompany] = useState(false)
-  const [showAddLine, setShowAddLine] = useState(false)
-  const [showAddSet, setShowAddSet] = useState(false)
-  const [showEditCompany, setShowEditCompany] = useState(false)
-  const [showEditLine, setShowEditLine] = useState(false)
-  const [showEditSet, setShowEditSet] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showDeleteLine, setShowDeleteLine] = useState(false)
-  const [showDeleteSet, setShowDeleteSet] = useState(false)
-  const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null)
+        case 'lines':
+          if (!state.selected.company) return
+          result = await loading.withLoading(
+            loadProductLines(
+              state.selected.company.id,
+              (linePagination.currentPage - 1) * linePagination.itemsPerPage,
+              linePagination.itemsPerPage,
+              lineSearch.searchTerm
+            )
+          )
+          if (result.error) throw new Error(result.error)
+          setState(prev => ({
+            ...prev,
+            productLines: result.data || [],
+            totals: { ...prev.totals, lines: result.count || 0 }
+          }))
+          break
 
-  // Load initial data and handle search/pagination
+        case 'sets':
+          if (!state.selected.line) return
+          result = await loading.withLoading(
+            loadProductSets(
+              state.selected.line.id,
+              (setPagination.currentPage - 1) * setPagination.itemsPerPage,
+              setPagination.itemsPerPage,
+              setSearch.searchTerm
+            )
+          )
+          if (result.error) throw new Error(result.error)
+          setState(prev => ({
+            ...prev,
+            productSets: result.data || [],
+            totals: { ...prev.totals, sets: result.count || 0 }
+          }))
+          break
+      }
+    } catch (error) {
+      showError(`Failed to load ${type}: ${error.message}`)
+    }
+  }
+
+  // Load data effects
   useEffect(() => {
-    refreshCompanies(companyPagination.currentPage, companySearch.searchTerm)
+    refresh('companies')
   }, [companyPagination.currentPage, companySearch.searchTerm])
 
   useEffect(() => {
-    if (selectedCompany) {
-      refreshProductLines(selectedCompany.id, linePagination.currentPage, lineSearch.searchTerm)
+    if (state.selected.company) {
+      refresh('lines')
     } else {
-      setProductLines([])
-      setSelectedLine(null)
+      setState(prev => ({
+        ...prev,
+        productLines: [],
+        selected: { ...prev.selected, line: null }
+      }))
     }
-  }, [selectedCompany, linePagination.currentPage, lineSearch.searchTerm])
+  }, [state.selected.company, linePagination.currentPage, lineSearch.searchTerm])
 
   useEffect(() => {
-    if (selectedLine) {
-      refreshProductSets(selectedLine.id, setPagination.currentPage, setSearch.searchTerm)
+    if (state.selected.line) {
+      refresh('sets')
     } else {
-      setProductSets([])
-      setSelectedSet(null)
+      setState(prev => ({
+        ...prev,
+        productSets: [],
+        selected: { ...prev.selected, set: null }
+      }))
     }
-  }, [selectedLine, setPagination.currentPage, setSearch.searchTerm])
+  }, [state.selected.line, setPagination.currentPage, setSearch.searchTerm])
 
-  // Companies handlers
-  const refreshCompanies = async (page = 1, searchTerm = '') => {
-    const { data, count, error } = await loading.withLoading(
-      loadCompanies(
-        (page - 1) * companyPagination.itemsPerPage,
-        companyPagination.itemsPerPage,
-        searchTerm
-      )
-    )
+  // Generic modal action handler
+  const handleModalAction = async (action: string, data?: any) => {
+    try {
+      let result
+      switch (action) {
+        case 'addCompany':
+          result = await loading.withLoading(addCompany(data))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Company added successfully')
+          refresh('companies')
+          break
 
-    if (error) {
-      showError('Failed to load companies')
-      return
-    }
+        case 'editCompany':
+          result = await loading.withLoading(editCompany(state.modal.data.id, data))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Company updated successfully')
+          refresh('companies')
+          break
 
-    if (data) {
-      setCompanies(data)
-      setTotalCompanies(count || 0)
-      
-      // Keep current page within bounds when total changes
-      const maxPage = Math.ceil((count || 0) / companyPagination.itemsPerPage)
-      if (maxPage > 0 && page > maxPage) {
-        companyPagination.handlePageChange(maxPage)
+        case 'deleteCompany':
+          result = await loading.withLoading(deleteCompany(state.modal.data.id))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Company deleted successfully')
+          if (state.selected.company?.id === state.modal.data.id) {
+            setState(prev => ({
+              ...prev,
+              selected: { ...prev.selected, company: null }
+            }))
+          }
+          refresh('companies')
+          break
+
+        case 'addLine':
+          if (!state.selected.company) return
+          result = await loading.withLoading(addProductLine(
+            String(data?.name || data),
+            state.selected.company.id
+          ))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Product line added successfully')
+          refresh('lines')
+          break
+
+        case 'editLine':
+          result = await loading.withLoading(editProductLine(state.modal.data.id, String(data?.name || data)))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Product line updated successfully')
+          refresh('lines')
+          break
+
+        case 'deleteLine':
+          result = await loading.withLoading(deleteProductLine(state.modal.data.id))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Product line deleted successfully')
+          if (state.selected.line?.id === state.modal.data.id) {
+            setState(prev => ({
+              ...prev,
+              selected: { ...prev.selected, line: null }
+            }))
+          }
+          refresh('lines')
+          break
+
+        case 'addSet':
+          if (!state.selected.line) return
+          result = await loading.withLoading(addProductSet(
+            String(data?.name || data),
+            state.selected.line.id
+          ))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Product set added successfully')
+          refresh('sets')
+          break
+
+        case 'editSet':
+          result = await loading.withLoading(editProductSet(state.modal.data.id, String(data?.name || data)))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Product set updated successfully')
+          refresh('sets')
+          break
+
+        case 'deleteSet':
+          result = await loading.withLoading(deleteProductSet(state.modal.data.id))
+          if (result.error) throw new Error(result.error)
+          showSuccess('Product set deleted successfully')
+          if (state.selected.set?.id === state.modal.data.id) {
+            setState(prev => ({
+              ...prev,
+              selected: { ...prev.selected, set: null }
+            }))
+          }
+          refresh('sets')
+          break
       }
+      setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))
+    } catch (error) {
+      showError(error.message)
     }
   }
 
-  // Product Lines handlers
-  const refreshProductLines = async (companyId: number, page = 1, searchTerm = '') => {
-    const { data, count, error } = await loading.withLoading(
-      loadProductLines(
-        companyId,
-        (page - 1) * linePagination.itemsPerPage,
-        linePagination.itemsPerPage,
-        searchTerm
-      )
-    )
-    if (error) {
-      showError('Failed to load product lines')
-      return
-    }
-    if (data) {
-      setProductLines(data)
-      setTotalLines(count || 0)
-    }
-  }
-
-  // Product Sets handlers
-  const refreshProductSets = async (lineId: number, page = 1, searchTerm = '') => {
-    const { data, count, error } = await loading.withLoading(
-      loadProductSets(
-        lineId,
-        (page - 1) * setPagination.itemsPerPage,
-        setPagination.itemsPerPage,
-        searchTerm
-      )
-    )
-    if (error) {
-      showError('Failed to load product sets')
-      return
-    }
-    if (data) {
-      setProductSets(data)
-      setTotalSets(count || 0)
-    }
-  }
-
-  // Company handlers
-  const handleAddCompany = async (name: string) => {
-    const { error } = await loading.withLoading(addCompany(name))
-    if (error) {
-      if (error.includes('duplicate')) {
-        showError('A company with this name already exists')
-      } else {
-        showError(`Failed to add company: ${error}`)
-      }
-      return
-    }
-    
-    showSuccess('Company added successfully')
-    setShowAddCompany(false)
-    refreshCompanies(companyPagination.currentPage, companySearch.searchTerm)
-  }
-
-  const handleEditCompany = async (id: number, name: string) => {
-    const { error } = await loading.withLoading(editCompany(id, name))
-    if (error) {
-      showError(`Failed to edit company: ${error}`)
-      return
-    }
-    
-    showSuccess('Company updated successfully')
-    setShowEditCompany(false)
-    refreshCompanies(companyPagination.currentPage, companySearch.searchTerm)
-  }
-
-  const handleDeleteCompany = async (company: Company) => {
-    const { data: productLines } = await loading.withLoading(loadProductLines(company.id, 0, 1000))
-    if (productLines && productLines.length > 0) {
-      showError('Cannot delete company that has product lines')
-      return
-    }
-    
-    setCompanyToDelete(company)
-    setShowDeleteConfirm(true)
-  }
-
-  const confirmDelete = async () => {
-    if (!companyToDelete) return
-
-    const { error } = await loading.withLoading(deleteCompany(companyToDelete.id))
-    if (error) {
-      showError(`Failed to delete company: ${error}`)
-      return
-    }
-    
-    showSuccess('Company deleted successfully')
-    if (selectedCompany?.id === companyToDelete.id) {
-      setSelectedCompany(null)
-    }
-    setShowDeleteConfirm(false)
-    setCompanyToDelete(null)
-    refreshCompanies(companyPagination.currentPage, companySearch.searchTerm)
-  }
-
-  // Product Line handlers
-  const handleAddProductLine = async (name: string) => {
-    if (!selectedCompany) return
-
-    const { error } = await loading.withLoading(addProductLine(name, selectedCompany.id))
-    if (error) {
-      if (error.includes('duplicate')) {
-        showError('A product line with this name already exists')
-      } else {
-        showError(`Failed to add product line: ${error}`)
-      }
-      return
-    }
-    
-    showSuccess('Product line added successfully')
-    setShowAddLine(false)
-    refreshProductLines(selectedCompany.id)
-  }
-
-  const handleEditProductLine = async (id: number, name: string) => {
-    if (!selectedCompany) return
-
-    const { error } = await loading.withLoading(editProductLine(id, name))
-    if (error) {
-      showError(`Failed to edit product line: ${error}`)
-      return
-    }
-    
-    showSuccess('Product line updated successfully')
-    setShowEditLine(false)
-    refreshProductLines(selectedCompany.id)
-  }
-
-  const handleDeleteProductLine = async (line: ProductLine) => {
-    const { data: productSets } = await loading.withLoading(loadProductSets(line.id, 0, 1000))
-    if (productSets && productSets.length > 0) {
-      showError('Cannot delete product line that has product sets')
-      return
-    }
-
-    setSelectedLine(line)
-    setShowDeleteLine(true)
-  }
-
-  const confirmDeleteLine = async () => {
-    if (!selectedLine || !selectedCompany) return
-
-    const { error } = await loading.withLoading(deleteProductLine(selectedLine.id))
-    if (error) {
-      showError(`Failed to delete product line: ${error}`)
-      return
-    }
-    
-    showSuccess('Product line deleted successfully')
-    setShowDeleteLine(false)
-    setSelectedLine(null)
-    refreshProductLines(selectedCompany.id)
-  }
-
-  // Product Set handlers
-  const handleAddProductSet = async (name: string) => {
-    if (!selectedLine) return
-
-    const { error } = await loading.withLoading(addProductSet(name, selectedLine.id))
-    if (error) {
-      if (error.includes('duplicate')) {
-        showError('A product set with this name already exists')
-      } else {
-        showError(`Failed to add product set: ${error}`)
-      }
-      return
-    }
-    
-    showSuccess('Product set added successfully')
-    setShowAddSet(false)
-    refreshProductSets(selectedLine.id)
-  }
-
-  const handleEditProductSet = async (id: number, name: string) => {
-    if (!selectedLine) return
-
-    const { error } = await loading.withLoading(editProductSet(id, name))
-    if (error) {
-      showError(`Failed to edit product set: ${error}`)
-      return
-    }
-    
-    showSuccess('Product set updated successfully')
-    setShowEditSet(false)
-    refreshProductSets(selectedLine.id)
-  }
-
-  const handleDeleteProductSet = async (set: ProductSet) => {
-    setSelectedSet(set)
-    setShowDeleteSet(true)
-  }
-
-  const confirmDeleteSet = async () => {
-    if (!selectedSet || !selectedLine) return
-
-    const { error } = await loading.withLoading(deleteProductSet(selectedSet.id))
-    if (error) {
-      showError(`Failed to delete product set: ${error}`)
-      return
-    }
-    
-    showSuccess('Product set deleted successfully')
-    setShowDeleteSet(false)
-    setSelectedSet(null)
-    refreshProductSets(selectedLine.id)
-  }
-
-  // Filter and paginate items
-  // Remove client-side filtering and pagination
   return (
-    <>
-      <div className="grid grid-cols-3 gap-4">
-        {/* Companies Section */}
+    <div className="grid grid-cols-12 gap-4">
+      {/* Companies Section */}
+      <div className="col-span-4">
         <UI.AdminTableSection
           title="Companies"
           icon={FaBuilding}
-          items={companies}
-          selectedItem={selectedCompany}
-          onSelect={(company) => {
-            setSelectedCompany(company)
-            setSelectedLine(null)
-            setSelectedSet(null)
-            refreshProductLines(company.id, linePagination.currentPage, lineSearch.searchTerm)
-          }}
-          onAdd={() => setShowAddCompany(true)}
-          onEdit={(company) => {
-            setSelectedCompany(company)
-            setShowEditCompany(true)
-          }}
-          onDelete={handleDeleteCompany}
+          items={state.companies}
+          selectedItem={state.selected.company}
+          onSelect={(company) => setState(prev => ({
+            ...prev,
+            selected: { ...prev.selected, company }
+          }))}
+          onAdd={() => setState(prev => ({
+            ...prev,
+            modal: { type: 'addCompany', isOpen: true }
+          }))}
+          onEdit={(company) => setState(prev => ({
+            ...prev,
+            modal: { type: 'editCompany', isOpen: true, data: company }
+          }))}
+          onDelete={(company) => setState(prev => ({
+            ...prev,
+            modal: { type: 'deleteCompany', isOpen: true, data: company }
+          }))}
           loading={loading.isLoading}
-          headerSubText="Manage your product companies"
           searchProps={{
             ...companySearch.searchProps,
             placeholder: "Search companies..."
           }}
           pagination={{
             currentPage: companyPagination.currentPage,
-            totalItems: totalCompanies,
+            totalItems: state.totals.companies,
             itemsPerPage: companyPagination.itemsPerPage,
-            onPageChange: (page) => {
-              companyPagination.handlePageChange(page)
-              setSelectedCompany(null)
-            }
+            onPageChange: companyPagination.handlePageChange
           }}
           getItemName={(item) => item.name}
         />
+      </div>
 
-        {/* Product Lines Section */}
+      {/* Product Lines Section */}
+      <div className="col-span-4">
         <UI.AdminTableSection
           title="Product Lines"
           icon={FaList}
-          items={productLines}
-          selectedItem={selectedLine}
-          onSelect={(line) => {
-            setSelectedLine(line)
-            setSelectedSet(null)
-            refreshProductSets(line.id, setPagination.currentPage, setSearch.searchTerm)
-          }}
-          onAdd={() => setShowAddLine(true)}
-          onEdit={(line) => {
-            setSelectedLine(line)
-            setShowEditLine(true)
-          }}
-          onDelete={handleDeleteProductLine}
+          items={state.productLines}
+          selectedItem={state.selected.line}
+          onSelect={(line) => setState(prev => ({
+            ...prev,
+            selected: { ...prev.selected, line }
+          }))}
+          onAdd={() => setState(prev => ({
+            ...prev,
+            modal: { type: 'addLine', isOpen: true }
+          }))}
+          onEdit={(line) => setState(prev => ({
+            ...prev,
+            modal: { type: 'editLine', isOpen: true, data: line }
+          }))}
+          onDelete={(line) => setState(prev => ({
+            ...prev,
+            modal: { type: 'deleteLine', isOpen: true, data: line }
+          }))}
           loading={loading.isLoading}
-          headerSubText="Manage product lines"
-          headerItalicText={selectedCompany ? `for ${selectedCompany.name}` : undefined}
-          addButtonDisabled={!selectedCompany}
-          emptyMessage={selectedCompany ? "No product lines found" : "Select a company to view product lines"}
+          addButtonDisabled={!state.selected.company}
+          headerSubText={`Selected company: ${state.selected.company?.name || 'None'}`}
+          headerItalicText={!state.selected.company 
+            ? "Select a company to manage its product lines" 
+            : `${state.productLines.length} product line${state.productLines.length === 1 ? '' : 's'}`
+          }
+          emptyMessage={!state.selected.company ? "Select a company to view product lines" : "No product lines found"}
           searchProps={{
             ...lineSearch.searchProps,
             placeholder: "Search product lines..."
           }}
           pagination={{
             currentPage: linePagination.currentPage,
-            totalItems: totalLines,
+            totalItems: state.totals.lines,
             itemsPerPage: linePagination.itemsPerPage,
-            onPageChange: (page) => {
-              linePagination.handlePageChange(page)
-              setSelectedLine(null)
-            }
+            onPageChange: linePagination.handlePageChange
           }}
           getItemName={(item) => item.name}
         />
+      </div>
 
-        {/* Product Sets Section */}
+      {/* Product Sets Section */}
+      <div className="col-span-4">
         <UI.AdminTableSection
           title="Product Sets"
           icon={FaListAlt}
-          items={productSets}
-          selectedItem={selectedSet}
-          onSelect={setSelectedSet}
-          onAdd={() => setShowAddSet(true)}
-          onEdit={(set) => {
-            setSelectedSet(set)
-            setShowEditSet(true)
-          }}
-          onDelete={handleDeleteProductSet}
+          items={state.productSets}
+          selectedItem={state.selected.set}
+          onSelect={(set) => setState(prev => ({
+            ...prev,
+            selected: { ...prev.selected, set }
+          }))}
+          onAdd={() => setState(prev => ({
+            ...prev,
+            modal: { type: 'addSet', isOpen: true }
+          }))}
+          onEdit={(set) => setState(prev => ({
+            ...prev,
+            modal: { type: 'editSet', isOpen: true, data: set }
+          }))}
+          onDelete={(set) => setState(prev => ({
+            ...prev,
+            modal: { type: 'deleteSet', isOpen: true, data: set }
+          }))}
           loading={loading.isLoading}
-          headerSubText="Manage product sets"
-          headerItalicText={selectedLine ? `for ${selectedLine.name}` : undefined}
-          addButtonDisabled={!selectedLine}
-          emptyMessage={selectedLine ? "No product sets found" : "Select a product line to view sets"}
+          addButtonDisabled={!state.selected.line}
+          headerSubText={`Selected line: ${state.selected.line?.name || 'None'}`}
+          headerItalicText={!state.selected.line 
+            ? "Select a product line to manage its sets" 
+            : `${state.productSets.length} set${state.productSets.length === 1 ? '' : 's'}`
+          }
+          emptyMessage={!state.selected.line ? "Select a product line to view sets" : "No product sets found"}
           searchProps={{
             ...setSearch.searchProps,
             placeholder: "Search product sets..."
           }}
           pagination={{
             currentPage: setPagination.currentPage,
-            totalItems: totalSets,
+            totalItems: state.totals.sets,
             itemsPerPage: setPagination.itemsPerPage,
-            onPageChange: (page) => {
-              setPagination.handlePageChange(page)
-              setSelectedSet(null)
-            }
+            onPageChange: setPagination.handlePageChange
           }}
           getItemName={(item) => item.name}
         />
       </div>
 
       {/* Modals */}
-      {showAddCompany && (
-        <ProductCompanyModal
-          isOpen={showAddCompany}
-          onClose={() => setShowAddCompany(false)}
-          onSubmit={handleAddCompany}
-          isLoading={loading.isLoading}
-        />
-      )}
-
-      {showEditCompany && selectedCompany && (
-        <ProductCompanyModal
-          isOpen={showEditCompany}
-          onClose={() => setShowEditCompany(false)}
-          onSubmit={(name) => handleEditCompany(selectedCompany.id, name)}
-          company={selectedCompany}
-          isLoading={loading.isLoading}
-        />
-      )}
-
-      {showAddLine && (
-        <ProductLineModal
-          isOpen={showAddLine}
-          onClose={() => setShowAddLine(false)}
-          onSubmit={handleAddProductLine}
-          isLoading={loading.isLoading}
-        />
-      )}
-
-      {showEditLine && selectedLine && (
-        <ProductLineModal
-          isOpen={showEditLine}
-          onClose={() => setShowEditLine(false)}
-          onSubmit={(name) => handleEditProductLine(selectedLine.id, name)}
-          productLine={selectedLine}
-          isLoading={loading.isLoading}
-        />
-      )}
-
-      {showAddSet && (
-        <ProductSetModal
-          isOpen={showAddSet}
-          onClose={() => setShowAddSet(false)}
-          onSubmit={handleAddProductSet}
-          isLoading={loading.isLoading}
-        />
-      )}
-
-      {showEditSet && selectedSet && (
-        <ProductSetModal
-          isOpen={showEditSet}
-          onClose={() => setShowEditSet(false)}
-          onSubmit={(name) => handleEditProductSet(selectedSet.id, name)}
-          productSet={selectedSet}
-          isLoading={loading.isLoading}
-        />
-      )}
-
-      <UI.DeleteConfirmModal
-        isOpen={showDeleteConfirm}
-        onClose={() => {
-          setShowDeleteConfirm(false)
-          setCompanyToDelete(null)
-        }}
-        onConfirm={confirmDelete}
+      <ProductCompanyModal
+        isOpen={['addCompany', 'editCompany'].includes(state.modal.type || '')}
+        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+        onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
+        company={state.modal.type === 'editCompany' ? state.modal.data : null}
         isLoading={loading.isLoading}
-        title="Delete Company"
-        message="Are you sure you want to delete the company"
-        itemName={companyToDelete?.name || ''}
-        icon={FaBuilding}
+      />
+
+      <ProductLineModal
+        isOpen={['addLine', 'editLine'].includes(state.modal.type || '')}
+        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+        onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
+        productLine={state.modal.type === 'editLine' ? state.modal.data : null}
+        isLoading={loading.isLoading}
+      />
+
+      <ProductSetModal
+        isOpen={['addSet', 'editSet'].includes(state.modal.type || '')}
+        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+        onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
+        productSet={state.modal.type === 'editSet' ? state.modal.data : null}
+        isLoading={loading.isLoading}
       />
 
       <UI.DeleteConfirmModal
-        isOpen={showDeleteLine}
-        onClose={() => {
-          setShowDeleteLine(false)
-          setSelectedLine(null)
-        }}
-        onConfirm={confirmDeleteLine}
+        isOpen={state.modal.type?.startsWith('delete') || false}
+        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+        onConfirm={() => handleModalAction(state.modal.type || '')}
+        title={`Delete ${state.modal.type?.replace('delete', '')}`}
+        message={`Are you sure you want to delete this ${state.modal.type?.replace('delete', '').toLowerCase()}?`}
+        itemName={state.modal.data?.name || ''}
         isLoading={loading.isLoading}
-        title="Delete Product Line"
-        message="Are you sure you want to delete the product line"
-        itemName={selectedLine?.name || ''}
-        icon={FaList}
       />
-
-      <UI.DeleteConfirmModal
-        isOpen={showDeleteSet}
-        onClose={() => {
-          setShowDeleteSet(false)
-          setSelectedSet(null)
-        }}
-        onConfirm={confirmDeleteSet}
-        isLoading={loading.isLoading}
-        title="Delete Product Set"
-        message="Are you sure you want to delete the product set"
-        itemName={selectedSet?.name || ''}
-        icon={FaListAlt}
-      />
-
-      {error && (
-        <UI.Toast
-          message={error}
-          type="error"
-        />
-      )}
-    </>
+    </div>
   )
 }
