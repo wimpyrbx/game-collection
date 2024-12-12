@@ -1,23 +1,18 @@
 interface SearchInputProps {
   value: string
-  onChange: (value: string) => void
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
   placeholder?: string
   className?: string
 }
 
-export function SearchInput({ 
-  value, 
-  onChange, 
-  placeholder = "Search...",
-  className = ''
-}: SearchInputProps) {
+export function SearchInput({ value, onChange, placeholder, className = '' }: SearchInputProps) {
   return (
     <input
       type="text"
-      placeholder={placeholder}
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`bg-gray-700 p-2 rounded w-64 ${className}`}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
     />
   )
 } 

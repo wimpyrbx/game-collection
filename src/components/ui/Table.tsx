@@ -4,6 +4,22 @@ interface TableHeaderProps {
   className?: string
 }
 
+interface EmptyTableStateProps {
+  icon: React.ReactNode
+  message?: string
+}
+
+export function EmptyTableState({ icon, message }: EmptyTableStateProps) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-gray-500">
+      <div className="text-6xl opacity-20 mb-2">
+        {icon}
+      </div>
+      {message && <div className="text-sm">{message}</div>}
+    </div>
+  )
+}
+
 export function TableHeader({ title, actionWidth = "w-20", className = '' }: TableHeaderProps) {
   return (
     <div className={`bgTableHeader p-2 rounded-t flex justify-between items-center mb-1 ${className}`}>

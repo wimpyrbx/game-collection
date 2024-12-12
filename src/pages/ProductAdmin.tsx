@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useProductAdmin } from '../hooks/useProductAdmin'
+import { useNotification } from '../hooks/useNotification'
 import * as UI from '../components/ui'
-import { AddProductCompanyModal, EditProductCompanyModal, DeleteProductCompanyModal } from '../components/product-companies'
-import { AddProductLineModal, EditProductLineModal, DeleteProductLineModal } from '../components/product-lines'
-import { AddProductSetModal, EditProductSetModal, DeleteProductSetModal } from '../components/product-sets'
-import { FaBuilding, FaList, FaListAlt } from 'react-icons/fa'
+import { ProductLineModal, ProductSetModal, ProductCompanyModal } from '../components/productadmin'
+import { FaBuilding, FaList, FaListAlt, FaTrash } from 'react-icons/fa'
 
 interface Company {
   id: number
@@ -39,6 +38,8 @@ export default function ProductAdmin() {
     deleteProductLine,
     deleteProductSet
   } = useProductAdmin()
+
+  const { notification, showSuccess, showError } = useNotification()
 
   // Data state
   const [companies, setCompanies] = useState<Company[]>([])
@@ -84,15 +85,19 @@ export default function ProductAdmin() {
   const refreshCompanies = async (page = 1, searchTerm = '') => {
     setLoadingCompanies(true)
     try {
-      const { data, count } = await loadCompanies(
+      const { data, count, error } = await loadCompanies(
         (page - 1) * ITEMS_PER_PAGE,
         ITEMS_PER_PAGE,
         searchTerm
       )
+      if (error) {
+        showError('Failed to load companies')
+        return
+      }
       setCompanies(data || [])
       setTotalCompanies(count || 0)
     } catch (error) {
-      console.error('Error loading companies:', error)
+      showError('An unexpected error occurred while loading companies')
     } finally {
       setLoadingCompanies(false)
     }
@@ -112,7 +117,10 @@ export default function ProductAdmin() {
   const handleAddCompany = async (name: string) => {
     setLoadingCompanies(true)
     const { error } = await addCompany(name)
-    if (!error) {
+    if (error) {
+      showError(`Failed to add company: ${error}`)
+    } else {
+      showSuccess('Company added successfully')
       setShowAddCompany(false)
       refreshCompanies(companyPage, searchCompany)
     }
@@ -122,14 +130,24 @@ export default function ProductAdmin() {
   const handleEditCompany = async (id: number, name: string) => {
     setLoadingCompanies(true)
     const { error } = await editCompany(id, name)
-    if (!error) {
+    if (error) {
+      showError(`Failed to edit company: ${error}`)
+    } else {
+      showSuccess('Company updated successfully')
       setShowEditCompany(false)
       refreshCompanies(companyPage, searchCompany)
     }
     setLoadingCompanies(false)
   }
 
-  const handleDeleteCompany = (company: Company) => {
+  const handleDeleteCompany = async (company: Company) => {
+    // First check if company can be deleted (has no product lines)
+    const productLines = await loadProductLines(company.id)
+    if (productLines && productLines.length > 0) {
+      showError('Cannot delete company that has product lines')
+      return
+    }
+    
     setCompanyToDelete(company)
     setShowDeleteConfirm(true)
   }
@@ -138,7 +156,10 @@ export default function ProductAdmin() {
     if (!companyToDelete) return
     setLoadingCompanies(true)
     const { error } = await deleteCompany(companyToDelete.id)
-    if (!error) {
+    if (error) {
+      showError(`Failed to delete company: ${error}`)
+    } else {
+      showSuccess('Company deleted successfully')
       if (selectedCompany?.id === companyToDelete.id) {
         setSelectedCompany(null)
       }
@@ -167,7 +188,10 @@ export default function ProductAdmin() {
     if (!selectedCompany) return
     setLoadingProductLines(true)
     const { error } = await addProductLine(name, selectedCompany.id)
-    if (!error) {
+    if (error) {
+      showError(`Failed to add product line: ${error}`)
+    } else {
+      showSuccess('Product line added successfully')
       setShowAddLine(false)
       refreshProductLines(selectedCompany.id)
     }
@@ -178,7 +202,10 @@ export default function ProductAdmin() {
     if (!selectedCompany) return
     setLoadingProductLines(true)
     const { error } = await editProductLine(id, name)
-    if (!error) {
+    if (error) {
+      showError(`Failed to edit product line: ${error}`)
+    } else {
+      showSuccess('Product line updated successfully')
       setShowEditLine(false)
       refreshProductLines(selectedCompany.id)
     }
@@ -186,6 +213,13 @@ export default function ProductAdmin() {
   }
 
   const handleDeleteProductLine = async (line: ProductLine) => {
+    // First check if product line can be deleted (has no product sets)
+    const productSets = await loadProductSets(line.id)
+    if (productSets && productSets.length > 0) {
+      showError('Cannot delete product line that has product sets')
+      return
+    }
+
     setSelectedLine(line)
     setShowDeleteLine(true)
   }
@@ -194,7 +228,10 @@ export default function ProductAdmin() {
     if (!selectedLine || !selectedCompany) return
     setLoadingProductLines(true)
     const { error } = await deleteProductLine(selectedLine.id)
-    if (!error) {
+    if (error) {
+      showError(`Failed to delete product line: ${error}`)
+    } else {
+      showSuccess('Product line deleted successfully')
       setShowDeleteLine(false)
       setSelectedLine(null)
       refreshProductLines(selectedCompany.id)
@@ -212,7 +249,10 @@ export default function ProductAdmin() {
     if (!selectedLine) return
     setLoadingProductSets(true)
     const { error } = await addProductSet(name, selectedLine.id)
-    if (!error) {
+    if (error) {
+      showError(`Failed to add product set: ${error}`)
+    } else {
+      showSuccess('Product set added successfully')
       setShowAddSet(false)
       refreshProductSets(selectedLine.id)
     }
@@ -223,7 +263,10 @@ export default function ProductAdmin() {
     if (!selectedLine) return
     setLoadingProductSets(true)
     const { error } = await editProductSet(id, name)
-    if (!error) {
+    if (error) {
+      showError(`Failed to edit product set: ${error}`)
+    } else {
+      showSuccess('Product set updated successfully')
       setShowEditSet(false)
       refreshProductSets(selectedLine.id)
     }
@@ -231,6 +274,7 @@ export default function ProductAdmin() {
   }
 
   const handleDeleteProductSet = async (set: ProductSet) => {
+    // Add any deletion rules check here if needed
     setSelectedSet(set)
     setShowDeleteSet(true)
   }
@@ -239,12 +283,50 @@ export default function ProductAdmin() {
     if (!selectedSet || !selectedLine) return
     setLoadingProductSets(true)
     const { error } = await deleteProductSet(selectedSet.id)
-    if (!error) {
+    if (error) {
+      showError(`Failed to delete product set: ${error}`)
+    } else {
+      showSuccess('Product set deleted successfully')
       setShowDeleteSet(false)
       setSelectedSet(null)
       refreshProductSets(selectedLine.id)
     }
     setLoadingProductSets(false)
+  }
+
+  // Company handlers
+  const handleCompanySelect = (company: Company) => {
+    setSelectedCompany(company)
+    setSelectedLine(null)
+    setSelectedSet(null)
+    if (company) {
+      refreshProductLines(company.id)
+    }
+  }
+
+  const handleCompanyEdit = (company: Company) => {
+    setSelectedCompany(company)
+    setShowEditCompany(true)
+  }
+
+  // Product Line handlers
+  const handleLineSelect = (line: ProductLine) => {
+    setSelectedLine(line)
+    setSelectedSet(null)
+    if (line) {
+      refreshProductSets(line.id)
+    }
+  }
+
+  const handleLineEdit = (line: ProductLine) => {
+    setSelectedLine(line)
+    setShowEditLine(true)
+  }
+
+  // Product Set handlers
+  const handleSetEdit = (set: ProductSet) => {
+    setSelectedSet(set)
+    setShowEditSet(true)
   }
 
   // Effects
@@ -272,9 +354,9 @@ export default function ProductAdmin() {
 
   return (
     <>
-      <div className="flex gap-6">
-        {/* Companies Column */}
-        <div className="flex-1 flex flex-col gap-4">
+      <div className="grid grid-cols-3 gap-4">
+        {/* Companies Section */}
+        <div className="flex flex-col gap-2">
           <UI.Card>
             <UI.CardHeader>
               <div className="flex">
@@ -299,251 +381,273 @@ export default function ProductAdmin() {
                 </UI.Button>
               </UI.CardHeaderRightSide>
             </UI.CardHeader>
-
             <UI.CardBody>
               <div className="mb-4">
                 <UI.SearchInput
                   value={searchCompany}
-                  onChange={handleSearch}
-                  placeholder="Filter companies..."
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Search companies..."
                   className="w-full"
                 />
               </div>
-
               <UI.TableHeader title="Company Name" />
-              <div className="space-y-1">
-                {companies.length > 0 ? (
-                  companies.map(company => (
-                    <UI.TableRow
-                      key={company.id}
-                      title={company.name}
-                      isSelected={selectedCompany?.id === company.id}
-                      onSelect={() => setSelectedCompany(company)}
-                      onEdit={() => {
-                        setSelectedCompany(company)
-                        setShowEditCompany(true)
-                      }}
-                      onDelete={() => handleDeleteCompany(company)}
-                      disabled={loadingCompanies}
-                    />
-                  ))
-                ) : loadingCompanies ? (
-                  <UI.LoadingSpinner />
-                ) : (
-                  <div className="text-gray-500 text-center py-4">No companies found</div>
-                )}
-              </div>
+              {companies.length === 0 && !loadingCompanies ? (
+                <UI.EmptyTableState icon={<FaBuilding />} message="No companies found" />
+              ) : (
+                companies.map((company) => (
+                  <UI.TableRow
+                    key={company.id}
+                    title={company.name}
+                    isSelected={selectedCompany?.id === company.id}
+                    onSelect={() => handleCompanySelect(company)}
+                    onEdit={() => handleCompanyEdit(company)}
+                    onDelete={() => handleDeleteCompany(company)}
+                  />
+                ))
+              )}
             </UI.CardBody>
           </UI.Card>
-
-          <UI.Pagination
-            currentPage={companyPage}
-            totalItems={totalCompanies}
-            itemsPerPage={ITEMS_PER_PAGE}
-            onPageChange={handleCompanyPageChange}
-          />
+          {companies.length > 0 && (
+            <UI.Pagination
+              currentPage={companyPage}
+              totalItems={totalCompanies}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={handleCompanyPageChange}
+            />
+          )}
         </div>
 
-        {/* Product Lines Column */}
-        <UI.Card className="flex-1">
-          <UI.CardHeader>
-            <div className="flex">
-              <UI.CardIcon size="big" className="text-green-700">
-                <FaList />
-              </UI.CardIcon>
-              <div>
-                <UI.CardHeaderText>
-                  Product Lines
-                </UI.CardHeaderText>
-                <UI.CardHeaderSubText>
-                  Selected company: <strong>{selectedCompany?.name || 'None'}</strong>
-                </UI.CardHeaderSubText>
-                <UI.CardHeaderItalicText>
-                  {!selectedCompany 
-                    ? '* Please select a company to manage its product lines'
-                    : productLines.length === 0
-                      ? '* No product lines yet'
-                      : `This company has ${productLines.length} product line(s)`}
-                </UI.CardHeaderItalicText>
+        {/* Product Lines Section */}
+        <div className="flex flex-col gap-2">
+          <UI.Card>
+            <UI.CardHeader>
+              <div className="flex">
+                <UI.CardIcon size="big" className="text-green-700">
+                  <FaList />
+                </UI.CardIcon>
+                <div>
+                  <UI.CardHeaderText>
+                    Product Lines
+                  </UI.CardHeaderText>
+                  <UI.CardHeaderSubText>
+                    Selected company: <strong>{selectedCompany?.name || 'None'}</strong>
+                  </UI.CardHeaderSubText>
+                  <UI.CardHeaderItalicText>
+                    {!selectedCompany 
+                      ? '* Please select a company to manage its product lines'
+                      : productLines.length === 0
+                        ? '* No product lines yet'
+                        : `This company has ${productLines.length} product line(s)`}
+                  </UI.CardHeaderItalicText>
+                </div>
               </div>
-            </div>
-            <UI.CardHeaderRightSide>
-              <UI.Button 
-                variant="btnSuccess"
-                onClick={() => setShowAddLine(true)}
-                disabled={!selectedCompany}
-              >
-                + Add Product Line
-              </UI.Button>
-            </UI.CardHeaderRightSide>
-          </UI.CardHeader>
+              <UI.CardHeaderRightSide>
+                <UI.Button 
+                  variant="btnSuccess"
+                  onClick={() => setShowAddLine(true)}
+                  disabled={!selectedCompany}
+                >
+                  + Add Product Line
+                </UI.Button>
+              </UI.CardHeaderRightSide>
+            </UI.CardHeader>
+            <UI.CardBody>
+              <UI.TableHeader title="Product Line Name" />
+              {!selectedCompany ? (
+                <UI.EmptyTableState icon={<FaList />} message="Select a company to view product lines" />
+              ) : productLines.length === 0 && !loadingProductLines ? (
+                <UI.EmptyTableState icon={<FaList />} message="No product lines found" />
+              ) : (
+                productLines.map((line) => (
+                  <UI.TableRow
+                    key={line.id}
+                    title={line.name}
+                    isSelected={selectedLine?.id === line.id}
+                    onSelect={() => handleLineSelect(line)}
+                    onEdit={() => handleLineEdit(line)}
+                    onDelete={() => handleDeleteProductLine(line)}
+                  />
+                ))
+              )}
+            </UI.CardBody>
+          </UI.Card>
+          {selectedCompany && productLines.length > 0 && (
+            <UI.Pagination
+              currentPage={productLinePage}
+              totalItems={productLines.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setProductLinePage}
+            />
+          )}
+        </div>
 
-          <UI.CardBody>
-            <UI.TableHeader title="Product Line Name" />
-            <div className="space-y-1 min-h-[400px]">
-              {productLines.map(line => (
-                <UI.TableRow
-                  key={line.id}
-                  title={line.name}
-                  isSelected={selectedLine?.id === line.id}
-                  onSelect={() => setSelectedLine(line)}
-                  onEdit={() => {
-                    setSelectedLine(line)
-                    setShowEditLine(true)
-                  }}
-                  onDelete={() => handleDeleteProductLine(line)}
-                />
-              ))}
-            </div>
-
-            {selectedCompany && (
-              <UI.Pagination
-                currentPage={productLinePage}
-                totalItems={productLines.length}
-                itemsPerPage={ITEMS_PER_PAGE}
-                onPageChange={setProductLinePage}
-              />
-            )}
-          </UI.CardBody>
-        </UI.Card>
-
-        {/* Product Sets Column */}
-        <UI.Card className="flex-1">
-          <UI.CardHeader>
-            <div className="flex">
-              <UI.CardIcon size="big" className="text-purple-700">
-                <FaListAlt />
-              </UI.CardIcon>
-              <div>
-                <UI.CardHeaderText>
-                  Product Sets
-                </UI.CardHeaderText>
-                <UI.CardHeaderSubText>
-                  Selected line: <strong>{selectedLine?.name || 'None'}</strong>
-                </UI.CardHeaderSubText>
-                <UI.CardHeaderItalicText>
-                  {!selectedLine 
-                    ? '* Please select a product line to manage its sets'
-                    : productSets.length === 0
-                      ? '* No product sets yet'
-                      : `This line has ${productSets.length} product set(s)`}
-                </UI.CardHeaderItalicText>
+        {/* Product Sets Section */}
+        <div className="flex flex-col gap-2">
+          <UI.Card>
+            <UI.CardHeader>
+              <div className="flex">
+                <UI.CardIcon size="big" className="text-purple-700">
+                  <FaListAlt />
+                </UI.CardIcon>
+                <div>
+                  <UI.CardHeaderText>
+                    Product Sets
+                  </UI.CardHeaderText>
+                  <UI.CardHeaderSubText>
+                    Selected line: <strong>{selectedLine?.name || 'None'}</strong>
+                  </UI.CardHeaderSubText>
+                  <UI.CardHeaderItalicText>
+                    {!selectedLine 
+                      ? '* Please select a product line to manage its sets'
+                      : productSets.length === 0
+                        ? '* No product sets yet'
+                        : `This line has ${productSets.length} product set(s)`}
+                  </UI.CardHeaderItalicText>
+                </div>
               </div>
-            </div>
-            <UI.CardHeaderRightSide>
-              <UI.Button 
-                variant="btnSuccess"
-                onClick={() => setShowAddSet(true)}
-                disabled={!selectedLine}
-              >
-                + Add Product Set
-              </UI.Button>
-            </UI.CardHeaderRightSide>
-          </UI.CardHeader>
-
-          <UI.CardBody>
-            <UI.TableHeader title="Product Set Name" />
-            <div className="space-y-1 min-h-[400px]">
-              {productSets.map(set => (
-                <UI.TableRow
-                  key={set.id}
-                  title={set.name}
-                  isSelected={selectedSet?.id === set.id}
-                  onSelect={() => setSelectedSet(set)}
-                  onEdit={() => {
-                    setSelectedSet(set)
-                    setShowEditSet(true)
-                  }}
-                  onDelete={() => handleDeleteProductSet(set)}
-                />
-              ))}
-            </div>
-
-            {selectedLine && (
-              <UI.Pagination
-                currentPage={productSetPage}
-                totalItems={productSets.length}
-                itemsPerPage={ITEMS_PER_PAGE}
-                onPageChange={setProductSetPage}
-              />
-            )}
-          </UI.CardBody>
-        </UI.Card>
+              <UI.CardHeaderRightSide>
+                <UI.Button 
+                  variant="btnSuccess"
+                  onClick={() => setShowAddSet(true)}
+                  disabled={!selectedLine}
+                >
+                  + Add Product Set
+                </UI.Button>
+              </UI.CardHeaderRightSide>
+            </UI.CardHeader>
+            <UI.CardBody>
+              <UI.TableHeader title="Product Set Name" />
+              {!selectedLine ? (
+                <UI.EmptyTableState icon={<FaListAlt />} message="Select a product line to view sets" />
+              ) : productSets.length === 0 && !loadingProductSets ? (
+                <UI.EmptyTableState icon={<FaListAlt />} message="No product sets found" />
+              ) : (
+                productSets.map((set) => (
+                  <UI.TableRow
+                    key={set.id}
+                    title={set.name}
+                    isSelected={selectedSet?.id === set.id}
+                    onEdit={() => handleSetEdit(set)}
+                    onDelete={() => handleDeleteProductSet(set)}
+                  />
+                ))
+              )}
+            </UI.CardBody>
+          </UI.Card>
+          {selectedLine && productSets.length > 0 && (
+            <UI.Pagination
+              currentPage={productSetPage}
+              totalItems={productSets.length}
+              itemsPerPage={ITEMS_PER_PAGE}
+              onPageChange={setProductSetPage}
+            />
+          )}
+        </div>
       </div>
 
-      {/* Company Modals */}
-      <AddProductCompanyModal
-        isOpen={showAddCompany}
-        onClose={() => setShowAddCompany(false)}
-        onAdd={handleAddCompany}
+      {/* Toast Notification */}
+      {notification.isVisible && (
+        <UI.Toast
+          message={notification.message}
+          type={notification.type}
+        />
+      )}
+
+      {/* Modals */}
+      <ProductCompanyModal
+        isOpen={showAddCompany || showEditCompany}
+        onClose={() => {
+          setShowAddCompany(false)
+          setShowEditCompany(false)
+          setSelectedCompany(null)
+        }}
+        onSubmit={async (name) => {
+          if (showEditCompany && selectedCompany) {
+            await handleEditCompany(selectedCompany.id, name)
+          } else {
+            await handleAddCompany(name)
+          }
+        }}
+        company={showEditCompany ? selectedCompany : null}
         isLoading={loadingCompanies}
       />
 
-      <EditProductCompanyModal
-        isOpen={showEditCompany}
-        onClose={() => setShowEditCompany(false)}
-        onEdit={handleEditCompany}
-        company={selectedCompany}
-        isLoading={loadingCompanies}
-      />
-
-      <DeleteProductCompanyModal
+      <UI.DeleteConfirmModal
         isOpen={showDeleteConfirm}
         onClose={() => {
           setShowDeleteConfirm(false)
           setCompanyToDelete(null)
         }}
         onConfirm={confirmDelete}
-        company={companyToDelete}
         isLoading={loadingCompanies}
+        title="Delete Company"
+        message="Are you sure you want to delete this company? This action cannot be undone."
+        itemName={companyToDelete?.name || ''}
+        icon={FaTrash}
       />
 
-      {/* Product Line Modals */}
-      <AddProductLineModal
-        isOpen={showAddLine}
-        onClose={() => setShowAddLine(false)}
-        onAdd={handleAddProductLine}
+      <ProductLineModal
+        isOpen={showAddLine || showEditLine}
+        onClose={() => {
+          setShowAddLine(false)
+          setShowEditLine(false)
+          setSelectedLine(null)
+        }}
+        onSubmit={async (name) => {
+          if (showEditLine && selectedLine) {
+            await handleEditProductLine(selectedLine.id, name)
+          } else {
+            await handleAddProductLine(name)
+          }
+        }}
+        productLine={showEditLine ? selectedLine : null}
         isLoading={loadingProductLines}
       />
 
-      <EditProductLineModal
-        isOpen={showEditLine}
-        onClose={() => setShowEditLine(false)}
-        onEdit={handleEditProductLine}
-        productLine={selectedLine}
-        isLoading={loadingProductLines}
-      />
-
-      <DeleteProductLineModal
+      <UI.DeleteConfirmModal
         isOpen={showDeleteLine}
-        onClose={() => setShowDeleteLine(false)}
+        onClose={() => {
+          setShowDeleteLine(false)
+          setSelectedLine(null)
+        }}
         onConfirm={confirmDeleteLine}
-        productLine={selectedLine}
         isLoading={loadingProductLines}
+        title="Delete Product Line"
+        message="Are you sure you want to delete this product line? This action cannot be undone."
+        itemName={selectedLine?.name || ''}
+        icon={FaTrash}
       />
 
-      {/* Product Set Modals */}
-      <AddProductSetModal
-        isOpen={showAddSet}
-        onClose={() => setShowAddSet(false)}
-        onAdd={handleAddProductSet}
+      <ProductSetModal
+        isOpen={showAddSet || showEditSet}
+        onClose={() => {
+          setShowAddSet(false)
+          setShowEditSet(false)
+          setSelectedSet(null)
+        }}
+        onSubmit={async (name) => {
+          if (showEditSet && selectedSet) {
+            await handleEditProductSet(selectedSet.id, name)
+          } else {
+            await handleAddProductSet(name)
+          }
+        }}
+        productSet={showEditSet ? selectedSet : null}
         isLoading={loadingProductSets}
       />
 
-      <EditProductSetModal
-        isOpen={showEditSet}
-        onClose={() => setShowEditSet(false)}
-        onEdit={handleEditProductSet}
-        productSet={selectedSet}
-        isLoading={loadingProductSets}
-      />
-
-      <DeleteProductSetModal
+      <UI.DeleteConfirmModal
         isOpen={showDeleteSet}
-        onClose={() => setShowDeleteSet(false)}
+        onClose={() => {
+          setShowDeleteSet(false)
+          setSelectedSet(null)
+        }}
         onConfirm={confirmDeleteSet}
-        productSet={selectedSet}
         isLoading={loadingProductSets}
+        title="Delete Product Set"
+        message="Are you sure you want to delete this product set? This action cannot be undone."
+        itemName={selectedSet?.name || ''}
+        icon={FaTrash}
       />
     </>
   )

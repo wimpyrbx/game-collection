@@ -5,6 +5,8 @@ interface InputProps {
   placeholder?: string
   type?: string
   className?: string
+  required?: boolean
+  autoFocus?: boolean
 }
 
 export function Input({
@@ -13,12 +15,14 @@ export function Input({
   onChange,
   placeholder,
   type = "text",
-  className = ""
+  className = "",
+  required,
+  autoFocus
 }: InputProps) {
   return (
-    <div>
+    <div className="flex items-center gap-4">
       {label && (
-        <label className="block text-sm font-medium mb-2">
+        <label className="text-sm font-medium w-32 text-gray-400">
           {label}
         </label>
       )}
@@ -27,7 +31,9 @@ export function Input({
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className={`w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${className}`}
+        required={required}
+        autoFocus={autoFocus}
+        className={`flex-1 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
       />
     </div>
   )

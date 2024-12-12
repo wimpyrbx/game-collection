@@ -1,10 +1,11 @@
 interface ButtonProps {
   children: React.ReactNode
-  onClick: () => void
+  onClick?: () => void
   variant?: 'btnSuccess' | 'btnDanger' | 'btnWarning' | 'btnPrimary'
   size?: 'sm' | 'md' | 'lg'
   disabled?: boolean
   className?: string
+  type?: 'button' | 'submit' | 'reset'
 }
 
 export function Button({ 
@@ -13,7 +14,8 @@ export function Button({
   variant = 'btnPrimary',
   size = 'sm',
   disabled = false,
-  className = ''
+  className = '',
+  type = 'button'
 }: ButtonProps) {
   const variants = {
     btnSuccess: 'btnSuccess',
@@ -40,6 +42,7 @@ export function Button({
         disabled:cursor-not-allowed
         ${className}
       `}
+      type={type}
     >
       {children}
     </button>

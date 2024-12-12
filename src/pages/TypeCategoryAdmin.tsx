@@ -5,7 +5,7 @@ import AddTypeModal from '../components/AddTypeModal'
 import EditTypeModal from '../components/EditTypeModal'
 import ManageCategoriesModal from '../components/ManageCategoriesModal'
 import DeleteTypeConfirmationModal from '../components/DeleteTypeConfirmationModal'
-import * as UI from '../components/ui'
+import * as UI from '../components/ui/index.ts'
 import { FaAd, FaAdjust, FaAlgolia, FaArchive, FaList, FaListAlt, FaListOl, FaListUl, FaThList, FaUserCog, FaUsers } from 'react-icons/fa'
 
 export default function TypeCategoryAdmin() {

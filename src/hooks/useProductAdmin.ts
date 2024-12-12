@@ -5,21 +5,18 @@ import { supabase } from '../lib/supabase'
 interface Company {
   id: number
   name: string
-  description?: string
 }
 
 interface ProductLine {
   id: number
   name: string
   company_id: number
-  description?: string
 }
 
 interface ProductSet {
   id: number
   name: string
   product_line_id: number
-  description?: string
 }
 
 export function useProductAdmin() {
@@ -76,146 +73,93 @@ export function useProductAdmin() {
     return data || []
   }
 
-  const addCompany = async (name: string, description?: string) => {
-    setError('')
-    if (!name.trim()) {
-      setError('Name is required')
-      return { error: 'Name is required' }
-    }
-
+  const addCompany = async (name: string) => {
     const { data, error } = await supabase
       .from('product_companies')
-      .insert([{ name: name.trim(), description: description?.trim() }])
+      .insert([{ name: name.trim() }])
       .select()
       .single()
 
     if (error) {
-      setError(error.message)
       return { error: error.message }
     }
 
     return { data }
   }
 
-  const addProductLine = async (name: string, companyId: number, description?: string) => {
-    setError('')
-    if (!name.trim()) {
-      setError('Name is required')
-      return { error: 'Name is required' }
-    }
-
+  const addProductLine = async (name: string, companyId: number) => {
     const { data, error } = await supabase
       .from('product_lines')
       .insert([{ 
-        name: name.trim(), 
-        company_id: companyId,
-        description: description?.trim()
+        name: name.trim(),
+        company_id: companyId
       }])
       .select()
       .single()
 
     if (error) {
-      setError(error.message)
       return { error: error.message }
     }
 
     return { data }
   }
 
-  const addProductSet = async (name: string, lineId: number, description?: string) => {
-    setError('')
-    if (!name.trim()) {
-      setError('Name is required')
-      return { error: 'Name is required' }
-    }
-
+  const addProductSet = async (name: string, lineId: number) => {
     const { data, error } = await supabase
       .from('product_sets')
       .insert([{ 
-        name: name.trim(), 
-        product_line_id: lineId,
-        description: description?.trim()
+        name: name.trim(),
+        product_line_id: lineId
       }])
       .select()
       .single()
 
     if (error) {
-      setError(error.message)
       return { error: error.message }
     }
 
     return { data }
   }
 
-  const editCompany = async (id: number, name: string, description?: string) => {
-    setError('')
-    if (!name.trim()) {
-      setError('Name is required')
-      return { error: 'Name is required' }
-    }
-
+  const editCompany = async (id: number, name: string) => {
     const { data, error } = await supabase
       .from('product_companies')
-      .update({ 
-        name: name.trim(), 
-        description: description?.trim() 
-      })
+      .update({ name: name.trim() })
       .eq('id', id)
       .select()
       .single()
 
     if (error) {
-      setError(error.message)
       return { error: error.message }
     }
 
     return { data }
   }
 
-  const editProductLine = async (id: number, name: string, description?: string) => {
-    setError('')
-    if (!name.trim()) {
-      setError('Name is required')
-      return { error: 'Name is required' }
-    }
-
+  const editProductLine = async (id: number, name: string) => {
     const { data, error } = await supabase
       .from('product_lines')
-      .update({ 
-        name: name.trim(), 
-        description: description?.trim() 
-      })
+      .update({ name: name.trim() })
       .eq('id', id)
       .select()
       .single()
 
     if (error) {
-      setError(error.message)
       return { error: error.message }
     }
 
     return { data }
   }
 
-  const editProductSet = async (id: number, name: string, description?: string) => {
-    setError('')
-    if (!name.trim()) {
-      setError('Name is required')
-      return { error: 'Name is required' }
-    }
-
+  const editProductSet = async (id: number, name: string) => {
     const { data, error } = await supabase
       .from('product_sets')
-      .update({ 
-        name: name.trim(), 
-        description: description?.trim() 
-      })
+      .update({ name: name.trim() })
       .eq('id', id)
       .select()
       .single()
 
     if (error) {
-      setError(error.message)
       return { error: error.message }
     }
 

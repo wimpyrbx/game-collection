@@ -4,10 +4,9 @@ interface ModalProps {
   isOpen: boolean
   onClose: () => void
   children: ReactNode
-  footer?: ReactNode
 }
 
-export function Modal({ isOpen, onClose, children, footer }: ModalProps) {
+export function Modal({ isOpen, onClose, children }: ModalProps) {
   if (!isOpen) return null
 
   return (
@@ -21,18 +20,50 @@ export function Modal({ isOpen, onClose, children, footer }: ModalProps) {
         
         {/* Modal content */}
         <div className="relative z-50 w-full max-w-2xl">
-          <div className="bg-gray-900 rounded-lg border border-gray-800">
+          <div className="bg-gray-900 rounded-lg border border-gray-800 shadow-xl">
             {children}
-
-            {/* Footer */}
-            {footer && (
-              <div className="bg-gray-800 px-6 py-4 rounded-b-lg border-t border-gray-700">
-                {footer}
-              </div>
-            )}
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+interface ModalHeaderProps {
+  children: ReactNode
+  className?: string
+}
+
+export function ModalHeader({ children, className = '' }: ModalHeaderProps) {
+  return (
+    <div className={`p-6 bg-gray-800/50 border-b border-gray-700 rounded-t-lg ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+interface ModalBodyProps {
+  children: ReactNode
+  className?: string
+}
+
+export function ModalBody({ children, className = '' }: ModalBodyProps) {
+  return (
+    <div className={`p-6 bg-gray-900 ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+interface ModalFooterProps {
+  children: ReactNode
+  className?: string
+}
+
+export function ModalFooter({ children, className = '' }: ModalFooterProps) {
+  return (
+    <div className={`p-6 bg-gray-800/50 border-t border-gray-700 rounded-b-lg ${className}`}>
+      {children}
     </div>
   )
 } 
