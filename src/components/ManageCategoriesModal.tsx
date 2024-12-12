@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import Modal from './Modal'
+import * as UI from './ui'
 
 interface ManageCategoriesModalProps {
   isOpen: boolean
@@ -70,7 +70,7 @@ export default function ManageCategoriesModal({
   )
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
+    <UI.Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
       <div>
         {/* Header */}
         <div className="bg-gray-800 px-6 py-4 rounded-t-lg border-b border-gray-700">
@@ -138,6 +138,6 @@ export default function ManageCategoriesModal({
           </div>
         </div>
       </div>
-    </Modal>
+    </UI.Modal>
   )
 } 

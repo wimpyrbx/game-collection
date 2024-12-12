@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import Modal from './Modal'
+import * as UI from './ui'
 
 interface AddTypeModalProps {
   isOpen: boolean
@@ -46,7 +46,7 @@ export default function AddTypeModal({ isOpen, onClose, onAdd }: AddTypeModalPro
   )
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
+    <UI.Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
       <div>
         {/* Header */}
         <div className="bg-gray-800 px-6 py-4 rounded-t-lg border-b border-gray-700">
@@ -88,6 +88,6 @@ export default function AddTypeModal({ isOpen, onClose, onAdd }: AddTypeModalPro
           </div>
         </div>
       </div>
-    </Modal>
+    </UI.Modal>
   )
 } 

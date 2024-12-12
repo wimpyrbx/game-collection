@@ -1,16 +1,13 @@
+import { ReactNode } from 'react'
+
 interface ModalProps {
   isOpen: boolean
   onClose: () => void
-  children: React.ReactNode
-  footer?: React.ReactNode
+  children: ReactNode
+  footer?: ReactNode
 }
 
-export default function Modal({ 
-  isOpen, 
-  onClose, 
-  children, 
-  footer
-}: ModalProps) {
+export function Modal({ isOpen, onClose, children, footer }: ModalProps) {
   if (!isOpen) return null
 
   return (

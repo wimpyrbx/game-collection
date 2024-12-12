@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import Modal from './Modal'
+import * as UI from './ui'
 
 interface EditTypeModalProps {
   isOpen: boolean
@@ -58,7 +58,7 @@ export default function EditTypeModal({ isOpen, onClose, onEdit, type }: EditTyp
   )
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
+    <UI.Modal isOpen={isOpen} onClose={onClose} footer={modalFooter}>
       <div>
         {/* Header */}
         <div className="bg-gray-800 px-6 py-4 rounded-t-lg border-b border-gray-700">
@@ -86,11 +86,9 @@ export default function EditTypeModal({ isOpen, onClose, onEdit, type }: EditTyp
               <label className="block text-sm font-medium mb-2">
                 Type Name
               </label>
-              <input
-                type="text"
+              <UI.SearchInput
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                onChange={(value) => setName(value)}
                 placeholder="Enter type name"
               />
             </div>
@@ -103,6 +101,6 @@ export default function EditTypeModal({ isOpen, onClose, onEdit, type }: EditTyp
           </div>
         </div>
       </div>
-    </Modal>
+    </UI.Modal>
   )
 } 

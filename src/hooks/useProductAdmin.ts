@@ -25,36 +25,55 @@ interface ProductSet {
 export function useProductAdmin() {
   const [error, setError] = useState<string>('')
 
-  const loadCompanies = async () => {
-    const { data, error } = await supabase
+  const loadCompanies = async (offset: number, limit: number, search = '') => {
+    let query = supabase
       .from('product_companies')
-      .select('id, name')
-      .order('name')
+      .select('*', { count: 'exact' })
+      
+    if (search) {
+      query = query.ilike('name', `%${search}%`)
+    }
     
-    if (error) throw error
-    return data
+    const { data, error, count } = await query
+      .range(offset, offset + limit - 1)
+      .order('name')
+
+    if (error) {
+      console.error('Error loading companies:', error)
+      return { data: [], count: 0 }
+    }
+
+    return { data, count }
   }
 
   const loadProductLines = async (companyId: number) => {
     const { data, error } = await supabase
       .from('product_lines')
-      .select('id, name, company_id')
+      .select('*')
       .eq('company_id', companyId)
       .order('name')
     
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('Error loading product lines:', error)
+      return []
+    }
+
+    return data || []
   }
 
   const loadProductSets = async (lineId: number) => {
     const { data, error } = await supabase
       .from('product_sets')
-      .select('id, name, product_line_id')
+      .select('*')
       .eq('product_line_id', lineId)
       .order('name')
     
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('Error loading product sets:', error)
+      return []
+    }
+
+    return data || []
   }
 
   const addCompany = async (name: string, description?: string) => {

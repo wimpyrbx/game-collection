@@ -1,540 +1,3682 @@
 BEGIN TRANSACTION;
-CREATE TABLE IF NOT EXISTS "product_groups" (
+CREATE TABLE IF NOT EXISTS "mini_categories" (
 	"id"	INTEGER,
-	"name"	TEXT NOT NULL CHECK(length("name") > 0) UNIQUE,
-	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	"name"	TEXT NOT NULL,
+	UNIQUE("name"),
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "product_types" (
+CREATE TABLE IF NOT EXISTS "product_companies" (
 	"id"	INTEGER,
-	"name"	TEXT NOT NULL CHECK(length("name") > 0) UNIQUE,
-	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	"name"	TEXT NOT NULL,
+	UNIQUE("name"),
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "regions" (
+CREATE TABLE IF NOT EXISTS "product_lines" (
 	"id"	INTEGER,
-	"name"	TEXT NOT NULL CHECK(length("name") > 0) UNIQUE,
-	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	"name"	TEXT NOT NULL,
+	"company_id"	INTEGER NOT NULL,
+	UNIQUE("name","company_id"),
+	FOREIGN KEY("company_id") REFERENCES "product_companies"("id") ON DELETE CASCADE,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "rating_groups" (
+CREATE TABLE IF NOT EXISTS "product_sets" (
 	"id"	INTEGER,
-	"region_id"	INTEGER NOT NULL,
-	"name"	TEXT NOT NULL CHECK(length("name") > 0),
-	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT,
-	PRIMARY KEY("id" AUTOINCREMENT),
-	UNIQUE("region_id","name")
-);
-CREATE TABLE IF NOT EXISTS "ratings" (
-	"id"	INTEGER,
-	"rating_group_id"	INTEGER NOT NULL,
-	"name"	TEXT NOT NULL CHECK(length("name") > 0),
-	"minimum_age"	INTEGER,
-	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("rating_group_id") REFERENCES "rating_groups"("id") ON DELETE RESTRICT,
-	PRIMARY KEY("id" AUTOINCREMENT),
-	UNIQUE("rating_group_id","name")
-);
-CREATE TABLE IF NOT EXISTS "products" (
-	"id"	INTEGER,
-	"product_group_id"	INTEGER NOT NULL,
-	"product_type_id"	INTEGER NOT NULL,
-	"region_id"	INTEGER NOT NULL,
-	"rating_id"	INTEGER,
-	"pricecharting_id"	INTEGER,
-	"title"	TEXT NOT NULL CHECK(length("title") > 0),
-	"variant"	TEXT,
-	"release_year"	INTEGER CHECK("release_year" BETWEEN 1950 AND 2050),
-	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("region_id") REFERENCES "regions"("id") ON DELETE RESTRICT,
-	FOREIGN KEY("product_type_id") REFERENCES "product_types"("id") ON DELETE RESTRICT,
-	FOREIGN KEY("product_group_id") REFERENCES "product_groups"("id") ON DELETE RESTRICT,
-	FOREIGN KEY("rating_id") REFERENCES "ratings"("id") ON DELETE RESTRICT,
-	PRIMARY KEY("id" AUTOINCREMENT),
-	UNIQUE("title","variant","product_group_id","region_id")
-);
-CREATE TABLE IF NOT EXISTS "inventory" (
-	"id"	INTEGER,
-	"product_id"	INTEGER NOT NULL,
-	"barcode"	TEXT CHECK("barcode" IS NULL OR length("barcode") > 0),
-	"price_override"	REAL CHECK("price_override" IS NULL OR "price_override" >= 0),
-	"comment"	TEXT CHECK("comment" IS NULL OR length("comment") > 0),
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("product_id") REFERENCES "products"("id") ON DELETE RESTRICT,
-	PRIMARY KEY("id" AUTOINCREMENT),
-	UNIQUE("barcode")
-);
-CREATE TABLE IF NOT EXISTS "product_attribute_values" (
-	"id"	INTEGER,
-	"product_id"	INTEGER NOT NULL,
-	"attribute_id"	INTEGER NOT NULL,
-	"value"	TEXT NOT NULL,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("attribute_id") REFERENCES "attributes"("id") ON DELETE RESTRICT,
-	FOREIGN KEY("product_id") REFERENCES "products"("id") ON DELETE RESTRICT,
-	PRIMARY KEY("id" AUTOINCREMENT),
-	UNIQUE("product_id","attribute_id")
-);
-CREATE TABLE IF NOT EXISTS "inventory_attribute_values" (
-	"id"	INTEGER,
-	"inventory_id"	INTEGER NOT NULL,
-	"attribute_id"	INTEGER NOT NULL,
-	"value"	TEXT NOT NULL,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("inventory_id") REFERENCES "inventory"("id") ON DELETE RESTRICT,
-	FOREIGN KEY("attribute_id") REFERENCES "attributes"("id") ON DELETE RESTRICT,
-	PRIMARY KEY("id" AUTOINCREMENT),
-	UNIQUE("inventory_id","attribute_id")
-);
-CREATE TABLE IF NOT EXISTS "pricecharting_prices" (
-	"id"	INTEGER,
-	"product_id"	INTEGER NOT NULL,
-	"loose_usd"	REAL CHECK("loose_usd" IS NULL OR "loose_usd" >= 0),
-	"cib_usd"	REAL CHECK("cib_usd" IS NULL OR "cib_usd" >= 0),
-	"new_usd"	REAL CHECK("new_usd" IS NULL OR "new_usd" >= 0),
-	"manual_only_usd"	REAL CHECK("manual_only_usd" IS NULL OR "manual_only_usd" >= 0),
-	"box_only_usd"	REAL CHECK("box_only_usd" IS NULL OR "box_only_usd" >= 0),
-	"loose_nok"	REAL CHECK("loose_nok" IS NULL OR "loose_nok" >= 0),
-	"cib_nok"	REAL CHECK("cib_nok" IS NULL OR "cib_nok" >= 0),
-	"new_nok"	REAL CHECK("new_nok" IS NULL OR "new_nok" >= 0),
-	"manual_only_nok"	REAL CHECK("manual_only_nok" IS NULL OR "manual_only_nok" >= 0),
-	"box_only_nok"	REAL CHECK("box_only_nok" IS NULL OR "box_only_nok" >= 0),
-	"loose_nok_fixed"	REAL CHECK("loose_nok_fixed" IS NULL OR "loose_nok_fixed" >= 0),
-	"cib_nok_fixed"	REAL CHECK("cib_nok_fixed" IS NULL OR "cib_nok_fixed" >= 0),
-	"new_nok_fixed"	REAL CHECK("new_nok_fixed" IS NULL OR "new_nok_fixed" >= 0),
-	"manual_only_nok_fixed"	REAL CHECK("manual_only_nok_fixed" IS NULL OR "manual_only_nok_fixed" >= 0),
-	"box_only_nok_fixed"	REAL CHECK("box_only_nok_fixed" IS NULL OR "box_only_nok_fixed" >= 0),
-	"usd_nok_rate"	REAL NOT NULL CHECK("usd_nok_rate" > 0),
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("product_id") REFERENCES "products"("id") ON DELETE RESTRICT,
+	"name"	TEXT NOT NULL,
+	"product_line_id"	INTEGER NOT NULL,
+	UNIQUE("name","product_line_id"),
+	FOREIGN KEY("product_line_id") REFERENCES "product_lines"("id") ON DELETE CASCADE,
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "product_sites" (
+CREATE TABLE IF NOT EXISTS "tags" (
 	"id"	INTEGER,
-	"name"	TEXT NOT NULL CHECK(length("name") > 0) UNIQUE,
-	"base_url"	TEXT NOT NULL CHECK(length("base_url") > 0 AND "base_url" LIKE 'http%://%'),
+	"name"	TEXT NOT NULL,
+	UNIQUE("name"),
+	PRIMARY KEY("id" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "settings" (
+	"settings_id"	INTEGER,
+	"setting_name"	TEXT NOT NULL UNIQUE,
+	"setting_value"	TEXT NOT NULL,
+	PRIMARY KEY("settings_id" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "base_sizes" (
+	"id"	INTEGER,
+	"base_size_name"	TEXT NOT NULL,
+	PRIMARY KEY("id" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "painted_by" (
+	"id"	INTEGER,
+	"painted_by_name"	TEXT NOT NULL,
+	PRIMARY KEY("id" AUTOINCREMENT)
+);
+CREATE TABLE IF NOT EXISTS "minis" (
+	"id"	INTEGER,
+	"name"	TEXT NOT NULL,
 	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+	"location"	TEXT NOT NULL,
+	"quantity"	INTEGER DEFAULT 1 CHECK("quantity" >= 0),
+	"created_at"	TEXT DEFAULT (datetime('now')),
+	"updated_at"	TEXT DEFAULT (datetime('now')),
+	"painted_by_id"	INTEGER NOT NULL DEFAULT 1,
+	"base_size_id"	INTEGER NOT NULL DEFAULT 3,
+	"product_set_id"	INTEGER,
+	FOREIGN KEY("product_set_id") REFERENCES "product_sets"("id"),
+	FOREIGN KEY("painted_by_id") REFERENCES "painted_by"("id"),
+	FOREIGN KEY("base_size_id") REFERENCES "base_sizes"("id"),
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "product_site_links" (
+CREATE TABLE IF NOT EXISTS "mini_to_tags" (
+	"mini_id"	INTEGER NOT NULL,
+	"tag_id"	INTEGER NOT NULL,
+	FOREIGN KEY("tag_id") REFERENCES "tags"("id") ON DELETE CASCADE,
+	FOREIGN KEY("mini_id") REFERENCES "minis"("id") ON DELETE CASCADE,
+	PRIMARY KEY("mini_id","tag_id")
+);
+CREATE TABLE IF NOT EXISTS "mini_types" (
 	"id"	INTEGER,
-	"product_id"	INTEGER NOT NULL,
-	"site_id"	INTEGER NOT NULL,
-	"url_path"	TEXT NOT NULL CHECK(length("url_path") > 0),
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	FOREIGN KEY("product_id") REFERENCES "products"("id") ON DELETE RESTRICT,
-	FOREIGN KEY("site_id") REFERENCES "product_sites"("id") ON DELETE RESTRICT,
-	UNIQUE("product_id","site_id"),
+	"name"	TEXT NOT NULL,
+	UNIQUE("name"),
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "attributes" (
-	"id"	INTEGER,
-	"name"	TEXT NOT NULL CHECK(length("name") > 0) UNIQUE,
-	"ui_name"	TEXT NOT NULL CHECK(length("ui_name") > 0),
-	"type"	TEXT NOT NULL CHECK("type" IN ('boolean', 'string', 'number', 'set')),
-	"scope"	TEXT NOT NULL CHECK("scope" IN ('product', 'inventory')),
-	"allowed_values"	TEXT,
-	"product_type_ids"	TEXT,
-	"product_group_ids"	TEXT,
-	"is_required"	BOOLEAN NOT NULL DEFAULT 0,
-	"default_value"	TEXT,
-	"description"	TEXT,
-	"is_active"	BOOLEAN NOT NULL DEFAULT 1,
-	"created_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"updated_at"	DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-	"show_in_ui"	BOOLEAN NOT NULL DEFAULT 1,
-	"show_if_empty"	BOOLEAN NOT NULL DEFAULT 0,
-	"use_image"	BOOLEAN NOT NULL DEFAULT 0,
-	PRIMARY KEY("id" AUTOINCREMENT)
+CREATE TABLE IF NOT EXISTS "mini_to_types" (
+	"mini_id"	INTEGER NOT NULL,
+	"type_id"	INTEGER NOT NULL,
+	"proxy_type"	BOOLEAN NOT NULL DEFAULT 0,
+	FOREIGN KEY("type_id") REFERENCES "mini_types"("id") ON DELETE CASCADE,
+	FOREIGN KEY("mini_id") REFERENCES "minis"("id") ON DELETE CASCADE,
+	PRIMARY KEY("mini_id","type_id")
 );
-CREATE TABLE IF NOT EXISTS "users" (
-	"id"	INTEGER,
-	"username"	TEXT NOT NULL UNIQUE,
-	"password"	TEXT NOT NULL,
-	"created_at"	DATETIME DEFAULT CURRENT_TIMESTAMP,
-	PRIMARY KEY("id" AUTOINCREMENT)
+CREATE TABLE IF NOT EXISTS "type_to_categories" (
+	"type_id"	INTEGER NOT NULL,
+	"category_id"	INTEGER NOT NULL,
+	FOREIGN KEY("category_id") REFERENCES "mini_categories"("id") ON DELETE CASCADE,
+	FOREIGN KEY("type_id") REFERENCES "mini_types"("id") ON DELETE CASCADE,
+	PRIMARY KEY("type_id","category_id")
 );
-INSERT INTO "product_groups" VALUES (1,'Xbox 360','Microsoft Xbox 360 gaming console and related items',1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_groups" VALUES (2,'PlayStation 3','Sony Playstation 3 gaming console and related items',1,'2024-11-23 13:26:58','2024-11-29 01:44:42');
-INSERT INTO "product_groups" VALUES (3,'PlayStation 4','Sony PlayStation 4 gaming console and related items',1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_groups" VALUES (4,'Nintendo Wii','Nintendo Wii gaming console and related items',1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_groups" VALUES (5,'Nintendo Wii U','Nintendo Wii U gaming console and related items',1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_types" VALUES (1,'Game',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_types" VALUES (3,'Console',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_types" VALUES (7,'Peripherals',NULL,1,'2024-11-30 00:48:56','2024-11-30 00:48:56');
-INSERT INTO "regions" VALUES (1,'PAL',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "regions" VALUES (2,'NTSC',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "regions" VALUES (3,'NTSC-J',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "rating_groups" VALUES (1,1,'PEGI',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "rating_groups" VALUES (2,2,'ESRB',NULL,1,'2024-11-23 13:26:58','2024-11-29 01:35:36');
-INSERT INTO "rating_groups" VALUES (3,1,'USK',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "rating_groups" VALUES (4,1,'ACB',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "rating_groups" VALUES (5,1,'BBFC',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "rating_groups" VALUES (6,3,'CERO',NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (1,1,'PEGI 3',3,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (3,1,'PEGI 12',12,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (4,1,'PEGI 16',16,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (5,1,'PEGI 18',18,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (6,6,'CERO A',0,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (7,6,'CERO B',12,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (8,6,'CERO C',15,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (9,6,'CERO D',17,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (10,6,'CERO Z',18,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (11,4,'ACB G',0,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (12,4,'ACB M',15,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (13,4,'ACB M15',15,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (14,4,'ACB PG',0,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (15,4,'ACB R18',18,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (16,5,'BBFC 12e',12,NULL,1,'2024-11-23 13:26:58','2024-11-29 01:33:25');
-INSERT INTO "ratings" VALUES (17,5,'BBFC 15',15,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (18,5,'BBFC 18',18,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (19,5,'BBFC PG',0,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (20,5,'BBFC U',0,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (24,2,'ESRB T',13,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (26,3,'USK 0',0,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (27,3,'USK 6',6,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (28,3,'USK 12',12,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (29,3,'USK 16',16,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (30,3,'USK 18',18,NULL,1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "ratings" VALUES (31,2,'ESRB Ed',NULL,NULL,1,'2024-11-29 01:31:43','2024-11-29 01:35:40');
-INSERT INTO "ratings" VALUES (32,2,'ESRB EC',NULL,NULL,1,'2024-11-29 01:31:49','2024-11-29 01:31:49');
-INSERT INTO "ratings" VALUES (33,2,'ESRB E10',NULL,NULL,1,'2024-11-29 01:31:55','2024-11-29 01:37:23');
-INSERT INTO "ratings" VALUES (34,2,'ESRB M',NULL,NULL,1,'2024-11-29 01:32:01','2024-11-29 01:32:01');
-INSERT INTO "ratings" VALUES (35,1,'PEGI 7',NULL,NULL,1,'2024-11-29 01:32:37','2024-11-29 01:32:37');
-INSERT INTO "products" VALUES (1,1,1,1,5,NULL,'Assassin''s Creed',NULL,2009,'a',1,'2024-11-30 12:35:17','2024-11-30 13:41:28');
-INSERT INTO "product_attribute_values" VALUES (25,1,46,'dd','2024-11-30 13:41:28','2024-11-30 13:41:28');
-INSERT INTO "product_attribute_values" VALUES (26,1,47,'pp','2024-11-30 13:41:28','2024-11-30 13:41:28');
-INSERT INTO "product_attribute_values" VALUES (27,1,48,'1','2024-11-30 13:41:28','2024-11-30 13:41:28');
-INSERT INTO "product_attribute_values" VALUES (28,1,49,'gg','2024-11-30 13:41:28','2024-11-30 13:41:28');
-INSERT INTO "product_sites" VALUES (1,'PriceCharting','https://www.pricecharting.com','Video game price tracking website',1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_sites" VALUES (2,'MobyGames','https://www.mobygames.com','Video game database',1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "product_sites" VALUES (3,'GameFAQs','https://gamefaqs.gamespot.com','Video game guides and community',1,'2024-11-23 13:26:58','2024-11-23 13:26:58');
-INSERT INTO "attributes" VALUES (46,'developerName','Developer','string','product','','[1]','[4,5,2,3,1]',0,'',NULL,1,'2024-11-29 13:16:25','2024-11-29 13:16:25',1,0,0);
-INSERT INTO "attributes" VALUES (47,'publisherName','Publisher','string','product','','[1]','[4,5,2,3,1]',0,'',NULL,1,'2024-11-29 13:16:40','2024-11-29 13:16:40',1,0,0);
-INSERT INTO "attributes" VALUES (48,'isKinect','Kinect','boolean','product','','[1]','[1]',1,'0',NULL,1,'2024-11-29 13:17:06','2024-11-29 23:59:12',1,0,0);
-INSERT INTO "attributes" VALUES (49,'gameGenre','Genre','string','product','','[1]','[4,5,2,3,1]',1,'',NULL,1,'2024-11-29 13:17:37','2024-11-29 14:11:35',1,0,0);
-INSERT INTO "users" VALUES (1,'ltg','$2b$10$kllPpEdLlvn9nAT4Otb7qO3D9eJ7yWnvAFRDNi6NN.DmZqBeAr4hq','2024-11-30 04:15:14');
-INSERT INTO "users" VALUES (2,'guyra','$2b$10$US79s0yn2Wl5Hd5QuwIM1OwpyA.dUr16SedvlCHa7NxEu5OHcDb1a','2024-11-30 04:15:14');
-CREATE INDEX IF NOT EXISTS "idx_product_groups_active" ON "product_groups" (
-	"is_active"
+INSERT INTO "mini_categories" VALUES (7,'Dragon');
+INSERT INTO "mini_categories" VALUES (8,'Elemental');
+INSERT INTO "mini_categories" VALUES (10,'Giant');
+INSERT INTO "mini_categories" VALUES (11,'Humanoid');
+INSERT INTO "mini_categories" VALUES (12,'Magical Beast');
+INSERT INTO "mini_categories" VALUES (13,'Monstrous Humanoid');
+INSERT INTO "mini_categories" VALUES (14,'Ooze');
+INSERT INTO "mini_categories" VALUES (15,'Outsider');
+INSERT INTO "mini_categories" VALUES (16,'Plant');
+INSERT INTO "mini_categories" VALUES (17,'Undead');
+INSERT INTO "mini_categories" VALUES (18,'Vermin');
+INSERT INTO "mini_categories" VALUES (20,'Fiend');
+INSERT INTO "mini_categories" VALUES (33,'Fire');
+INSERT INTO "mini_categories" VALUES (34,'Incorporeal');
+INSERT INTO "mini_categories" VALUES (35,'Psionic');
+INSERT INTO "mini_categories" VALUES (36,'Shapechanger');
+INSERT INTO "mini_categories" VALUES (37,'Swarm');
+INSERT INTO "mini_categories" VALUES (38,'Water');
+INSERT INTO "mini_categories" VALUES (39,'Unique');
+INSERT INTO "product_companies" VALUES (2,'WizKids Games');
+INSERT INTO "product_companies" VALUES (4,'Wizards of the Coast');
+INSERT INTO "product_companies" VALUES (5,'Gifted Vision');
+INSERT INTO "product_companies" VALUES (7,'Fantasy Flight Games');
+INSERT INTO "product_companies" VALUES (8,'King Games');
+INSERT INTO "product_companies" VALUES (9,'Games Workshop');
+INSERT INTO "product_companies" VALUES (10,'CMON');
+INSERT INTO "product_companies" VALUES (11,'Tehnolog');
+INSERT INTO "product_companies" VALUES (12,'Wells Expedition');
+INSERT INTO "product_companies" VALUES (13,'Schleich');
+INSERT INTO "product_companies" VALUES (14,'Petersen Games');
+INSERT INTO "product_companies" VALUES (15,'Monolith Board Games');
+INSERT INTO "product_companies" VALUES (16,'Mantic Games');
+INSERT INTO "product_companies" VALUES (17,'Workhouse Games');
+INSERT INTO "product_companies" VALUES (18,'Blacklist Games');
+INSERT INTO "product_companies" VALUES (19,'Privateer Press');
+INSERT INTO "product_companies" VALUES (20,'North Star Military Figures');
+INSERT INTO "product_companies" VALUES (21,'Archon Studio');
+INSERT INTO "product_companies" VALUES (22,'Ral Partha');
+INSERT INTO "product_companies" VALUES (23,'Chap Mey');
+INSERT INTO "product_companies" VALUES (24,'Hammerlot Games');
+INSERT INTO "product_companies" VALUES (26,'Twilight Creations');
+INSERT INTO "product_companies" VALUES (27,'Trenchworx');
+INSERT INTO "product_companies" VALUES (28,'TTCombat');
+INSERT INTO "product_companies" VALUES (29,'Milton Bradley');
+INSERT INTO "product_companies" VALUES (30,'eM4 Miniatures');
+INSERT INTO "product_companies" VALUES (32,'Dark Sword Miniatures');
+INSERT INTO "product_companies" VALUES (33,'Gale Force 9');
+INSERT INTO "product_companies" VALUES (34,'Midlam Miniatures');
+INSERT INTO "product_companies" VALUES (35,'Monster Fight Club');
+INSERT INTO "product_companies" VALUES (36,'Next Level Miniatures');
+INSERT INTO "product_companies" VALUES (37,'Reaper Miniatures');
+INSERT INTO "product_companies" VALUES (38,'Steamforge Games');
+INSERT INTO "product_companies" VALUES (39,'Tomb Guardians');
+INSERT INTO "product_companies" VALUES (43,'Bad Squiddo Games');
+INSERT INTO "product_lines" VALUES (3,'Icons of the Realms',2);
+INSERT INTO "product_lines" VALUES (6,'Magic the Gathering: Creature Forge',2);
+INSERT INTO "product_lines" VALUES (7,'Dungeons & Dragons Miniatures',4);
+INSERT INTO "product_lines" VALUES (8,'Pathfinder Battles',2);
+INSERT INTO "product_lines" VALUES (9,'Critical Role',2);
+INSERT INTO "product_lines" VALUES (10,'Dungeon Crawler Miniatures',5);
+INSERT INTO "product_lines" VALUES (12,'Runewars Miniatures Game',7);
+INSERT INTO "product_lines" VALUES (13,'Arkham Horror Premium Figures',7);
+INSERT INTO "product_lines" VALUES (14,'Mage Knight',2);
+INSERT INTO "product_lines" VALUES (15,'Wardlings',2);
+INSERT INTO "product_lines" VALUES (16,'Dreamblade',4);
+INSERT INTO "product_lines" VALUES (17,'Star Wars Miniatures',4);
+INSERT INTO "product_lines" VALUES (18,'Be-Sieged',10);
+INSERT INTO "product_lines" VALUES (19,'Massive Darkness',10);
+INSERT INTO "product_lines" VALUES (20,'Arcane Legions',12);
+INSERT INTO "product_lines" VALUES (21,'Eldrador',13);
+INSERT INTO "product_lines" VALUES (22,'Mystic Battles: Pantheon',15);
+INSERT INTO "product_lines" VALUES (23,'Terrain Crate',16);
+INSERT INTO "product_lines" VALUES (24,'The Awful Orphanage',17);
+INSERT INTO "product_lines" VALUES (25,'Blacklist Miniatures',18);
+INSERT INTO "product_lines" VALUES (26,'Altar Quest',18);
+INSERT INTO "product_lines" VALUES (27,'Widower''s Wood',19);
+INSERT INTO "product_lines" VALUES (28,'Frostgrave',20);
+INSERT INTO "product_lines" VALUES (29,'Dungeon & Lasers',21);
+INSERT INTO "product_lines" VALUES (30,'MCDM Minis',27);
+INSERT INTO "product_lines" VALUES (31,'Heroscape',29);
+INSERT INTO "product_lines" VALUES (32,'Elfsera',30);
+INSERT INTO "product_sets" VALUES (7,'Waterdeep: Dungeon of the Mad Mage',3);
+INSERT INTO "product_sets" VALUES (8,'Monster Menagerie 2',3);
+INSERT INTO "product_sets" VALUES (9,'Monster Menagerie',3);
+INSERT INTO "product_sets" VALUES (10,'White Dracolich',3);
+INSERT INTO "product_sets" VALUES (11,'Maze of Death',8);
+INSERT INTO "product_sets" VALUES (12,'Monsters of Wildemount 1',9);
+INSERT INTO "product_sets" VALUES (13,'Behemoth',10);
+INSERT INTO "product_sets" VALUES (15,'Overwhelming Swarm',6);
+INSERT INTO "product_sets" VALUES (16,'Aberrations',7);
+INSERT INTO "product_sets" VALUES (17,'Giants of Legend',7);
+INSERT INTO "product_sets" VALUES (20,'Dungeons: Pyramid',14);
+INSERT INTO "product_sets" VALUES (21,'Dungeons: Citadel',14);
+INSERT INTO "product_sets" VALUES (22,'Dungeons: Magestone Mines',14);
+INSERT INTO "product_sets" VALUES (23,'Dragon''s Gate',14);
+INSERT INTO "product_sets" VALUES (24,'Dungeons',14);
+INSERT INTO "product_sets" VALUES (36,'test',29);
+INSERT INTO "tags" VALUES (40,'two-handed sword');
+INSERT INTO "tags" VALUES (41,'barbarian');
+INSERT INTO "tags" VALUES (42,'cloak');
+INSERT INTO "tags" VALUES (43,'light armor');
+INSERT INTO "tags" VALUES (44,'female');
+INSERT INTO "tags" VALUES (45,'holding item');
+INSERT INTO "tags" VALUES (46,'enlarged');
+INSERT INTO "tags" VALUES (47,'mushroom');
+INSERT INTO "tags" VALUES (48,'spellcaster');
+INSERT INTO "tags" VALUES (49,'horns');
+INSERT INTO "tags" VALUES (50,'wings');
+INSERT INTO "tags" VALUES (51,'humanoid');
+INSERT INTO "tags" VALUES (52,'t1');
+INSERT INTO "tags" VALUES (53,'t2');
+INSERT INTO "tags" VALUES (54,'lol');
+INSERT INTO "tags" VALUES (55,'afe');
+INSERT INTO "tags" VALUES (56,'qwerqwer');
+INSERT INTO "tags" VALUES (57,'1');
+INSERT INTO "tags" VALUES (58,'2');
+INSERT INTO "tags" VALUES (59,'3');
+INSERT INTO "tags" VALUES (60,'t3');
+INSERT INTO "tags" VALUES (61,'t');
+INSERT INTO "tags" VALUES (62,'e');
+INSERT INTO "tags" VALUES (63,'q');
+INSERT INTO "tags" VALUES (64,'malespånytt');
+INSERT INTO "tags" VALUES (65,'d');
+INSERT INTO "tags" VALUES (66,'taaaag');
+INSERT INTO "tags" VALUES (67,'dette');
+INSERT INTO "tags" VALUES (68,'er');
+INSERT INTO "tags" VALUES (69,'tags');
+INSERT INTO "tags" VALUES (70,'haha');
+INSERT INTO "tags" VALUES (71,'this');
+INSERT INTO "tags" VALUES (72,'dude');
+INSERT INTO "tags" VALUES (73,'got');
+INSERT INTO "tags" VALUES (74,'skills');
+INSERT INTO "tags" VALUES (75,'tag2');
+INSERT INTO "tags" VALUES (76,'tag3');
+INSERT INTO "tags" VALUES (77,'purple');
+INSERT INTO "tags" VALUES (78,'dragon');
+INSERT INTO "tags" VALUES (79,'asdf');
+INSERT INTO "settings" VALUES (208,'collection_viewtype','table');
+INSERT INTO "settings" VALUES (259,'minisadmin_entries_per_page','10');
+INSERT INTO "settings" VALUES (286,'collection_show_entries_per_page','10');
+INSERT INTO "settings" VALUES (287,'productadmin_entries_per_page','10');
+INSERT INTO "base_sizes" VALUES (1,'tiny');
+INSERT INTO "base_sizes" VALUES (2,'small');
+INSERT INTO "base_sizes" VALUES (3,'medium');
+INSERT INTO "base_sizes" VALUES (4,'large');
+INSERT INTO "base_sizes" VALUES (5,'huge');
+INSERT INTO "base_sizes" VALUES (6,'gargantuan');
+INSERT INTO "base_sizes" VALUES (7,'colossal');
+INSERT INTO "base_sizes" VALUES (8,'colossal+');
+INSERT INTO "painted_by" VALUES (1,'prepainted');
+INSERT INTO "painted_by" VALUES (2,'self');
+INSERT INTO "painted_by" VALUES (3,'other');
+INSERT INTO "minis" VALUES (14,'Saproling',NULL,'Skuff 3',1,'2024-11-21 23:43:32','2024-11-21 23:43:32',1,3,15);
+INSERT INTO "minis" VALUES (15,'Celestial Black Bear',NULL,'Skuff 2',1,'2024-11-21 23:44:13','2024-11-25 18:51:30',1,3,16);
+INSERT INTO "minis" VALUES (16,'Frenzied Berserker',NULL,'Skuff 4',1,'2024-11-21 23:45:04','2024-11-21 23:45:04',1,3,16);
+INSERT INTO "minis" VALUES (17,'Bronze Wyrmling','asdfqwr','Drage Skuffen',1,'2024-11-21 23:45:41','2024-12-08 01:53:59',1,2,NULL);
+INSERT INTO "minis" VALUES (18,'DryadName2s','desc','Test skuffen2',11,'2024-11-21 23:46:37','2024-12-05 13:09:42',1,5,36);
+INSERT INTO "minis" VALUES (19,'Halfling Rogue',NULL,'Skuff 4',1,'2024-11-21 23:47:19','2024-11-26 13:34:05',1,2,8);
+INSERT INTO "minis" VALUES (20,'Otto',NULL,'Store Skuffen',1,'2024-11-21 23:48:14','2024-11-26 08:44:30',1,4,7);
+INSERT INTO "minis" VALUES (21,'White Dracolich',NULL,'Store Skuffen',1,'2024-11-21 23:48:58','2024-11-26 08:45:59',1,6,10);
+INSERT INTO "minis" VALUES (22,'Purple Fungus',NULL,'Plante Skuffen',1,'2024-11-21 23:49:33','2024-11-26 08:45:46',1,3,11);
+INSERT INTO "minis" VALUES (23,'Nergaliid','w','Skuff 2',1,'2024-11-21 23:50:30','2024-11-26 08:42:43',1,4,12);
+INSERT INTO "minis" VALUES (24,'Behemoth','qwdqwfd','Store Skuffen',1,'2024-11-21 23:52:30','2024-12-08 02:15:40',1,8,13);
+INSERT INTO "minis" VALUES (25,'Glasya','qww','Skuff 1',1,'2024-11-21 23:56:49','2024-12-08 01:52:14',2,5,NULL);
+INSERT INTO "minis" VALUES (56,'En-zar',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (57,'Pearl',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (58,'Khoura',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (59,'Captain Salidar',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,21);
+INSERT INTO "minis" VALUES (60,'Nazul Leptra',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,22);
+INSERT INTO "minis" VALUES (61,'Tridrax',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (62,'Feasting Raptor',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,23);
+INSERT INTO "minis" VALUES (63,'Sun Leopard',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (64,'Temple Cat',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (65,'Dagon',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (66,'Gnoll Poacher',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (67,'Chromazar',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,22);
+INSERT INTO "minis" VALUES (68,'Ember',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (69,'Ram Warrior',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (71,'Satyr',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,24);
+INSERT INTO "minis" VALUES (72,'Stone Boar',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (73,'Skulk',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (74,'Scalesworn Specter',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,23);
+INSERT INTO "minis" VALUES (75,'Possessing Spirit',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (76,'Seeker Elydia',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (77,'Desert Ape',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (78,'Lizard Man',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,24);
+INSERT INTO "minis" VALUES (79,'Potbellied Gremlin',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,24);
+INSERT INTO "minis" VALUES (81,'Arne','Here is a little text that will serve as the description for this miniature.','Skap 2 Skuff 4',1,'2024-11-27 17:13:11','2024-12-08 02:37:13',3,3,NULL);
+INSERT INTO "minis" VALUES (82,'Poisonous Salamander',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,23);
+INSERT INTO "minis" VALUES (83,'Rurik the Blessed',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (84,'Ironblood Ettin',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (85,'Phreggs',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (86,'Hawk Guardian',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (87,'Hazna',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (88,'Mage-king Alment Lan',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,24);
+INSERT INTO "minis" VALUES (89,'Sham-rin',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,22);
+INSERT INTO "minis" VALUES (90,'Stone Golem',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (91,'Squalid Gremlin',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (92,'Slag Troll',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,23);
+INSERT INTO "minis" VALUES (93,'Vine Golem',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (94,'Rattletail',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (95,'Skull Warder',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (96,'Lord Oren',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,24);
+INSERT INTO "minis" VALUES (97,'Seeker Contri',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (98,'Dark Archer',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,23);
+INSERT INTO "minis" VALUES (99,'Corpheus',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,22);
+INSERT INTO "minis" VALUES (100,'Gervin the Loyal',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,23);
+INSERT INTO "minis" VALUES (101,'Fire Salamander',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (102,'Geddion Longblade',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (103,'Seeker Mock',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (104,'Gnoll Robber',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (105,'Seeker Azruk',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (106,'Stinging Skeleton',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (108,'Hydra Serpent',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,24);
+INSERT INTO "minis" VALUES (109,'Tomb Skeleton',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (110,'Elabeth the Pure',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,23);
+INSERT INTO "minis" VALUES (111,'Revenant Draconum',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-11-27 17:13:11',1,3,20);
+INSERT INTO "minis" VALUES (112,'Animated Mud',NULL,'Skuff',1,'2024-11-27 17:13:11','2024-12-08 01:57:24',1,3,NULL);
+INSERT INTO "minis" VALUES (113,'Coral',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,20);
+INSERT INTO "minis" VALUES (114,'Demolishing Ape',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,24);
+INSERT INTO "minis" VALUES (115,'Autumn',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-12-08 01:37:11',1,3,NULL);
+INSERT INTO "minis" VALUES (117,'Carapace Creature',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,23);
+INSERT INTO "minis" VALUES (118,'Jackal Guardian',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,20);
+INSERT INTO "minis" VALUES (119,'Hooded Assassin',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,20);
+INSERT INTO "minis" VALUES (120,'Gorgon',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,20);
+INSERT INTO "minis" VALUES (121,'Erlin Boltripper',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,21);
+INSERT INTO "minis" VALUES (122,'Gargoyle',NULL,'Skuff',1,'2024-11-27 17:13:12','2024-11-27 17:13:12',1,3,24);
+INSERT INTO "minis" VALUES (124,'Dragonette','Just a dragon. Purple.','locccce',12,'2024-12-05 22:41:10','2024-12-08 01:39:19',1,3,16);
+INSERT INTO "mini_types" VALUES (1669,'Greater Kruthik');
+INSERT INTO "mini_types" VALUES (1670,'Hatchling Kruthik');
+INSERT INTO "mini_types" VALUES (1671,'Kuldurath');
+INSERT INTO "mini_types" VALUES (1672,'Lamia');
+INSERT INTO "mini_types" VALUES (1673,'Lammasu');
+INSERT INTO "mini_types" VALUES (1674,'Leskylor');
+INSERT INTO "mini_types" VALUES (1675,'Three-Headed Leskylor');
+INSERT INTO "mini_types" VALUES (1676,'Leucrotta');
+INSERT INTO "mini_types" VALUES (1677,'Changesteed Leucrotta');
+INSERT INTO "mini_types" VALUES (1678,'Leviathan');
+INSERT INTO "mini_types" VALUES (1679,'Limbo Stalker');
+INSERT INTO "mini_types" VALUES (1680,'Lirr');
+INSERT INTO "mini_types" VALUES (1681,'Lith');
+INSERT INTO "mini_types" VALUES (1682,'Living Shipwreck');
+INSERT INTO "mini_types" VALUES (1683,'Loquasphinx');
+INSERT INTO "mini_types" VALUES (1684,'Lucent Worm');
+INSERT INTO "mini_types" VALUES (1685,'Luna Moth');
+INSERT INTO "mini_types" VALUES (1686,'Malastor');
+INSERT INTO "mini_types" VALUES (1687,'Manticore');
+INSERT INTO "mini_types" VALUES (1688,'Mantimera');
+INSERT INTO "mini_types" VALUES (1689,'Metalmaster');
+INSERT INTO "mini_types" VALUES (1690,'Mivilorn');
+INSERT INTO "mini_types" VALUES (1691,'Mlarraun');
+INSERT INTO "mini_types" VALUES (1692,'Mockery Drone');
+INSERT INTO "mini_types" VALUES (1693,'Mockery Monarch');
+INSERT INTO "mini_types" VALUES (1694,'Monkeyman');
+INSERT INTO "mini_types" VALUES (1695,'Mooncalf');
+INSERT INTO "mini_types" VALUES (1696,'Mooncalf Moonlord');
+INSERT INTO "mini_types" VALUES (1697,'Moonrat');
+INSERT INTO "mini_types" VALUES (1698,'Moor Cat');
+INSERT INTO "mini_types" VALUES (1701,'Mudmaw');
+INSERT INTO "mini_types" VALUES (1702,'Nethersight Mastiff');
+INSERT INTO "mini_types" VALUES (1703,'Nightmare Beast');
+INSERT INTO "mini_types" VALUES (1704,'Osquip');
+INSERT INTO "mini_types" VALUES (1705,'Overworm');
+INSERT INTO "mini_types" VALUES (1706,'Giant Owl');
+INSERT INTO "mini_types" VALUES (1707,'Owlbear');
+INSERT INTO "mini_types" VALUES (1708,'Pack Fiend');
+INSERT INTO "mini_types" VALUES (1709,'Pegasus');
+INSERT INTO "mini_types" VALUES (1710,'Peryton');
+INSERT INTO "mini_types" VALUES (1711,'Phargion');
+INSERT INTO "mini_types" VALUES (1712,'Phase Wasp');
+INSERT INTO "mini_types" VALUES (1713,'Phoenix');
+INSERT INTO "mini_types" VALUES (1714,'Phoera');
+INSERT INTO "mini_types" VALUES (1715,'Prismasaurus');
+INSERT INTO "mini_types" VALUES (1716,'Prismfly Swarm');
+INSERT INTO "mini_types" VALUES (1717,'Puppeteer');
+INSERT INTO "mini_types" VALUES (1718,'Flesh Harrower Puppeteer');
+INSERT INTO "mini_types" VALUES (1719,'Purple Worm');
+INSERT INTO "mini_types" VALUES (1720,'Pyrohydra');
+INSERT INTO "mini_types" VALUES (1721,'Quanlos');
+INSERT INTO "mini_types" VALUES (1722,'Rainbow Crow');
+INSERT INTO "mini_types" VALUES (1723,'Ramfish');
+INSERT INTO "mini_types" VALUES (1724,'Rasclinn');
+INSERT INTO "mini_types" VALUES (1725,'Giant Raven');
+INSERT INTO "mini_types" VALUES (1726,'Redspawn Birther');
+INSERT INTO "mini_types" VALUES (1727,'Redspawn Firebelcher');
+INSERT INTO "mini_types" VALUES (1728,'Remorhaz');
+INSERT INTO "mini_types" VALUES (1729,'Riftjumper');
+INSERT INTO "mini_types" VALUES (1730,'Rockhound');
+INSERT INTO "mini_types" VALUES (1731,'Roper');
+INSERT INTO "mini_types" VALUES (1732,'Deep Rothe');
+INSERT INTO "mini_types" VALUES (1733,'Ghost Rothe');
+INSERT INTO "mini_types" VALUES (1734,'Surface Rothe');
+INSERT INTO "mini_types" VALUES (1735,'Roving Mauler');
+INSERT INTO "mini_types" VALUES (1736,'Rylkar Harridan');
+INSERT INTO "mini_types" VALUES (1737,'Rylkar Madclaw');
+INSERT INTO "mini_types" VALUES (1738,'Rylkar Tormentor');
+INSERT INTO "mini_types" VALUES (1739,'Rylkspawn Swarm');
+INSERT INTO "mini_types" VALUES (1740,'Sand Howler');
+INSERT INTO "mini_types" VALUES (1741,'Sand Hunter');
+INSERT INTO "mini_types" VALUES (1747,'Scavenger');
+INSERT INTO "mini_types" VALUES (1751,'Seawolf');
+INSERT INTO "mini_types" VALUES (1752,'Senmurv');
+INSERT INTO "mini_types" VALUES (1753,'Shadestriker');
+INSERT INTO "mini_types" VALUES (1754,'Shadow Asp');
+INSERT INTO "mini_types" VALUES (1755,'Shadow Sea Serpent');
+INSERT INTO "mini_types" VALUES (1756,'Shedu');
+INSERT INTO "mini_types" VALUES (1757,'Shimmerwing');
+INSERT INTO "mini_types" VALUES (1758,'Shocker Lizard');
+INSERT INTO "mini_types" VALUES (1759,'Simpathetic');
+INSERT INTO "mini_types" VALUES (1760,'Simurgh');
+INSERT INTO "mini_types" VALUES (1761,'Sinister');
+INSERT INTO "mini_types" VALUES (1762,'Sirrush');
+INSERT INTO "mini_types" VALUES (1763,'Sisiutl');
+INSERT INTO "mini_types" VALUES (1764,'Skerath');
+INSERT INTO "mini_types" VALUES (1765,'Skiurid');
+INSERT INTO "mini_types" VALUES (1766,'Flying Snake');
+INSERT INTO "mini_types" VALUES (1767,'Spectral Hound');
+INSERT INTO "mini_types" VALUES (1768,'Spectral Panther');
+INSERT INTO "mini_types" VALUES (1769,'Spellgaunt');
+INSERT INTO "mini_types" VALUES (1770,'Sphinx');
+INSERT INTO "mini_types" VALUES (1771,'Canisphinx');
+INSERT INTO "mini_types" VALUES (1772,'Crocosphinx');
+INSERT INTO "mini_types" VALUES (1773,'Saurosphinx');
+INSERT INTO "mini_types" VALUES (1774,'Threskisphinx');
+INSERT INTO "mini_types" VALUES (1775,'Spider Eater');
+INSERT INTO "mini_types" VALUES (1776,'Hive Spider Queen');
+INSERT INTO "mini_types" VALUES (1777,'Phase Spider');
+INSERT INTO "mini_types" VALUES (1778,'Shadow Spider');
+INSERT INTO "mini_types" VALUES (1779,'Spirit Of The Air');
+INSERT INTO "mini_types" VALUES (1780,'Starsnake');
+INSERT INTO "mini_types" VALUES (1781,'Starwhale');
+INSERT INTO "mini_types" VALUES (1782,'Steeder');
+INSERT INTO "mini_types" VALUES (1783,'Steelwing');
+INSERT INTO "mini_types" VALUES (1784,'Stirge');
+INSERT INTO "mini_types" VALUES (1785,'Stone Flyer');
+INSERT INTO "mini_types" VALUES (1786,'Giant Strider');
+INSERT INTO "mini_types" VALUES (1788,'Swamplight Lynx');
+INSERT INTO "mini_types" VALUES (1796,'Tainted');
+INSERT INTO "mini_types" VALUES (1802,'Tayellah');
+INSERT INTO "mini_types" VALUES (1803,'Terlen');
+INSERT INTO "mini_types" VALUES (1804,'Thrum Worm');
+INSERT INTO "mini_types" VALUES (1805,'Thrym Hound');
+INSERT INTO "mini_types" VALUES (1806,'Thunder Worm');
+INSERT INTO "mini_types" VALUES (1807,'Thunderbird');
+INSERT INTO "mini_types" VALUES (1808,'Tirbana Drowser');
+INSERT INTO "mini_types" VALUES (1809,'Tirbana Eyewing');
+INSERT INTO "mini_types" VALUES (1810,'Tirbana Slayer');
+INSERT INTO "mini_types" VALUES (1811,'Tirbana Spawner');
+INSERT INTO "mini_types" VALUES (1812,'Tlalusk');
+INSERT INTO "mini_types" VALUES (1813,'Fire Toad');
+INSERT INTO "mini_types" VALUES (1814,'Ice Toad');
+INSERT INTO "mini_types" VALUES (1815,'Tomb Spider');
+INSERT INTO "mini_types" VALUES (1816,'Tomb Spider Broodswarm');
+INSERT INTO "mini_types" VALUES (1817,'Tree Python');
+INSERT INTO "mini_types" VALUES (1818,'Tressym');
+INSERT INTO "mini_types" VALUES (1819,'Tusk Terror');
+INSERT INTO "mini_types" VALUES (1820,'Tusked Behemoth');
+INSERT INTO "mini_types" VALUES (1821,'Tyrg');
+INSERT INTO "mini_types" VALUES (1822,'Unicorn');
+INSERT INTO "mini_types" VALUES (1823,'Black Unicorn');
+INSERT INTO "mini_types" VALUES (1825,'Ur''Epona');
+INSERT INTO "mini_types" VALUES (1826,'Urskan');
+INSERT INTO "mini_types" VALUES (1827,'Varrangoin');
+INSERT INTO "mini_types" VALUES (1828,'Varrangoin Arcanist');
+INSERT INTO "mini_types" VALUES (1829,'Lesser Varrangoin');
+INSERT INTO "mini_types" VALUES (1830,'Varrangoin Rager');
+INSERT INTO "mini_types" VALUES (1831,'Veserab');
+INSERT INTO "mini_types" VALUES (1832,'Giant Vulture');
+INSERT INTO "mini_types" VALUES (1833,'Warturtle');
+INSERT INTO "mini_types" VALUES (1834,'River Watcher');
+INSERT INTO "mini_types" VALUES (1835,'Stygian Watcher');
+INSERT INTO "mini_types" VALUES (1836,'Water Watcher');
+INSERT INTO "mini_types" VALUES (1837,'Watchspider');
+INSERT INTO "mini_types" VALUES (1838,'White Hart');
+INSERT INTO "mini_types" VALUES (1839,'Whitespawn Iceskidder');
+INSERT INTO "mini_types" VALUES (1840,'Wilora');
+INSERT INTO "mini_types" VALUES (1841,'Winter Wolf');
+INSERT INTO "mini_types" VALUES (1842,'Cloud Wolf');
+INSERT INTO "mini_types" VALUES (1843,'Magma Wolf');
+INSERT INTO "mini_types" VALUES (1844,'Mist Wolf');
+INSERT INTO "mini_types" VALUES (1845,'Sea Wolf');
+INSERT INTO "mini_types" VALUES (1846,'Shard Wolf');
+INSERT INTO "mini_types" VALUES (1847,'Thunder Wolf');
+INSERT INTO "mini_types" VALUES (1848,'Worg');
+INSERT INTO "mini_types" VALUES (1849,'Yeshir (Halfling Hound)');
+INSERT INTO "mini_types" VALUES (1850,'Yrthak');
+INSERT INTO "mini_types" VALUES (1851,'Zaratan');
+INSERT INTO "mini_types" VALUES (1852,'Zezir');
+INSERT INTO "mini_types" VALUES (1853,'Zhakal');
+INSERT INTO "mini_types" VALUES (1854,'Aarakocra');
+INSERT INTO "mini_types" VALUES (1855,'Abeil');
+INSERT INTO "mini_types" VALUES (1856,'Abeil Queen');
+INSERT INTO "mini_types" VALUES (1857,'Abeil Soldier');
+INSERT INTO "mini_types" VALUES (1858,'Abeil Vassal');
+INSERT INTO "mini_types" VALUES (1859,'Abomination Cult Leader');
+INSERT INTO "mini_types" VALUES (1860,'Alaghi');
+INSERT INTO "mini_types" VALUES (1861,'Anophelii');
+INSERT INTO "mini_types" VALUES (1862,'Arkamoi');
+INSERT INTO "mini_types" VALUES (1863,'Armand');
+INSERT INTO "mini_types" VALUES (1864,'Armand Warden');
+INSERT INTO "mini_types" VALUES (1865,'Bheur');
+INSERT INTO "mini_types" VALUES (1866,'Blackspawn Exterminator');
+INSERT INTO "mini_types" VALUES (1867,'Blackspawn Raider');
+INSERT INTO "mini_types" VALUES (1868,'Blindheim');
+INSERT INTO "mini_types" VALUES (1869,'Bluespawn Godslayer');
+INSERT INTO "mini_types" VALUES (1870,'Bluespawn Stoneglider');
+INSERT INTO "mini_types" VALUES (1871,'Boggle');
+INSERT INTO "mini_types" VALUES (1872,'Braxat');
+INSERT INTO "mini_types" VALUES (1873,'Bullywug Savant');
+INSERT INTO "mini_types" VALUES (1874,'Tigbanua Buso');
+INSERT INTO "mini_types" VALUES (1875,'Centaur');
+INSERT INTO "mini_types" VALUES (1876,'Chitine');
+INSERT INTO "mini_types" VALUES (1877,'Chosen One');
+INSERT INTO "mini_types" VALUES (1878,'Chupacabra');
+INSERT INTO "mini_types" VALUES (1879,'Claw Viper');
+INSERT INTO "mini_types" VALUES (1884,'Crazed Kuo-Toa');
+INSERT INTO "mini_types" VALUES (1885,'Creator Race');
+INSERT INTO "mini_types" VALUES (1886,'Derro');
+INSERT INTO "mini_types" VALUES (1888,'Doppelganger');
+INSERT INTO "mini_types" VALUES (1889,'Greater Doppelganger');
+INSERT INTO "mini_types" VALUES (1890,'Baaz Draconian');
+INSERT INTO "mini_types" VALUES (1891,'Dragonkin');
+INSERT INTO "mini_types" VALUES (1892,'Dromite');
+INSERT INTO "mini_types" VALUES (1893,'Equiceph');
+INSERT INTO "mini_types" VALUES (1894,'Firenewt');
+INSERT INTO "mini_types" VALUES (1898,'Frost Folk');
+INSERT INTO "mini_types" VALUES (1899,'Gargoyle');
+INSERT INTO "mini_types" VALUES (1900,'Kir-Lanan Gargoyle');
+INSERT INTO "mini_types" VALUES (1901,'Malgothian Gargoyle');
+INSERT INTO "mini_types" VALUES (1902,'Felar Gargun');
+INSERT INTO "mini_types" VALUES (1903,'Gloom');
+INSERT INTO "mini_types" VALUES (1904,'Goatfolk (Ibixian)');
+INSERT INTO "mini_types" VALUES (1905,'Dekanter Goblin');
+INSERT INTO "mini_types" VALUES (1906,'Greathorn Minotaur');
+INSERT INTO "mini_types" VALUES (1907,'Greenspawn Sneak');
+INSERT INTO "mini_types" VALUES (1908,'Greenspawn Sneak Raid Leader');
+INSERT INTO "mini_types" VALUES (1909,'Greenspawn Zealot');
+INSERT INTO "mini_types" VALUES (1910,'Grendel');
+INSERT INTO "mini_types" VALUES (1911,'Grendel’S Mother');
+INSERT INTO "mini_types" VALUES (1912,'Grimlock');
+INSERT INTO "mini_types" VALUES (1913,'Groundling');
+INSERT INTO "mini_types" VALUES (1914,'Gulgar');
+INSERT INTO "mini_types" VALUES (1915,'Hadrimoi');
+INSERT INTO "mini_types" VALUES (1916,'Hag');
+INSERT INTO "mini_types" VALUES (1917,'Annis Hag');
+INSERT INTO "mini_types" VALUES (1918,'Dune Hag');
+INSERT INTO "mini_types" VALUES (1919,'Dusk Hag');
+INSERT INTO "mini_types" VALUES (1920,'Green Hag');
+INSERT INTO "mini_types" VALUES (1921,'Sea Hag');
+INSERT INTO "mini_types" VALUES (1922,'Shrieking Hag');
+INSERT INTO "mini_types" VALUES (1923,'Hagspawn');
+INSERT INTO "mini_types" VALUES (1924,'Halfblood Deceiver');
+INSERT INTO "mini_types" VALUES (1925,'Hannya');
+INSERT INTO "mini_types" VALUES (1926,'Harpy');
+INSERT INTO "mini_types" VALUES (1927,'Harpy Archer');
+INSERT INTO "mini_types" VALUES (1928,'Harssaf');
+INSERT INTO "mini_types" VALUES (1929,'Hebi-No-Onna');
+INSERT INTO "mini_types" VALUES (1930,'Hobgoblin Spellscourge');
+INSERT INTO "mini_types" VALUES (1931,'Hobgoblin Warcaster');
+INSERT INTO "mini_types" VALUES (1932,'Hobgoblin Warsoul');
+INSERT INTO "mini_types" VALUES (1933,'Hueleneaer (Desert Centaur)');
+INSERT INTO "mini_types" VALUES (1934,'Jackal Lord');
+INSERT INTO "mini_types" VALUES (1935,'Kappa');
+INSERT INTO "mini_types" VALUES (1936,'Khaasta');
+INSERT INTO "mini_types" VALUES (1937,'Kopru');
+INSERT INTO "mini_types" VALUES (1938,'Kuo-Toa');
+INSERT INTO "mini_types" VALUES (1939,'Kuo-Toa Exalted Whip');
+INSERT INTO "mini_types" VALUES (1940,'Kuo-Toa Harpooner');
+INSERT INTO "mini_types" VALUES (1941,'Kuo-Toa Leviathan');
+INSERT INTO "mini_types" VALUES (1942,'Kuo-Toa Monitor');
+INSERT INTO "mini_types" VALUES (1943,'Kuo-Toa Voice Of Dagon');
+INSERT INTO "mini_types" VALUES (1944,'Lamia Noble');
+INSERT INTO "mini_types" VALUES (1945,'Lashemoi');
+INSERT INTO "mini_types" VALUES (1946,'Lhosk');
+INSERT INTO "mini_types" VALUES (1948,'Loxo');
+INSERT INTO "mini_types" VALUES (1949,'Maedar');
+INSERT INTO "mini_types" VALUES (1950,'Marrulurk');
+INSERT INTO "mini_types" VALUES (1951,'Marrusault');
+INSERT INTO "mini_types" VALUES (1952,'Marrutact');
+INSERT INTO "mini_types" VALUES (1953,'Marzanna');
+INSERT INTO "mini_types" VALUES (1954,'Meazel');
+INSERT INTO "mini_types" VALUES (1955,'Medusa');
+INSERT INTO "mini_types" VALUES (1956,'Minotaur');
+INSERT INTO "mini_types" VALUES (1957,'Minwhelgo');
+INSERT INTO "mini_types" VALUES (1958,'Muckdweller');
+INSERT INTO "mini_types" VALUES (1959,'Nagatha');
+INSERT INTO "mini_types" VALUES (1960,'Nuckalavee');
+INSERT INTO "mini_types" VALUES (1961,'Nycter');
+INSERT INTO "mini_types" VALUES (1962,'Nycter Defender Of The Cave');
+INSERT INTO "mini_types" VALUES (1963,'Ophidian');
+INSERT INTO "mini_types" VALUES (1964,'Ormyrr');
+INSERT INTO "mini_types" VALUES (1965,'Phoelarch');
+INSERT INTO "mini_types" VALUES (1966,'Phthisic');
+INSERT INTO "mini_types" VALUES (1967,'Protean Scourge');
+INSERT INTO "mini_types" VALUES (1968,'Protean Scourge Arcanist');
+INSERT INTO "mini_types" VALUES (1969,'Pureblood Slayer');
+INSERT INTO "mini_types" VALUES (1970,'Quaggoth');
+INSERT INTO "mini_types" VALUES (1971,'Ratatosk');
+INSERT INTO "mini_types" VALUES (1972,'Redspawn Arcaniss');
+INSERT INTO "mini_types" VALUES (1973,'Redspawn Berserker');
+INSERT INTO "mini_types" VALUES (1974,'Rhek');
+INSERT INTO "mini_types" VALUES (1975,'Rhek Chaosgrinder');
+INSERT INTO "mini_types" VALUES (1976,'Rokuro-Kubi');
+INSERT INTO "mini_types" VALUES (1977,'Sahuagin');
+INSERT INTO "mini_types" VALUES (1978,'Sand Raider');
+INSERT INTO "mini_types" VALUES (1983,'Sandworm (Dune)');
+INSERT INTO "mini_types" VALUES (1984,'Sarkrith');
+INSERT INTO "mini_types" VALUES (1985,'Sarkrith Spelleater');
+INSERT INTO "mini_types" VALUES (1986,'Sarkrith Thane');
+INSERT INTO "mini_types" VALUES (1987,'Sarrukh (Progenitor Race)');
+INSERT INTO "mini_types" VALUES (1988,'Scabmettler');
+INSERT INTO "mini_types" VALUES (1989,'Scaled Stalker');
+INSERT INTO "mini_types" VALUES (1990,'Scorpionfolk');
+INSERT INTO "mini_types" VALUES (1991,'Shadowperson');
+INSERT INTO "mini_types" VALUES (1992,'Skindancer');
+INSERT INTO "mini_types" VALUES (1993,'Spell Weaver');
+INSERT INTO "mini_types" VALUES (1994,'Stinger');
+INSERT INTO "mini_types" VALUES (1995,'Tauric Creature');
+INSERT INTO "mini_types" VALUES (1996,'Tauthar');
+INSERT INTO "mini_types" VALUES (1999,'Thanoi (Walrus-Folk)');
+INSERT INTO "mini_types" VALUES (2000,'Thoon Infiltrator');
+INSERT INTO "mini_types" VALUES (2001,'Thri-Kreen');
+INSERT INTO "mini_types" VALUES (2002,'Tree Troll');
+INSERT INTO "mini_types" VALUES (2003,'War Troll');
+INSERT INTO "mini_types" VALUES (2004,'Tsuno');
+INSERT INTO "mini_types" VALUES (2005,'Turlemoi');
+INSERT INTO "mini_types" VALUES (2006,'Unbodied');
+INSERT INTO "mini_types" VALUES (2007,'Uthraki');
+INSERT INTO "mini_types" VALUES (2008,'Vermin Lord');
+INSERT INTO "mini_types" VALUES (2009,'Voidmind Grimlock');
+INSERT INTO "mini_types" VALUES (2010,'Wemic');
+INSERT INTO "mini_types" VALUES (2011,'Whitespawn Berserker');
+INSERT INTO "mini_types" VALUES (2012,'Whitespawn Hordeling');
+INSERT INTO "mini_types" VALUES (2013,'Whitespawn Hunter');
+INSERT INTO "mini_types" VALUES (2014,'Witchknife');
+INSERT INTO "mini_types" VALUES (2015,'Witchknife Captain');
+INSERT INTO "mini_types" VALUES (2016,'Wyrmen');
+INSERT INTO "mini_types" VALUES (2017,'Xtabay');
+INSERT INTO "mini_types" VALUES (2018,'Yak Folk');
+INSERT INTO "mini_types" VALUES (2019,'Yeti');
+INSERT INTO "mini_types" VALUES (2020,'Yuan-Ti');
+INSERT INTO "mini_types" VALUES (2021,'Yuan-Ti Abomination');
+INSERT INTO "mini_types" VALUES (2022,'Yuan-Ti Halfblood');
+INSERT INTO "mini_types" VALUES (2023,'Yuan-Ti Holy Guardian');
+INSERT INTO "mini_types" VALUES (2024,'Yuan-Ti Ignan');
+INSERT INTO "mini_types" VALUES (2025,'Yuan-Ti Mage Slayer');
+INSERT INTO "mini_types" VALUES (2026,'Yuan-Ti Psionic');
+INSERT INTO "mini_types" VALUES (2027,'Yuan-Ti Pureblood');
+INSERT INTO "mini_types" VALUES (2028,'Yurian');
+INSERT INTO "mini_types" VALUES (2029,'Zern');
+INSERT INTO "mini_types" VALUES (2030,'Zern Blade Thrall');
+INSERT INTO "mini_types" VALUES (2031,'Aballin');
+INSERT INTO "mini_types" VALUES (2032,'Amoebic Crawler');
+INSERT INTO "mini_types" VALUES (2033,'Black Pudding');
+INSERT INTO "mini_types" VALUES (2034,'Elder Black Pudding');
+INSERT INTO "mini_types" VALUES (2035,'Bloodbloater');
+INSERT INTO "mini_types" VALUES (2036,'Bloodfire Ooze');
+INSERT INTO "mini_types" VALUES (2037,'Cesspit Ooze');
+INSERT INTO "mini_types" VALUES (2038,'Chilling Fog');
+INSERT INTO "mini_types" VALUES (2039,'Corrupture');
+INSERT INTO "mini_types" VALUES (2040,'Creeping Stone');
+INSERT INTO "mini_types" VALUES (2041,'Flesh Jelly');
+INSERT INTO "mini_types" VALUES (2042,'Gelatinous Cube');
+INSERT INTO "mini_types" VALUES (2043,'Genius Loci');
+INSERT INTO "mini_types" VALUES (2044,'Glitterfire');
+INSERT INTO "mini_types" VALUES (2045,'Graveyard Sludge');
+INSERT INTO "mini_types" VALUES (2046,'Living Blasphemy');
+INSERT INTO "mini_types" VALUES (2047,'Living Cloudkill');
+INSERT INTO "mini_types" VALUES (2048,'Living Fireball');
+INSERT INTO "mini_types" VALUES (2049,'Living Freezing Fog');
+INSERT INTO "mini_types" VALUES (2050,'Living Spell');
+INSERT INTO "mini_types" VALUES (2051,'Nightseed');
+INSERT INTO "mini_types" VALUES (2052,'Ochre Jelly');
+INSERT INTO "mini_types" VALUES (2053,'Olive Slime');
+INSERT INTO "mini_types" VALUES (2055,'Ooze');
+INSERT INTO "mini_types" VALUES (2056,'Aquatic Ooze');
+INSERT INTO "mini_types" VALUES (2057,'Arcane Ooze');
+INSERT INTO "mini_types" VALUES (2058,'Bone Ooze');
+INSERT INTO "mini_types" VALUES (2059,'Brine Ooze');
+INSERT INTO "mini_types" VALUES (2060,'Conflagration Ooze');
+INSERT INTO "mini_types" VALUES (2061,'Infernal Conflagration Ooze');
+INSERT INTO "mini_types" VALUES (2062,'Dissolution Ooze');
+INSERT INTO "mini_types" VALUES (2063,'Ethereal Ooze');
+INSERT INTO "mini_types" VALUES (2064,'Flotsam Ooze');
+INSERT INTO "mini_types" VALUES (2065,'Gray Ooze');
+INSERT INTO "mini_types" VALUES (2066,'Lava Ooze');
+INSERT INTO "mini_types" VALUES (2067,'Snowflake Ooze');
+INSERT INTO "mini_types" VALUES (2068,'Summoning Ooze');
+INSERT INTO "mini_types" VALUES (2069,'Void Ooze');
+INSERT INTO "mini_types" VALUES (2070,'Reason Stealer');
+INSERT INTO "mini_types" VALUES (2071,'Reekmurk');
+INSERT INTO "mini_types" VALUES (2072,'Shadow Jelly');
+INSERT INTO "mini_types" VALUES (2073,'Sickening Sleep');
+INSERT INTO "mini_types" VALUES (2074,'Slithering Tracker');
+INSERT INTO "mini_types" VALUES (2076,'Teratamorph');
+INSERT INTO "mini_types" VALUES (2077,'Teratomorph');
+INSERT INTO "mini_types" VALUES (2078,'Toxic Ooze');
+INSERT INTO "mini_types" VALUES (2079,'Venom Ooze');
+INSERT INTO "mini_types" VALUES (2080,'White Pudding');
+INSERT INTO "mini_types" VALUES (2081,'Chichimec');
+INSERT INTO "mini_types" VALUES (2082,'Dream Larva');
+INSERT INTO "mini_types" VALUES (2083,'Hecatoncheires');
+INSERT INTO "mini_types" VALUES (2084,'Infernal Abomination');
+INSERT INTO "mini_types" VALUES (2085,'Phaethon');
+INSERT INTO "mini_types" VALUES (2086,'Phane');
+INSERT INTO "mini_types" VALUES (2087,'Xixecal');
+INSERT INTO "mini_types" VALUES (2088,'Abyssal Eviscerator');
+INSERT INTO "mini_types" VALUES (2089,'Abyssal Maw');
+INSERT INTO "mini_types" VALUES (2090,'Abyssal Ravager');
+INSERT INTO "mini_types" VALUES (2091,'Abyssal Stalker');
+INSERT INTO "mini_types" VALUES (2092,'Achaierai');
+INSERT INTO "mini_types" VALUES (2093,'Adverspa');
+INSERT INTO "mini_types" VALUES (2094,'Akleu');
+INSERT INTO "mini_types" VALUES (2095,'Angel');
+INSERT INTO "mini_types" VALUES (2096,'Anzu');
+INSERT INTO "mini_types" VALUES (2097,'Droplet Aoa');
+INSERT INTO "mini_types" VALUES (2098,'Sphere Aoa');
+INSERT INTO "mini_types" VALUES (2099,'Arcadian Avenger');
+INSERT INTO "mini_types" VALUES (2100,'Archon');
+INSERT INTO "mini_types" VALUES (2101,'Hammer Archon');
+INSERT INTO "mini_types" VALUES (2102,'Hound Archon');
+INSERT INTO "mini_types" VALUES (2103,'Hound Archon Hero');
+INSERT INTO "mini_types" VALUES (2104,'Lantern Archon');
+INSERT INTO "mini_types" VALUES (2105,'Owl Archon');
+INSERT INTO "mini_types" VALUES (2106,'Sword Archon');
+INSERT INTO "mini_types" VALUES (2107,'Throne Archon');
+INSERT INTO "mini_types" VALUES (2108,'Trumpet Archon');
+INSERT INTO "mini_types" VALUES (2109,'Warden Archon');
+INSERT INTO "mini_types" VALUES (2110,'Word Archon');
+INSERT INTO "mini_types" VALUES (2111,'Arendagrost');
+INSERT INTO "mini_types" VALUES (2112,'Arrowhawk');
+INSERT INTO "mini_types" VALUES (2113,'Adult Arrowhawk');
+INSERT INTO "mini_types" VALUES (2114,'Elder Arrowhawk');
+INSERT INTO "mini_types" VALUES (2115,'Juvenile Arrowhawk');
+INSERT INTO "mini_types" VALUES (2116,'Artaaglith');
+INSERT INTO "mini_types" VALUES (2117,'Asag');
+INSERT INTO "mini_types" VALUES (2118,'Aspect Of Asmodeus');
+INSERT INTO "mini_types" VALUES (2119,'Aspect Of Baalzebul');
+INSERT INTO "mini_types" VALUES (2120,'Aspect Of Bel');
+INSERT INTO "mini_types" VALUES (2121,'Aspect Of Belial');
+INSERT INTO "mini_types" VALUES (2122,'Aspect Of Demogorgon');
+INSERT INTO "mini_types" VALUES (2123,'Aspect Of Dispater');
+INSERT INTO "mini_types" VALUES (2124,'Aspect Of Glasya');
+INSERT INTO "mini_types" VALUES (2125,'Aspect Of Graz''Zt');
+INSERT INTO "mini_types" VALUES (2126,'Aspect Of Hextor');
+INSERT INTO "mini_types" VALUES (2127,'Aspect Of Kord');
+INSERT INTO "mini_types" VALUES (2128,'Aspect Of Levistus');
+INSERT INTO "mini_types" VALUES (2129,'Aspect Of Lolth');
+INSERT INTO "mini_types" VALUES (2130,'Aspect Of Mammon');
+INSERT INTO "mini_types" VALUES (2131,'Aspect Of Mephistopheles');
+INSERT INTO "mini_types" VALUES (2132,'Aspect Of Nerull');
+INSERT INTO "mini_types" VALUES (2133,'Aspect Of Obox-Ob');
+INSERT INTO "mini_types" VALUES (2134,'Aspect Of Orcus');
+INSERT INTO "mini_types" VALUES (2135,'Aspect Of Pazuzu');
+INSERT INTO "mini_types" VALUES (2136,'Aspect Of Yeenoghu');
+INSERT INTO "mini_types" VALUES (2137,'Aspect Of Zotzilaha');
+INSERT INTO "mini_types" VALUES (2138,'Astral Deva (Angel)');
+INSERT INTO "mini_types" VALUES (2139,'Astral Dreadnought');
+INSERT INTO "mini_types" VALUES (2140,'Astral Stalker');
+INSERT INTO "mini_types" VALUES (2141,'Asura');
+INSERT INTO "mini_types" VALUES (2142,'Azer');
+INSERT INTO "mini_types" VALUES (2143,'B''Kallash Dreadnought');
+INSERT INTO "mini_types" VALUES (2144,'Bacchae');
+INSERT INTO "mini_types" VALUES (2145,'Baphitaur');
+INSERT INTO "mini_types" VALUES (2146,'Barghest');
+INSERT INTO "mini_types" VALUES (2147,'Greater Barghest');
+INSERT INTO "mini_types" VALUES (2148,'Bariaur');
+INSERT INTO "mini_types" VALUES (2150,'Abyssal Greater Basilisk');
+INSERT INTO "mini_types" VALUES (2151,'Bazim-Gorag The Firebringer');
+INSERT INTO "mini_types" VALUES (2152,'Behemoth');
+INSERT INTO "mini_types" VALUES (2153,'Behemoth Eagle');
+INSERT INTO "mini_types" VALUES (2154,'Behemoth Gorilla');
+INSERT INTO "mini_types" VALUES (2155,'Black Beast Of Bedlam');
+INSERT INTO "mini_types" VALUES (2156,'Black Cyst');
+INSERT INTO "mini_types" VALUES (2157,'Bladeling');
+INSERT INTO "mini_types" VALUES (2158,'Bralani (Eladrin)');
+INSERT INTO "mini_types" VALUES (2159,'Broodfiend');
+INSERT INTO "mini_types" VALUES (2160,'Broodswarm');
+INSERT INTO "mini_types" VALUES (2161,'Canomorph');
+INSERT INTO "mini_types" VALUES (2162,'Cauchimera');
+INSERT INTO "mini_types" VALUES (2163,'Celestial');
+INSERT INTO "mini_types" VALUES (2164,'Least Spirit Centipede');
+INSERT INTO "mini_types" VALUES (2165,'Lesser Spirit Centipede');
+INSERT INTO "mini_types" VALUES (2166,'Small Spirit Centipede');
+INSERT INTO "mini_types" VALUES (2167,'Cervidal (Celestial)');
+INSERT INTO "mini_types" VALUES (2168,'Chaos Beast');
+INSERT INTO "mini_types" VALUES (2170,'Chaos Eater');
+INSERT INTO "mini_types" VALUES (2171,'Charon');
+INSERT INTO "mini_types" VALUES (2172,'Chokesnake');
+INSERT INTO "mini_types" VALUES (2173,'Chosen Of Kostchtchie');
+INSERT INTO "mini_types" VALUES (2174,'Concordant Killer');
+INSERT INTO "mini_types" VALUES (2175,'Corruptor Of Fate');
+INSERT INTO "mini_types" VALUES (2176,'Corruptor Of Fate Assassin');
+INSERT INTO "mini_types" VALUES (2177,'Couatl');
+INSERT INTO "mini_types" VALUES (2179,'Daelkyr');
+INSERT INTO "mini_types" VALUES (2180,'Dalmosh');
+INSERT INTO "mini_types" VALUES (2181,'Deathdrinker');
+INSERT INTO "mini_types" VALUES (2182,'Demodand');
+INSERT INTO "mini_types" VALUES (2183,'Demogorgon');
+INSERT INTO "mini_types" VALUES (2184,'Demon');
+INSERT INTO "mini_types" VALUES (2185,'Adaru');
+INSERT INTO "mini_types" VALUES (2186,'Air Demon');
+INSERT INTO "mini_types" VALUES (2187,'Alkilith');
+INSERT INTO "mini_types" VALUES (2188,'Ankashar');
+INSERT INTO "mini_types" VALUES (2189,'Armanite');
+INSERT INTO "mini_types" VALUES (2190,'Arrow Demon');
+INSERT INTO "mini_types" VALUES (2191,'Ash Demon');
+INSERT INTO "mini_types" VALUES (2192,'Babau');
+INSERT INTO "mini_types" VALUES (2193,'Balor');
+INSERT INTO "mini_types" VALUES (2194,'Bar-Lgura');
+INSERT INTO "mini_types" VALUES (2195,'Bebilith');
+INSERT INTO "mini_types" VALUES (2196,'Belairon');
+INSERT INTO "mini_types" VALUES (2197,'Bulezau');
+INSERT INTO "mini_types" VALUES (2198,'Caligrosto');
+INSERT INTO "mini_types" VALUES (2199,'Cambion');
+INSERT INTO "mini_types" VALUES (2200,'Carnage Demon');
+INSERT INTO "mini_types" VALUES (2201,'Carnevus');
+INSERT INTO "mini_types" VALUES (2202,'Cataboligne');
+INSERT INTO "mini_types" VALUES (2203,'Cataboligne Demon');
+INSERT INTO "mini_types" VALUES (2204,'Cerebrilith');
+INSERT INTO "mini_types" VALUES (2205,'Chasme');
+INSERT INTO "mini_types" VALUES (2206,'Colchiln');
+INSERT INTO "mini_types" VALUES (2207,'Dretch');
+INSERT INTO "mini_types" VALUES (2208,'Earth Demon');
+INSERT INTO "mini_types" VALUES (2209,'Fire Demon');
+INSERT INTO "mini_types" VALUES (2210,'Gadacro');
+INSERT INTO "mini_types" VALUES (2211,'Ghour');
+INSERT INTO "mini_types" VALUES (2212,'Glabrezu');
+INSERT INTO "mini_types" VALUES (2213,'Goristro');
+INSERT INTO "mini_types" VALUES (2214,'Hezrou');
+INSERT INTO "mini_types" VALUES (2215,'Ice Demon');
+INSERT INTO "mini_types" VALUES (2216,'Incubus');
+INSERT INTO "mini_types" VALUES (2217,'Jarilith');
+INSERT INTO "mini_types" VALUES (2218,'Jovoc');
+INSERT INTO "mini_types" VALUES (2219,'Kastighur');
+INSERT INTO "mini_types" VALUES (2220,'Kelvezu');
+INSERT INTO "mini_types" VALUES (2222,'Klurichir');
+INSERT INTO "mini_types" VALUES (2223,'Lilitu');
+INSERT INTO "mini_types" VALUES (2224,'Lilitu Radiant Sister');
+INSERT INTO "mini_types" VALUES (2225,'Manes');
+INSERT INTO "mini_types" VALUES (2226,'Manitou');
+INSERT INTO "mini_types" VALUES (2227,'Marilith');
+INSERT INTO "mini_types" VALUES (2228,'Maurezhi');
+INSERT INTO "mini_types" VALUES (2229,'Mavawhan');
+INSERT INTO "mini_types" VALUES (2230,'Molydeus');
+INSERT INTO "mini_types" VALUES (2231,'Myrmyxicus');
+INSERT INTO "mini_types" VALUES (2232,'Juvenile Nabassu');
+INSERT INTO "mini_types" VALUES (2233,'Mature Nabassu');
+INSERT INTO "mini_types" VALUES (2234,'Nalfeshnee');
+INSERT INTO "mini_types" VALUES (2235,'Oculus');
+INSERT INTO "mini_types" VALUES (2236,'Orlath');
+INSERT INTO "mini_types" VALUES (2237,'Palrethee');
+INSERT INTO "mini_types" VALUES (2238,'Quasit');
+INSERT INTO "mini_types" VALUES (2239,'Rutterkin');
+INSERT INTO "mini_types" VALUES (2240,'Shadow Demon');
+INSERT INTO "mini_types" VALUES (2241,'Solamith');
+INSERT INTO "mini_types" VALUES (2242,'Sorrowsworn');
+INSERT INTO "mini_types" VALUES (2243,'Soul Demon');
+INSERT INTO "mini_types" VALUES (2244,'Succubus');
+INSERT INTO "mini_types" VALUES (2245,'Turagathshnee');
+INSERT INTO "mini_types" VALUES (2246,'Uridezu');
+INSERT INTO "mini_types" VALUES (2247,'Uzollru');
+INSERT INTO "mini_types" VALUES (2248,'Verakia');
+INSERT INTO "mini_types" VALUES (2249,'Vrock');
+INSERT INTO "mini_types" VALUES (2250,'Water Demon');
+INSERT INTO "mini_types" VALUES (2251,'Whisper Demon');
+INSERT INTO "mini_types" VALUES (2252,'Yochlol');
+INSERT INTO "mini_types" VALUES (2253,'Demonet Swarm');
+INSERT INTO "mini_types" VALUES (2254,'Demonhive Attendant');
+INSERT INTO "mini_types" VALUES (2255,'Demonhive Queen');
+INSERT INTO "mini_types" VALUES (2256,'Dendar The Night Serpent');
+INSERT INTO "mini_types" VALUES (2257,'Desert Devil (Araton)');
+INSERT INTO "mini_types" VALUES (2258,'Deva');
+INSERT INTO "mini_types" VALUES (2259,'Monadic Deva');
+INSERT INTO "mini_types" VALUES (2260,'Devil');
+INSERT INTO "mini_types" VALUES (2261,'Abishai');
+INSERT INTO "mini_types" VALUES (2262,'Black Abishai');
+INSERT INTO "mini_types" VALUES (2263,'Blue Abishai');
+INSERT INTO "mini_types" VALUES (2264,'Green Abishai');
+INSERT INTO "mini_types" VALUES (2265,'Red Abishai');
+INSERT INTO "mini_types" VALUES (2266,'White Abishai');
+INSERT INTO "mini_types" VALUES (2268,'Amnizu');
+INSERT INTO "mini_types" VALUES (2269,'Ayperobos Swarm');
+INSERT INTO "mini_types" VALUES (2270,'Barbazu');
+INSERT INTO "mini_types" VALUES (2271,'Brachina');
+INSERT INTO "mini_types" VALUES (2272,'Bueroza');
+INSERT INTO "mini_types" VALUES (2273,'Coal Devil');
+INSERT INTO "mini_types" VALUES (2274,'Cornugon');
+INSERT INTO "mini_types" VALUES (2275,'Dogai');
+INSERT INTO "mini_types" VALUES (2276,'Erinyes');
+INSERT INTO "mini_types" VALUES (2277,'Excruciarch');
+INSERT INTO "mini_types" VALUES (2278,'Falxugon');
+INSERT INTO "mini_types" VALUES (2279,'Gelugon');
+INSERT INTO "mini_types" VALUES (2280,'Ghargatula');
+INSERT INTO "mini_types" VALUES (2281,'Glass Devil');
+INSERT INTO "mini_types" VALUES (2282,'Gulthir');
+INSERT INTO "mini_types" VALUES (2283,'Hamatula');
+INSERT INTO "mini_types" VALUES (2284,'Hellcat');
+INSERT INTO "mini_types" VALUES (2285,'Imp');
+INSERT INTO "mini_types" VALUES (2286,'Bloodbag Imp');
+INSERT INTO "mini_types" VALUES (2287,'Choleric Imp');
+INSERT INTO "mini_types" VALUES (2288,'Euphoric Imp');
+INSERT INTO "mini_types" VALUES (2289,'Filth Imp');
+INSERT INTO "mini_types" VALUES (2290,'Melancholic Imp');
+INSERT INTO "mini_types" VALUES (2291,'Phlegmatic Imp');
+INSERT INTO "mini_types" VALUES (2292,'Sanguine Imp');
+INSERT INTO "mini_types" VALUES (2293,'Jerul');
+INSERT INTO "mini_types" VALUES (2294,'Kocrachon');
+INSERT INTO "mini_types" VALUES (2295,'Kyton');
+INSERT INTO "mini_types" VALUES (2296,'Lead Devil');
+INSERT INTO "mini_types" VALUES (2297,'Lemure');
+INSERT INTO "mini_types" VALUES (2298,'Logokron');
+INSERT INTO "mini_types" VALUES (2299,'Malebranche');
+INSERT INTO "mini_types" VALUES (2301,'Merregon');
+INSERT INTO "mini_types" VALUES (2302,'Narzugon');
+INSERT INTO "mini_types" VALUES (2303,'Nupperibo');
+INSERT INTO "mini_types" VALUES (2304,'Obsidian Devil');
+INSERT INTO "mini_types" VALUES (2305,'Orthon');
+INSERT INTO "mini_types" VALUES (2306,'Osyluth');
+INSERT INTO "mini_types" VALUES (2307,'Paeliryon');
+INSERT INTO "mini_types" VALUES (2308,'Pit Fiend');
+INSERT INTO "mini_types" VALUES (2309,'Remmanon');
+INSERT INTO "mini_types" VALUES (2310,'Sand Devil');
+INSERT INTO "mini_types" VALUES (2311,'Spiked Devil');
+INSERT INTO "mini_types" VALUES (2312,'Spinagon');
+INSERT INTO "mini_types" VALUES (2313,'Stitched Devil');
+INSERT INTO "mini_types" VALUES (2314,'Xerfilstyx');
+INSERT INTO "mini_types" VALUES (2315,'Djinni');
+INSERT INTO "mini_types" VALUES (2316,'Noble Djinni');
+INSERT INTO "mini_types" VALUES (2317,'Doc Cu''O''C');
+INSERT INTO "mini_types" VALUES (2318,'Dracolisk');
+INSERT INTO "mini_types" VALUES (2319,'Draegloth');
+INSERT INTO "mini_types" VALUES (2320,'Half-Fiend Draegloth');
+INSERT INTO "mini_types" VALUES (2321,'Abyssal Drake');
+INSERT INTO "mini_types" VALUES (2322,'Draudnu');
+INSERT INTO "mini_types" VALUES (2323,'Greater Dread');
+INSERT INTO "mini_types" VALUES (2324,'Lesser Dread');
+INSERT INTO "mini_types" VALUES (2325,'Dreadful Lasher');
+INSERT INTO "mini_types" VALUES (2326,'Dune Stalker');
+INSERT INTO "mini_types" VALUES (2327,'Ephemera Dust Beast');
+INSERT INTO "mini_types" VALUES (2328,'Dwarf Ancestor');
+INSERT INTO "mini_types" VALUES (2329,'Dwarf Einherjar');
+INSERT INTO "mini_types" VALUES (2330,'Midgard Dwarf');
+INSERT INTO "mini_types" VALUES (2331,'Dybbuk');
+INSERT INTO "mini_types" VALUES (2332,'Earth Glider');
+INSERT INTO "mini_types" VALUES (2333,'Ebon Aspect');
+INSERT INTO "mini_types" VALUES (2334,'Ephemera Ecalypse');
+INSERT INTO "mini_types" VALUES (2335,'Efreeti');
+INSERT INTO "mini_types" VALUES (2336,'Ekolid');
+INSERT INTO "mini_types" VALUES (2337,'Eladrin');
+INSERT INTO "mini_types" VALUES (2338,'Coure Eidolon');
+INSERT INTO "mini_types" VALUES (2339,'Firre Eidolon');
+INSERT INTO "mini_types" VALUES (2340,'Shiradi Eidolon');
+INSERT INTO "mini_types" VALUES (2341,'Tulani Eidolon');
+INSERT INTO "mini_types" VALUES (2342,'Einherjar Elf');
+INSERT INTO "mini_types" VALUES (2344,'Ember Guard');
+INSERT INTO "mini_types" VALUES (2345,'Xac-Yel Energon');
+INSERT INTO "mini_types" VALUES (2346,'Xac-Yij Energon');
+INSERT INTO "mini_types" VALUES (2347,'Xag-Ya Energon');
+INSERT INTO "mini_types" VALUES (2348,'Xap-Yaup Energon');
+INSERT INTO "mini_types" VALUES (2349,'Xeg-Yi Energon');
+INSERT INTO "mini_types" VALUES (2350,'Xong-Yong Energon');
+INSERT INTO "mini_types" VALUES (2351,'Xor-Yost Energon');
+INSERT INTO "mini_types" VALUES (2352,'Envoy Of Lolth');
+INSERT INTO "mini_types" VALUES (2353,'Essence Of Shothragot');
+INSERT INTO "mini_types" VALUES (2354,'Ether Scarab');
+INSERT INTO "mini_types" VALUES (2355,'Ethereal Slayer');
+INSERT INTO "mini_types" VALUES (2356,'Fallen One');
+INSERT INTO "mini_types" VALUES (2366,'Farastu (Demodand)');
+INSERT INTO "mini_types" VALUES (2367,'Fetch');
+INSERT INTO "mini_types" VALUES (2368,'Fey''Ri');
+INSERT INTO "mini_types" VALUES (2369,'Fiend-Sage Of Rel Astra');
+INSERT INTO "mini_types" VALUES (2371,'Formian');
+INSERT INTO "mini_types" VALUES (2372,'Formian Myrmarch');
+INSERT INTO "mini_types" VALUES (2373,'Formian Queen');
+INSERT INTO "mini_types" VALUES (2374,'Formian Taskmaster');
+INSERT INTO "mini_types" VALUES (2375,'Formian Warrior');
+INSERT INTO "mini_types" VALUES (2376,'Formian Worker');
+INSERT INTO "mini_types" VALUES (2377,'Armadon Formian');
+INSERT INTO "mini_types" VALUES (2378,'Observer Formian');
+INSERT INTO "mini_types" VALUES (2379,'Winged Formian Warrior');
+INSERT INTO "mini_types" VALUES (2381,'Air Gen');
+INSERT INTO "mini_types" VALUES (2382,'Earth Gen');
+INSERT INTO "mini_types" VALUES (2383,'Fire Gen');
+INSERT INTO "mini_types" VALUES (2384,'Water Gen');
+INSERT INTO "mini_types" VALUES (2385,'Genie');
+INSERT INTO "mini_types" VALUES (2386,'Dao');
+INSERT INTO "mini_types" VALUES (2387,'Khayal');
+INSERT INTO "mini_types" VALUES (2388,'Marid');
+INSERT INTO "mini_types" VALUES (2389,'Qorrashi');
+INSERT INTO "mini_types" VALUES (2390,'Ghaele (Eladrin)');
+INSERT INTO "mini_types" VALUES (2391,'Ghirrash');
+INSERT INTO "mini_types" VALUES (2392,'Muspelheim Fire Giant');
+INSERT INTO "mini_types" VALUES (2395,'Glamer');
+INSERT INTO "mini_types" VALUES (2396,'Glimmerfolk');
+INSERT INTO "mini_types" VALUES (2397,'Glimmerskin');
+INSERT INTO "mini_types" VALUES (2403,'Gormeel');
+INSERT INTO "mini_types" VALUES (2404,'Guardinal');
+INSERT INTO "mini_types" VALUES (2405,'Avoral Guardinal');
+INSERT INTO "mini_types" VALUES (2406,'Equinal Guardinal');
+INSERT INTO "mini_types" VALUES (2407,'Musteval Guardinal');
+INSERT INTO "mini_types" VALUES (2408,'Ursinal Guardinal');
+INSERT INTO "mini_types" VALUES (2409,'Guecubu');
+INSERT INTO "mini_types" VALUES (2410,'Night Hag');
+INSERT INTO "mini_types" VALUES (2411,'Half-Celestial');
+INSERT INTO "mini_types" VALUES (2412,'Half-Farspawn');
+INSERT INTO "mini_types" VALUES (2413,'Half-Fiend');
+INSERT INTO "mini_types" VALUES (2414,'Half-Fiend (Durzagon)');
+INSERT INTO "mini_types" VALUES (2415,'Half-Fiend Gnoll Warlock');
+INSERT INTO "mini_types" VALUES (2416,'Harakin');
+INSERT INTO "mini_types" VALUES (2417,'Harmonious Choir Of The Words');
+INSERT INTO "mini_types" VALUES (2418,'Hell Hound');
+INSERT INTO "mini_types" VALUES (2420,'Hellchain Weaver');
+INSERT INTO "mini_types" VALUES (2421,'Pseudonatural Hippogriff');
+INSERT INTO "mini_types" VALUES (2422,'Hob');
+INSERT INTO "mini_types" VALUES (2423,'Hobyah');
+INSERT INTO "mini_types" VALUES (2424,'Hollyphant');
+INSERT INTO "mini_types" VALUES (2425,'Hordling');
+INSERT INTO "mini_types" VALUES (2426,'Dread Gnasher Hordling');
+INSERT INTO "mini_types" VALUES (2427,'Skullreaver Hordling');
+INSERT INTO "mini_types" VALUES (2428,'Spittlemaw Hordling');
+INSERT INTO "mini_types" VALUES (2429,'Vulturewretch Hordling');
+INSERT INTO "mini_types" VALUES (2430,'Hound Of Kostchtchie');
+INSERT INTO "mini_types" VALUES (2431,'Howler');
+INSERT INTO "mini_types" VALUES (2432,'Human Einherjar');
+INSERT INTO "mini_types" VALUES (2433,'Illurien');
+INSERT INTO "mini_types" VALUES (2434,'Ithyak-Ortheel');
+INSERT INTO "mini_types" VALUES (2435,'Janni');
+INSERT INTO "mini_types" VALUES (2436,'Jersey Devil');
+INSERT INTO "mini_types" VALUES (2437,'Justicator');
+INSERT INTO "mini_types" VALUES (2438,'Justice Archon');
+INSERT INTO "mini_types" VALUES (2439,'Justice Archon Champion');
+INSERT INTO "mini_types" VALUES (2440,'Kalabon');
+INSERT INTO "mini_types" VALUES (2441,'Kaorti');
+INSERT INTO "mini_types" VALUES (2442,'Keeper');
+INSERT INTO "mini_types" VALUES (2443,'Kelubar (Demodand)');
+INSERT INTO "mini_types" VALUES (2444,'Kezef The Chaos Hound');
+INSERT INTO "mini_types" VALUES (2445,'Khumat');
+INSERT INTO "mini_types" VALUES (2446,'Krathbairn');
+INSERT INTO "mini_types" VALUES (2447,'Kyra');
+INSERT INTO "mini_types" VALUES (2448,'Laghathti');
+INSERT INTO "mini_types" VALUES (2449,'Laraken');
+INSERT INTO "mini_types" VALUES (2450,'Leonal');
+INSERT INTO "mini_types" VALUES (2452,'Lillend');
+INSERT INTO "mini_types" VALUES (2453,'Lizard King/Queen');
+INSERT INTO "mini_types" VALUES (2454,'Lolth-Touched Bebilith');
+INSERT INTO "mini_types" VALUES (2455,'Lumi');
+INSERT INTO "mini_types" VALUES (2456,'Lumi Crusader');
+INSERT INTO "mini_types" VALUES (2457,'Lupinal (Celestial)');
+INSERT INTO "mini_types" VALUES (2458,'Maelephant');
+INSERT INTO "mini_types" VALUES (2459,'Malcanthet');
+INSERT INTO "mini_types" VALUES (2460,'Malfera');
+INSERT INTO "mini_types" VALUES (2461,'Marrash');
+INSERT INTO "mini_types" VALUES (2462,'Marruspawn Abomination');
+INSERT INTO "mini_types" VALUES (2463,'Balrog');
+INSERT INTO "mini_types" VALUES (2464,'Pit Lord');
+INSERT INTO "mini_types" VALUES (2465,'Venom Lord');
+INSERT INTO "mini_types" VALUES (2466,'Mephit');
+INSERT INTO "mini_types" VALUES (2467,'Air Mephit');
+INSERT INTO "mini_types" VALUES (2468,'Dust Mephit');
+INSERT INTO "mini_types" VALUES (2469,'Earth Mephit');
+INSERT INTO "mini_types" VALUES (2470,'Fire Mephit');
+INSERT INTO "mini_types" VALUES (2471,'Glass Mephit');
+INSERT INTO "mini_types" VALUES (2472,'Ice Mephit');
+INSERT INTO "mini_types" VALUES (2473,'Magma Mephit');
+INSERT INTO "mini_types" VALUES (2474,'Ooze Mephit');
+INSERT INTO "mini_types" VALUES (2475,'Salt Mephit');
+INSERT INTO "mini_types" VALUES (2476,'Steam Mephit');
+INSERT INTO "mini_types" VALUES (2477,'Sulfur Mephit');
+INSERT INTO "mini_types" VALUES (2478,'Water Mephit');
+INSERT INTO "mini_types" VALUES (2479,'Mercane');
+INSERT INTO "mini_types" VALUES (2480,'Minion Of Chaos');
+INSERT INTO "mini_types" VALUES (2481,'Minion Of Set');
+INSERT INTO "mini_types" VALUES (2482,'Minotaur Of Legend');
+INSERT INTO "mini_types" VALUES (2483,'Mirror Mephit');
+INSERT INTO "mini_types" VALUES (2484,'Moon Dog');
+INSERT INTO "mini_types" VALUES (2485,'Mord Wraith');
+INSERT INTO "mini_types" VALUES (2486,'Movanic');
+INSERT INTO "mini_types" VALUES (2487,'Mur-Zhagul (Demon Troll)');
+INSERT INTO "mini_types" VALUES (2488,'Myrlochar');
+INSERT INTO "mini_types" VALUES (2489,'Naityan Rakshasa');
+INSERT INTO "mini_types" VALUES (2490,'Nashrou');
+INSERT INTO "mini_types" VALUES (2491,'Nerra');
+INSERT INTO "mini_types" VALUES (2492,'Kalareem Nerra');
+INSERT INTO "mini_types" VALUES (2493,'Sillit Nerra');
+INSERT INTO "mini_types" VALUES (2494,'Varoot Nerra');
+INSERT INTO "mini_types" VALUES (2495,'Nightmare');
+INSERT INTO "mini_types" VALUES (2496,'Cuachemar Nightmare');
+INSERT INTO "mini_types" VALUES (2497,'Lesser Nightmare');
+INSERT INTO "mini_types" VALUES (2498,'Nishruu');
+INSERT INTO "mini_types" VALUES (2499,'Akuma No');
+INSERT INTO "mini_types" VALUES (2500,'Ashi No');
+INSERT INTO "mini_types" VALUES (2501,'Byoki No');
+INSERT INTO "mini_types" VALUES (2502,'Gekido No');
+INSERT INTO "mini_types" VALUES (2503,'Haino No');
+INSERT INTO "mini_types" VALUES (2504,'Kamu No');
+INSERT INTO "mini_types" VALUES (2505,'Kyoso No');
+INSERT INTO "mini_types" VALUES (2506,'Sanru No');
+INSERT INTO "mini_types" VALUES (2507,'Shikibu No');
+INSERT INTO "mini_types" VALUES (2508,'Tsuburu No');
+INSERT INTO "mini_types" VALUES (2509,'Ugulu No');
+INSERT INTO "mini_types" VALUES (2510,'Yattoko No');
+INSERT INTO "mini_types" VALUES (2511,'Orc Plague Speaker');
+INSERT INTO "mini_types" VALUES (2512,'Orlythys');
+INSERT INTO "mini_types" VALUES (2513,'Petitioner');
+INSERT INTO "mini_types" VALUES (2514,'Phantasmal Slayer');
+INSERT INTO "mini_types" VALUES (2515,'Planetar (Angel)');
+INSERT INTO "mini_types" VALUES (2516,'Planetouched');
+INSERT INTO "mini_types" VALUES (2517,'Aasimar');
+INSERT INTO "mini_types" VALUES (2518,'Air Genasi');
+INSERT INTO "mini_types" VALUES (2519,'Chaon');
+INSERT INTO "mini_types" VALUES (2520,'Earth Genasi');
+INSERT INTO "mini_types" VALUES (2521,'Fire Genasi');
+INSERT INTO "mini_types" VALUES (2522,'Maeluth');
+INSERT INTO "mini_types" VALUES (2523,'Mechanatrix');
+INSERT INTO "mini_types" VALUES (2524,'Shyft');
+INSERT INTO "mini_types" VALUES (2525,'Tiefling');
+INSERT INTO "mini_types" VALUES (2526,'Water Genasi');
+INSERT INTO "mini_types" VALUES (2527,'Wispling');
+INSERT INTO "mini_types" VALUES (2528,'Zenythri');
+INSERT INTO "mini_types" VALUES (2529,'Protectar');
+INSERT INTO "mini_types" VALUES (2530,'Quori');
+INSERT INTO "mini_types" VALUES (2531,'Du''Lora (Dark Fury)');
+INSERT INTO "mini_types" VALUES (2532,'Du''Ulora');
+INSERT INTO "mini_types" VALUES (2533,'Hashalaq');
+INSERT INTO "mini_types" VALUES (2534,'Hashalaq (Dreamstealer)');
+INSERT INTO "mini_types" VALUES (2535,'Kalaraq');
+INSERT INTO "mini_types" VALUES (2536,'Kalaraq (Eyebinder)');
+INSERT INTO "mini_types" VALUES (2537,'Tsucora');
+INSERT INTO "mini_types" VALUES (2538,'Radiant Idol');
+INSERT INTO "mini_types" VALUES (2539,'Rainbow Dweller');
+INSERT INTO "mini_types" VALUES (2540,'Rakshasa');
+INSERT INTO "mini_types" VALUES (2544,'Ramadeen');
+INSERT INTO "mini_types" VALUES (2545,'Rast');
+INSERT INTO "mini_types" VALUES (2546,'Ravid');
+INSERT INTO "mini_types" VALUES (2547,'Rejkar');
+INSERT INTO "mini_types" VALUES (2548,'Reth Dekala');
+INSERT INTO "mini_types" VALUES (2549,'Rilmani');
+INSERT INTO "mini_types" VALUES (2550,'Aurumach');
+INSERT INTO "mini_types" VALUES (2551,'Cuprilach');
+INSERT INTO "mini_types" VALUES (2552,'Ferrumach');
+INSERT INTO "mini_types" VALUES (2553,'Rukarazyll');
+INSERT INTO "mini_types" VALUES (2554,'Saint');
+INSERT INTO "mini_types" VALUES (2555,'Salamander');
+INSERT INTO "mini_types" VALUES (2556,'Salamander Larva');
+INSERT INTO "mini_types" VALUES (2557,'Salamander Larva Flamebrother');
+INSERT INTO "mini_types" VALUES (2559,'Salamander Flamebrother');
+INSERT INTO "mini_types" VALUES (2560,'Salamander Noble');
+INSERT INTO "mini_types" VALUES (2561,'Scyllan');
+INSERT INTO "mini_types" VALUES (2562,'Shadow Eft');
+INSERT INTO "mini_types" VALUES (2563,'Shadow Fet');
+INSERT INTO "mini_types" VALUES (2564,'Shadow Mastiff');
+INSERT INTO "mini_types" VALUES (2565,'Shadurakul');
+INSERT INTO "mini_types" VALUES (2567,'Shator (Demodand)');
+INSERT INTO "mini_types" VALUES (2568,'Shensahti');
+INSERT INTO "mini_types" VALUES (2569,'Shirokinu-Katsukami');
+INSERT INTO "mini_types" VALUES (2570,'Shocker');
+INSERT INTO "mini_types" VALUES (2571,'Sibriex');
+INSERT INTO "mini_types" VALUES (2572,'Sibyllic Guardian');
+INSERT INTO "mini_types" VALUES (2573,'Skinwalker');
+INSERT INTO "mini_types" VALUES (2574,'Skull Bearer');
+INSERT INTO "mini_types" VALUES (2575,'Skulvyn');
+INSERT INTO "mini_types" VALUES (2576,'Skurchur');
+INSERT INTO "mini_types" VALUES (2577,'Slaad');
+INSERT INTO "mini_types" VALUES (2578,'Black Slaad');
+INSERT INTO "mini_types" VALUES (2583,'Mud Slaad');
+INSERT INTO "mini_types" VALUES (2585,'White Slaad');
+INSERT INTO "mini_types" VALUES (2586,'Sliver');
+INSERT INTO "mini_types" VALUES (2587,'Slow Shadow');
+INSERT INTO "mini_types" VALUES (2588,'Solar (Angel)');
+INSERT INTO "mini_types" VALUES (2589,'Souleater');
+INSERT INTO "mini_types" VALUES (2593,'Soulspark');
+INSERT INTO "mini_types" VALUES (2594,'Spellshadow');
+INSERT INTO "mini_types" VALUES (2595,'Spirit Of The Wild');
+INSERT INTO "mini_types" VALUES (2596,'Steel Predator');
+INSERT INTO "mini_types" VALUES (2597,'Stonechild');
+INSERT INTO "mini_types" VALUES (2599,'Sylph');
+INSERT INTO "mini_types" VALUES (2600,'Tanarukk');
+INSERT INTO "mini_types" VALUES (2601,'Thaskor');
+INSERT INTO "mini_types" VALUES (2602,'Thunder');
+INSERT INTO "mini_types" VALUES (2603,'Titan');
+INSERT INTO "mini_types" VALUES (2605,'Tojanida');
+INSERT INTO "mini_types" VALUES (2606,'Adult Tojanida');
+INSERT INTO "mini_types" VALUES (2607,'Elder Tojanida');
+INSERT INTO "mini_types" VALUES (2608,'Juvenile Tojanida');
+INSERT INTO "mini_types" VALUES (2609,'Trilloch');
+INSERT INTO "mini_types" VALUES (2610,'Triton');
+INSERT INTO "mini_types" VALUES (2611,'Pseudonatural Troll');
+INSERT INTO "mini_types" VALUES (2612,'Turaglas');
+INSERT INTO "mini_types" VALUES (2613,'Umbral Gloom');
+INSERT INTO "mini_types" VALUES (2614,'Unraveler');
+INSERT INTO "mini_types" VALUES (2615,'Uvuudaum');
+INSERT INTO "mini_types" VALUES (2616,'Vaath');
+INSERT INTO "mini_types" VALUES (2617,'Valkyrie');
+INSERT INTO "mini_types" VALUES (2618,'Valkyries'' Mount');
+INSERT INTO "mini_types" VALUES (2619,'Vaporighu');
+INSERT INTO "mini_types" VALUES (2620,'Vargouille');
+INSERT INTO "mini_types" VALUES (2621,'Vathugu');
+INSERT INTO "mini_types" VALUES (2628,'Celestial Viper');
+INSERT INTO "mini_types" VALUES (2629,'Fiendish Viper');
+INSERT INTO "mini_types" VALUES (2630,'Visilight');
+INSERT INTO "mini_types" VALUES (2631,'Voor');
+INSERT INTO "mini_types" VALUES (2632,'Vorr');
+INSERT INTO "mini_types" VALUES (2633,'Vultivor');
+INSERT INTO "mini_types" VALUES (2634,'Wastrilith');
+INSERT INTO "mini_types" VALUES (2635,'Weaver');
+INSERT INTO "mini_types" VALUES (2636,'Windrazor');
+INSERT INTO "mini_types" VALUES (2637,'Windscythe');
+INSERT INTO "mini_types" VALUES (2638,'Wrackspawn');
+INSERT INTO "mini_types" VALUES (2639,'Xag-Ya');
+INSERT INTO "mini_types" VALUES (2640,'Xill');
+INSERT INTO "mini_types" VALUES (2641,'Xorn');
+INSERT INTO "mini_types" VALUES (2643,'Xorn Elder');
+INSERT INTO "mini_types" VALUES (2644,'Xorn minor');
+INSERT INTO "mini_types" VALUES (2645,'Yeth Hound');
+INSERT INTO "mini_types" VALUES (2646,'Yugoloth');
+INSERT INTO "mini_types" VALUES (2647,'Arcanaloth');
+INSERT INTO "mini_types" VALUES (2648,'Arrow Battleloth');
+INSERT INTO "mini_types" VALUES (2649,'Axe Battleloth');
+INSERT INTO "mini_types" VALUES (2650,'Crossbow Battleloth');
+INSERT INTO "mini_types" VALUES (2651,'Pick Battleloth');
+INSERT INTO "mini_types" VALUES (2652,'Spiked Chain Battleloth');
+INSERT INTO "mini_types" VALUES (2653,'Sword Battleloth');
+INSERT INTO "mini_types" VALUES (2654,'Canoloth');
+INSERT INTO "mini_types" VALUES (2655,'Dergholoth');
+INSERT INTO "mini_types" VALUES (2656,'Echinoloth');
+INSERT INTO "mini_types" VALUES (2657,'Marraenoloth');
+INSERT INTO "mini_types" VALUES (2658,'Mezzoloth');
+INSERT INTO "mini_types" VALUES (2659,'Nycaloth');
+INSERT INTO "mini_types" VALUES (2660,'Nycaloth Commander');
+INSERT INTO "mini_types" VALUES (2661,'Piscoloth');
+INSERT INTO "mini_types" VALUES (2662,'Skeroloth');
+INSERT INTO "mini_types" VALUES (2663,'Ultroloth');
+INSERT INTO "mini_types" VALUES (2664,'Yagnoloth');
+INSERT INTO "mini_types" VALUES (2665,'Zovvuut');
+INSERT INTO "mini_types" VALUES (2666,'Ancient Night Twist');
+INSERT INTO "mini_types" VALUES (2667,'Arborror');
+INSERT INTO "mini_types" VALUES (2668,'Ascomoid');
+INSERT INTO "mini_types" VALUES (2669,'Assassin Vine');
+INSERT INTO "mini_types" VALUES (2670,'Basidirond');
+INSERT INTO "mini_types" VALUES (2671,'Battlebriar');
+INSERT INTO "mini_types" VALUES (2672,'Black Willow');
+INSERT INTO "mini_types" VALUES (2673,'Bloodthorn');
+INSERT INTO "mini_types" VALUES (2674,'Bonetree');
+INSERT INTO "mini_types" VALUES (2675,'Briarvex');
+INSERT INTO "mini_types" VALUES (2676,'Burrow Root');
+INSERT INTO "mini_types" VALUES (2677,'Child Of Sehan');
+INSERT INTO "mini_types" VALUES (2678,'Choke Creeper');
+INSERT INTO "mini_types" VALUES (2679,'Ciruja Plant');
+INSERT INTO "mini_types" VALUES (2680,'Dark Tree');
+INSERT INTO "mini_types" VALUES (2681,'Death''S Head Tree');
+INSERT INTO "mini_types" VALUES (2682,'Demonthorn Mandrake');
+INSERT INTO "mini_types" VALUES (2683,'Dusanu');
+INSERT INTO "mini_types" VALUES (2684,'Fetid Fungus');
+INSERT INTO "mini_types" VALUES (2685,'Fungus');
+INSERT INTO "mini_types" VALUES (2686,'Gas Spore');
+INSERT INTO "mini_types" VALUES (2687,'Green Guardian');
+INSERT INTO "mini_types" VALUES (2688,'Green Warder');
+INSERT INTO "mini_types" VALUES (2689,'Greenvise');
+INSERT INTO "mini_types" VALUES (2690,'Ironmaw');
+INSERT INTO "mini_types" VALUES (2691,'Ironmaw Seedling');
+INSERT INTO "mini_types" VALUES (2692,'Ironthorn');
+INSERT INTO "mini_types" VALUES (2693,'Kelp Angler');
+INSERT INTO "mini_types" VALUES (2694,'Marodin');
+INSERT INTO "mini_types" VALUES (2695,'Mother Of All');
+INSERT INTO "mini_types" VALUES (2696,'Mu Spore');
+INSERT INTO "mini_types" VALUES (2697,'Myconid');
+INSERT INTO "mini_types" VALUES (2698,'Myconid Venom Spore');
+INSERT INTO "mini_types" VALUES (2699,'Average Myconid Worker');
+INSERT INTO "mini_types" VALUES (2700,'Myconid Circle Leader');
+INSERT INTO "mini_types" VALUES (2701,'Elder Myconid Worker');
+INSERT INTO "mini_types" VALUES (2702,'Myconid Guard');
+INSERT INTO "mini_types" VALUES (2703,'Junior Myconid Worker');
+INSERT INTO "mini_types" VALUES (2704,'Myconid King');
+INSERT INTO "mini_types" VALUES (2705,'Myconid Sovereign');
+INSERT INTO "mini_types" VALUES (2706,'Needlefolk');
+INSERT INTO "mini_types" VALUES (2707,'Needleman');
+INSERT INTO "mini_types" VALUES (2708,'Night Twist');
+INSERT INTO "mini_types" VALUES (2709,'Oaken Defender');
+INSERT INTO "mini_types" VALUES (2710,'Obliviax Mossling');
+INSERT INTO "mini_types" VALUES (2711,'Octopus Tree');
+INSERT INTO "mini_types" VALUES (2712,'Orcwort');
+INSERT INTO "mini_types" VALUES (2713,'Wortling Ocrwort');
+INSERT INTO "mini_types" VALUES (2714,'Phantom Fungus');
+INSERT INTO "mini_types" VALUES (2715,'Phycomid');
+INSERT INTO "mini_types" VALUES (2716,'Plague Brush');
+INSERT INTO "mini_types" VALUES (2718,'Porcupine Cactus');
+INSERT INTO "mini_types" VALUES (2719,'Red Sundew');
+INSERT INTO "mini_types" VALUES (2720,'Saguaro Sentinel');
+INSERT INTO "mini_types" VALUES (2721,'Scarlet Lord (Xhagevoxhab)');
+INSERT INTO "mini_types" VALUES (2722,'Seedroach');
+INSERT INTO "mini_types" VALUES (2723,'Shambling Mound');
+INSERT INTO "mini_types" VALUES (2724,'Spirit Tree');
+INSERT INTO "mini_types" VALUES (2725,'Sporebat');
+INSERT INTO "mini_types" VALUES (2727,'Tendriculos');
+INSERT INTO "mini_types" VALUES (2728,'Topiary Guardian');
+INSERT INTO "mini_types" VALUES (2733,'Treant');
+INSERT INTO "mini_types" VALUES (2734,'Elder Treant');
+INSERT INTO "mini_types" VALUES (2735,'Tumbling Mound');
+INSERT INTO "mini_types" VALUES (2736,'Twig Blight');
+INSERT INTO "mini_types" VALUES (2737,'Twilight Guardian');
+INSERT INTO "mini_types" VALUES (2738,'Udoroot');
+INSERT INTO "mini_types" VALUES (2739,'Umbral Banyan');
+INSERT INTO "mini_types" VALUES (2740,'Vampire Rose Bush');
+INSERT INTO "mini_types" VALUES (2741,'Verdant Reaver');
+INSERT INTO "mini_types" VALUES (2742,'Vine Horror');
+INSERT INTO "mini_types" VALUES (2743,'Vine Spawn');
+INSERT INTO "mini_types" VALUES (2744,'Elder Viper Tree');
+INSERT INTO "mini_types" VALUES (2745,'Volodni');
+INSERT INTO "mini_types" VALUES (2746,'Warbound Impaler (Lesser Battlebriar)');
+INSERT INTO "mini_types" VALUES (2747,'Wizened Elder');
+INSERT INTO "mini_types" VALUES (2748,'Wood Woad');
+INSERT INTO "mini_types" VALUES (2749,'Yellow Musk Creeper');
+INSERT INTO "mini_types" VALUES (2750,'Beast Of Malar');
+INSERT INTO "mini_types" VALUES (2751,'Bog Hag');
+INSERT INTO "mini_types" VALUES (2752,'Dokufu');
+INSERT INTO "mini_types" VALUES (2754,'Ethereal Doppleganger');
+INSERT INTO "mini_types" VALUES (2755,'Ghaunadan');
+INSERT INTO "mini_types" VALUES (2756,'Grimalkin');
+INSERT INTO "mini_types" VALUES (2757,'Hengeyokai');
+INSERT INTO "mini_types" VALUES (2758,'Werebat');
+INSERT INTO "mini_types" VALUES (2759,'Werecrocodile');
+INSERT INTO "mini_types" VALUES (2760,'Wereshark');
+INSERT INTO "mini_types" VALUES (2761,'Malaugrym');
+INSERT INTO "mini_types" VALUES (2762,'Mamono');
+INSERT INTO "mini_types" VALUES (2763,'Mwellret');
+INSERT INTO "mini_types" VALUES (2764,'Hagunemnon Protean');
+INSERT INTO "mini_types" VALUES (2765,'Pterafolk');
+INSERT INTO "mini_types" VALUES (2767,'Atropal');
+INSERT INTO "mini_types" VALUES (2768,'Acidwraith');
+INSERT INTO "mini_types" VALUES (2769,'Alchemical Undead');
+INSERT INTO "mini_types" VALUES (2770,'All-Consuming Hunger');
+INSERT INTO "mini_types" VALUES (2771,'Allip');
+INSERT INTO "mini_types" VALUES (2772,'Angel Of Decay');
+INSERT INTO "mini_types" VALUES (2773,'Animus');
+INSERT INTO "mini_types" VALUES (2774,'Ashen Husk');
+INSERT INTO "mini_types" VALUES (2775,'Aspect Of Vecna');
+INSERT INTO "mini_types" VALUES (2776,'Atropal Scion');
+INSERT INTO "mini_types" VALUES (2777,'Bane Wraith');
+INSERT INTO "mini_types" VALUES (2778,'Banedead');
+INSERT INTO "mini_types" VALUES (2779,'Baneguard');
+INSERT INTO "mini_types" VALUES (2780,'Banshee');
+INSERT INTO "mini_types" VALUES (2781,'Beastwraith');
+INSERT INTO "mini_types" VALUES (2782,'Eviscerator Beetle (Hound Of Kyuss)');
+INSERT INTO "mini_types" VALUES (2783,'Death Tyrant');
+INSERT INTO "mini_types" VALUES (2784,'Bhut');
+INSERT INTO "mini_types" VALUES (2785,'Blackskate');
+INSERT INTO "mini_types" VALUES (2786,'Blackwing');
+INSERT INTO "mini_types" VALUES (2787,'Blade Spirit');
+INSERT INTO "mini_types" VALUES (2788,'Blaspheme');
+INSERT INTO "mini_types" VALUES (2789,'Bleakborn');
+INSERT INTO "mini_types" VALUES (2790,'Blood Amniote');
+INSERT INTO "mini_types" VALUES (2791,'Blood Fiend');
+INSERT INTO "mini_types" VALUES (2792,'Bloodhulk Crusher');
+INSERT INTO "mini_types" VALUES (2793,'Bloodhulk Fighter');
+INSERT INTO "mini_types" VALUES (2794,'Bloodhulk Giant');
+INSERT INTO "mini_types" VALUES (2795,'Bloodmote Cloud');
+INSERT INTO "mini_types" VALUES (2796,'Bloodrot');
+INSERT INTO "mini_types" VALUES (2797,'Bodak');
+INSERT INTO "mini_types" VALUES (2798,'Bonebat');
+INSERT INTO "mini_types" VALUES (2799,'Boneclaw');
+INSERT INTO "mini_types" VALUES (2800,'Bonedrinker');
+INSERT INTO "mini_types" VALUES (2801,'Lesser Bonedrinker');
+INSERT INTO "mini_types" VALUES (2802,'Bonesinger');
+INSERT INTO "mini_types" VALUES (2803,'Bonespitter');
+INSERT INTO "mini_types" VALUES (2804,'Bonespur');
+INSERT INTO "mini_types" VALUES (2805,'Boneyard');
+INSERT INTO "mini_types" VALUES (2806,'Brain In A Jar');
+INSERT INTO "mini_types" VALUES (2807,'Bridge Haunt');
+INSERT INTO "mini_types" VALUES (2808,'Burning Skeleton');
+INSERT INTO "mini_types" VALUES (2809,'Caller In Darkness');
+INSERT INTO "mini_types" VALUES (2810,'Earthcancer Centipede');
+INSERT INTO "mini_types" VALUES (2811,'Charnel Custodian');
+INSERT INTO "mini_types" VALUES (2812,'Charnel Hound');
+INSERT INTO "mini_types" VALUES (2813,'Cinderspawn');
+INSERT INTO "mini_types" VALUES (2814,'Corpse Gatherer');
+INSERT INTO "mini_types" VALUES (2815,'Crawling Apocalypse');
+INSERT INTO "mini_types" VALUES (2816,'Crawling Head');
+INSERT INTO "mini_types" VALUES (2817,'Crawling Slaughter');
+INSERT INTO "mini_types" VALUES (2818,'Crimson Death');
+INSERT INTO "mini_types" VALUES (2819,'Crypt Chanter');
+INSERT INTO "mini_types" VALUES (2820,'Crypt Thing');
+INSERT INTO "mini_types" VALUES (2821,'Cursed Spirit');
+INSERT INTO "mini_types" VALUES (2822,'Deadwood Revenant');
+INSERT INTO "mini_types" VALUES (2823,'Death Knight');
+INSERT INTO "mini_types" VALUES (2824,'Deathbringer');
+INSERT INTO "mini_types" VALUES (2825,'Deathfang');
+INSERT INTO "mini_types" VALUES (2826,'Deathlock');
+INSERT INTO "mini_types" VALUES (2827,'Deathshead');
+INSERT INTO "mini_types" VALUES (2828,'Deathshrieker');
+INSERT INTO "mini_types" VALUES (2829,'Advanced Deathshrieker');
+INSERT INTO "mini_types" VALUES (2830,'Defacer');
+INSERT INTO "mini_types" VALUES (2831,'Demilich');
+INSERT INTO "mini_types" VALUES (2833,'Desiccator');
+INSERT INTO "mini_types" VALUES (2834,'Devourer');
+INSERT INTO "mini_types" VALUES (2835,'Direguard');
+INSERT INTO "mini_types" VALUES (2836,'Domovoi (Ghost)');
+INSERT INTO "mini_types" VALUES (2837,'Ghostly Dragon');
+INSERT INTO "mini_types" VALUES (2838,'Ghostly Adult Green Dragon');
+INSERT INTO "mini_types" VALUES (2839,'Zombie Dragon');
+INSERT INTO "mini_types" VALUES (2840,'Dragotha');
+INSERT INTO "mini_types" VALUES (2841,'Dread');
+INSERT INTO "mini_types" VALUES (2842,'Dread Ram');
+INSERT INTO "mini_types" VALUES (2843,'Dread Warrior');
+INSERT INTO "mini_types" VALUES (2844,'Dread Wraith');
+INSERT INTO "mini_types" VALUES (2845,'Dream Vestige');
+INSERT INTO "mini_types" VALUES (2846,'Dreamstealer');
+INSERT INTO "mini_types" VALUES (2847,'Drider Vampire');
+INSERT INTO "mini_types" VALUES (2848,'Drowned');
+INSERT INTO "mini_types" VALUES (2849,'Dungeon Phantom');
+INSERT INTO "mini_types" VALUES (2850,'Effigy');
+INSERT INTO "mini_types" VALUES (2851,'Eldritch Archer');
+INSERT INTO "mini_types" VALUES (2852,'Entombed');
+INSERT INTO "mini_types" VALUES (2853,'Entomber');
+INSERT INTO "mini_types" VALUES (2854,'Entropic Reaper');
+INSERT INTO "mini_types" VALUES (2855,'Eye Of Fear And Flame');
+INSERT INTO "mini_types" VALUES (2856,'Famine Spirit');
+INSERT INTO "mini_types" VALUES (2857,'Feral Spirit');
+INSERT INTO "mini_types" VALUES (2858,'Fireshadow');
+INSERT INTO "mini_types" VALUES (2859,'Flameskull');
+INSERT INTO "mini_types" VALUES (2860,'Forest Haunt');
+INSERT INTO "mini_types" VALUES (2861,'Forgewraith');
+INSERT INTO "mini_types" VALUES (2862,'Forlorn Husk');
+INSERT INTO "mini_types" VALUES (2863,'Forsaken Shell');
+INSERT INTO "mini_types" VALUES (2864,'Ghast');
+INSERT INTO "mini_types" VALUES (2865,'Lacedon Ghast');
+INSERT INTO "mini_types" VALUES (2866,'Ghost');
+INSERT INTO "mini_types" VALUES (2867,'Abyssal Monstrous Spider Ghost');
+INSERT INTO "mini_types" VALUES (2868,'Frostfell Ghost');
+INSERT INTO "mini_types" VALUES (2869,'Ghoul');
+INSERT INTO "mini_types" VALUES (2870,'Abyssal Ghoul');
+INSERT INTO "mini_types" VALUES (2871,'Lacedon Ghoul');
+INSERT INTO "mini_types" VALUES (2872,'True Ghoul');
+INSERT INTO "mini_types" VALUES (2873,'Gravecrawler');
+INSERT INTO "mini_types" VALUES (2874,'Gravehound');
+INSERT INTO "mini_types" VALUES (2875,'Grimweird');
+INSERT INTO "mini_types" VALUES (2876,'Hopping Vampire');
+INSERT INTO "mini_types" VALUES (2877,'Huecuva');
+INSERT INTO "mini_types" VALUES (2878,'Hulking Corpse');
+INSERT INTO "mini_types" VALUES (2879,'Hullathoin');
+INSERT INTO "mini_types" VALUES (2880,'Humbaba');
+INSERT INTO "mini_types" VALUES (2881,'Hunefer');
+INSERT INTO "mini_types" VALUES (2882,'Icegaunt');
+INSERT INTO "mini_types" VALUES (2883,'Icy Prisoner');
+INSERT INTO "mini_types" VALUES (2884,'Inquisitor');
+INSERT INTO "mini_types" VALUES (2886,'Jahi');
+INSERT INTO "mini_types" VALUES (2887,'Jiki-Ketsu-Gaki');
+INSERT INTO "mini_types" VALUES (2888,'Jiki-Niku-Gaki');
+INSERT INTO "mini_types" VALUES (2889,'Karrnathi Dread Marshal');
+INSERT INTO "mini_types" VALUES (2890,'Kr''Y''Izoth');
+INSERT INTO "mini_types" VALUES (2891,'Kurge');
+INSERT INTO "mini_types" VALUES (2892,'Kyuss Knight');
+INSERT INTO "mini_types" VALUES (2893,'Kyuss Spawnling');
+INSERT INTO "mini_types" VALUES (2894,'Lavawight');
+INSERT INTO "mini_types" VALUES (2895,'Lich');
+INSERT INTO "mini_types" VALUES (2896,'Death Lion');
+INSERT INTO "mini_types" VALUES (2897,'Alhoon');
+INSERT INTO "mini_types" VALUES (2898,'Mind Flayer Vampire');
+INSERT INTO "mini_types" VALUES (2899,'Mohrg');
+INSERT INTO "mini_types" VALUES (2900,'Mummy');
+INSERT INTO "mini_types" VALUES (2901,'Mummy Lord');
+INSERT INTO "mini_types" VALUES (2902,'Bog Mummy');
+INSERT INTO "mini_types" VALUES (2903,'Salt Mummy');
+INSERT INTO "mini_types" VALUES (2904,'Murk');
+INSERT INTO "mini_types" VALUES (2905,'Bone Naga');
+INSERT INTO "mini_types" VALUES (2906,'Necronaut');
+INSERT INTO "mini_types" VALUES (2907,'Necroplasm');
+INSERT INTO "mini_types" VALUES (2908,'Necrosis Carnex');
+INSERT INTO "mini_types" VALUES (2909,'Nightshade');
+INSERT INTO "mini_types" VALUES (2910,'Nightcrawler Nightshade');
+INSERT INTO "mini_types" VALUES (2911,'Nighthaunt Nightshade');
+INSERT INTO "mini_types" VALUES (2912,'Nightswimmer Nightshade');
+INSERT INTO "mini_types" VALUES (2913,'Nightwalker Nightshade');
+INSERT INTO "mini_types" VALUES (2914,'Nightwing Nightshade');
+INSERT INTO "mini_types" VALUES (2915,'Onikage');
+INSERT INTO "mini_types" VALUES (2916,'Orb Wraith');
+INSERT INTO "mini_types" VALUES (2917,'Painspeaker');
+INSERT INTO "mini_types" VALUES (2918,'Plague Blight');
+INSERT INTO "mini_types" VALUES (2919,'Plague Spewer');
+INSERT INTO "mini_types" VALUES (2920,'Plague Walker');
+INSERT INTO "mini_types" VALUES (2921,'Quell');
+INSERT INTO "mini_types" VALUES (2922,'Quth-Maren');
+INSERT INTO "mini_types" VALUES (2923,'Ragewind');
+INSERT INTO "mini_types" VALUES (2924,'Raiment');
+INSERT INTO "mini_types" VALUES (2925,'Rolling Head');
+INSERT INTO "mini_types" VALUES (2926,'Rotripper');
+INSERT INTO "mini_types" VALUES (2927,'Sanguineous Drinker');
+INSERT INTO "mini_types" VALUES (2928,'Mindkiller Scorpion');
+INSERT INTO "mini_types" VALUES (2929,'Selskar Watchghost');
+INSERT INTO "mini_types" VALUES (2930,'Serpentir');
+INSERT INTO "mini_types" VALUES (2931,'Shade');
+INSERT INTO "mini_types" VALUES (2932,'Shadow');
+INSERT INTO "mini_types" VALUES (2933,'Shadow Of The Void');
+INSERT INTO "mini_types" VALUES (2934,'Greater Shadow');
+INSERT INTO "mini_types" VALUES (2935,'Shape Of Fire');
+INSERT INTO "mini_types" VALUES (2936,'Sheet Ghoul');
+INSERT INTO "mini_types" VALUES (2937,'Sheet Phantom');
+INSERT INTO "mini_types" VALUES (2938,'Shikki-Gaki');
+INSERT INTO "mini_types" VALUES (2939,'Shinen-Gaki');
+INSERT INTO "mini_types" VALUES (2940,'Shoosuva');
+INSERT INTO "mini_types" VALUES (2941,'Skeletal Warbeast');
+INSERT INTO "mini_types" VALUES (2942,'Skeleton');
+INSERT INTO "mini_types" VALUES (2943,'Karrnathi Skeleton');
+INSERT INTO "mini_types" VALUES (2944,'Skin Kite');
+INSERT INTO "mini_types" VALUES (2945,'Skirr');
+INSERT INTO "mini_types" VALUES (2946,'Skulking Cyst');
+INSERT INTO "mini_types" VALUES (2947,'Skull Lord');
+INSERT INTO "mini_types" VALUES (2948,'Skuz');
+INSERT INTO "mini_types" VALUES (2949,'Slaughter Wight');
+INSERT INTO "mini_types" VALUES (2950,'Slaymate');
+INSERT INTO "mini_types" VALUES (2951,'Son Of Kyuss');
+INSERT INTO "mini_types" VALUES (2952,'Spawn Of Kyuss');
+INSERT INTO "mini_types" VALUES (2953,'Spectral Lyrist');
+INSERT INTO "mini_types" VALUES (2954,'Spectral Rider');
+INSERT INTO "mini_types" VALUES (2955,'Spectral Steed');
+INSERT INTO "mini_types" VALUES (2956,'Spectre');
+INSERT INTO "mini_types" VALUES (2957,'Chaos Spectre');
+INSERT INTO "mini_types" VALUES (2958,'Fire Spectre');
+INSERT INTO "mini_types" VALUES (2959,'Spellstiched Ghast');
+INSERT INTO "mini_types" VALUES (2960,'Spellstitched Creature');
+INSERT INTO "mini_types" VALUES (2961,'Steaming Soldier');
+INSERT INTO "mini_types" VALUES (2962,'Strahd''S Skeletal Steed');
+INSERT INTO "mini_types" VALUES (2967,'Sword Of Kyuss');
+INSERT INTO "mini_types" VALUES (2968,'Swordwraith');
+INSERT INTO "mini_types" VALUES (2969,'Taunting Haunt');
+INSERT INTO "mini_types" VALUES (2970,'Tl''A''Ikith');
+INSERT INTO "mini_types" VALUES (2971,'Tomb Mote');
+INSERT INTO "mini_types" VALUES (2972,'Ulgurstasta');
+INSERT INTO "mini_types" VALUES (2979,'Undead Martyr');
+INSERT INTO "mini_types" VALUES (2980,'Urdark');
+INSERT INTO "mini_types" VALUES (2981,'Vampire');
+INSERT INTO "mini_types" VALUES (2982,'Vampire Spawn');
+INSERT INTO "mini_types" VALUES (2983,'Vasuthant');
+INSERT INTO "mini_types" VALUES (2984,'Horrific Vasuthant');
+INSERT INTO "mini_types" VALUES (2985,'Vilewight');
+INSERT INTO "mini_types" VALUES (2986,'Visage');
+INSERT INTO "mini_types" VALUES (2987,'Vitreous Drinker');
+INSERT INTO "mini_types" VALUES (2988,'Voidwraith');
+INSERT INTO "mini_types" VALUES (2989,'Vour');
+INSERT INTO "mini_types" VALUES (2990,'Web Mummy');
+INSERT INTO "mini_types" VALUES (2991,'Wheep');
+INSERT INTO "mini_types" VALUES (2992,'Wight');
+INSERT INTO "mini_types" VALUES (2993,'Dust Wight');
+INSERT INTO "mini_types" VALUES (2994,'Black Soul');
+INSERT INTO "mini_types" VALUES (2995,'Burning Soul');
+INSERT INTO "mini_types" VALUES (2996,'Gloam');
+INSERT INTO "mini_types" VALUES (2997,'Swamp Ghost');
+INSERT INTO "mini_types" VALUES (2998,'Winterling');
+INSERT INTO "mini_types" VALUES (2999,'Winterspawn');
+INSERT INTO "mini_types" VALUES (3000,'Winterwight');
+INSERT INTO "mini_types" VALUES (3001,'Wormcaller');
+INSERT INTO "mini_types" VALUES (3002,'Wraith');
+INSERT INTO "mini_types" VALUES (3003,'Wraith Spider');
+INSERT INTO "mini_types" VALUES (3004,'Incarnum Wraith');
+INSERT INTO "mini_types" VALUES (3005,'Sea Wraith');
+INSERT INTO "mini_types" VALUES (3006,'Zombie');
+INSERT INTO "mini_types" VALUES (3014,'Adult Amedian Gutworm');
+INSERT INTO "mini_types" VALUES (3015,'Larva Amedian Gutworm');
+INSERT INTO "mini_types" VALUES (3016,'Giant Ant Lion');
+INSERT INTO "mini_types" VALUES (3017,'Giant Ant');
+INSERT INTO "mini_types" VALUES (3018,'Giant Ant Queen');
+INSERT INTO "mini_types" VALUES (3019,'Giant Ant Soldier');
+INSERT INTO "mini_types" VALUES (3020,'Giant Ant Worker');
+INSERT INTO "mini_types" VALUES (3021,'Astral Kraken');
+INSERT INTO "mini_types" VALUES (3022,'Giant Bee');
+INSERT INTO "mini_types" VALUES (3023,'Beetle Buckler');
+INSERT INTO "mini_types" VALUES (3024,'Devastation Beetle');
+INSERT INTO "mini_types" VALUES (3025,'Giant Bombadier Beetle');
+INSERT INTO "mini_types" VALUES (3026,'Giant Fire Beetle');
+INSERT INTO "mini_types" VALUES (3027,'Giant Stag Beetle');
+INSERT INTO "mini_types" VALUES (3029,'Knell Beetle');
+INSERT INTO "mini_types" VALUES (3030,'Knell Lesser Beetle');
+INSERT INTO "mini_types" VALUES (3031,'Oil Beetle');
+INSERT INTO "mini_types" VALUES (3032,'Bonespear');
+INSERT INTO "mini_types" VALUES (3033,'Brine Swimmer');
+INSERT INTO "mini_types" VALUES (3034,'Devastation Centipede');
+INSERT INTO "mini_types" VALUES (3035,'Monstrous Centipede');
+INSERT INTO "mini_types" VALUES (3036,'Monstrous Redspotted Centipede');
+INSERT INTO "mini_types" VALUES (3037,'Century Worm');
+INSERT INTO "mini_types" VALUES (3038,'Chelicera');
+INSERT INTO "mini_types" VALUES (3039,'Giant Cockroach');
+INSERT INTO "mini_types" VALUES (3041,'Giant Crayfish');
+INSERT INTO "mini_types" VALUES (3042,'Deep Barnacle');
+INSERT INTO "mini_types" VALUES (3043,'Devastation Vermin');
+INSERT INTO "mini_types" VALUES (3044,'Devastation Scorpion');
+INSERT INTO "mini_types" VALUES (3045,'Giant Dragonfly');
+INSERT INTO "mini_types" VALUES (3046,'Ectoplasmic Vermin');
+INSERT INTO "mini_types" VALUES (3047,'Giant Firefly');
+INSERT INTO "mini_types" VALUES (3048,'Giant Wasp Mount');
+INSERT INTO "mini_types" VALUES (3049,'Hoard Scarab');
+INSERT INTO "mini_types" VALUES (3050,'Speckled Hurrum');
+INSERT INTO "mini_types" VALUES (3051,'Giant Leech');
+INSERT INTO "mini_types" VALUES (3052,'Leechwalker');
+INSERT INTO "mini_types" VALUES (3053,'Living Crossbow');
+INSERT INTO "mini_types" VALUES (3054,'Lolth-Touched Monstrous Hunting Spider');
+INSERT INTO "mini_types" VALUES (3055,'Dire Maggot');
+INSERT INTO "mini_types" VALUES (3056,'Giant Maggot');
+INSERT INTO "mini_types" VALUES (3057,'Megapede');
+INSERT INTO "mini_types" VALUES (3058,'Mulworm');
+INSERT INTO "mini_types" VALUES (3059,'Mummy Mites');
+INSERT INTO "mini_types" VALUES (3060,'Phalanx Vermin');
+INSERT INTO "mini_types" VALUES (3061,'Giant Praying Mantis');
+INSERT INTO "mini_types" VALUES (3062,'Rhagodessa');
+INSERT INTO "mini_types" VALUES (3063,'Rot Grub Swarm');
+INSERT INTO "mini_types" VALUES (3064,'Sand Maggot');
+INSERT INTO "mini_types" VALUES (3070,'Giant Whip Scorpion');
+INSERT INTO "mini_types" VALUES (3071,'Monstrous Scorpion');
+INSERT INTO "mini_types" VALUES (3072,'Siege Beetle');
+INSERT INTO "mini_types" VALUES (3073,'Greater Siege Crab');
+INSERT INTO "mini_types" VALUES (3074,'Siege Crag');
+INSERT INTO "mini_types" VALUES (3075,'Giant Slug');
+INSERT INTO "mini_types" VALUES (3076,'Abyssal Armored Monstrous Spider');
+INSERT INTO "mini_types" VALUES (3077,'Abyssal Monstrous Spider');
+INSERT INTO "mini_types" VALUES (3078,'Devastation Spider');
+INSERT INTO "mini_types" VALUES (3079,'Giant Sun Spider');
+INSERT INTO "mini_types" VALUES (3080,'Giant Whip Spider');
+INSERT INTO "mini_types" VALUES (3081,'Hairy Spider');
+INSERT INTO "mini_types" VALUES (3082,'Hastendeath Spider Swarm');
+INSERT INTO "mini_types" VALUES (3083,'Hive Spider Drone');
+INSERT INTO "mini_types" VALUES (3084,'Jungle Spider');
+INSERT INTO "mini_types" VALUES (3085,'Monstrous Diving Spider');
+INSERT INTO "mini_types" VALUES (3086,'Monstrous Spider');
+INSERT INTO "mini_types" VALUES (3087,'Snow Spider');
+INSERT INTO "mini_types" VALUES (3088,'Sword Spider');
+INSERT INTO "mini_types" VALUES (3089,'Spitting Spider');
+INSERT INTO "mini_types" VALUES (3092,'Centipede Swarm');
+INSERT INTO "mini_types" VALUES (3093,'Hell Swarm');
+INSERT INTO "mini_types" VALUES (3103,'Scarab Beetle Swarm');
+INSERT INTO "mini_types" VALUES (3104,'Scorpion Swarm');
+INSERT INTO "mini_types" VALUES (3105,'Spider Swarm');
+INSERT INTO "mini_types" VALUES (3108,'Tangle Terror');
+INSERT INTO "mini_types" VALUES (3109,'Termite Queen');
+INSERT INTO "mini_types" VALUES (3110,'Termite Soldier');
+INSERT INTO "mini_types" VALUES (3111,'Termite Worker');
+INSERT INTO "mini_types" VALUES (3112,'Giant Tick');
+INSERT INTO "mini_types" VALUES (3113,'Giant Velvet Worm');
+INSERT INTO "mini_types" VALUES (3114,'Giant Wasp');
+INSERT INTO "mini_types" VALUES (3115,'Widowmaker');
+INSERT INTO "mini_types" VALUES (3116,'Wormswarm');
+INSERT INTO "mini_to_types" VALUES (14,30,0);
+INSERT INTO "mini_to_types" VALUES (16,4,0);
+INSERT INTO "mini_to_types" VALUES (15,42,0);
+INSERT INTO "mini_to_types" VALUES (23,25,0);
+INSERT INTO "mini_to_types" VALUES (20,8,0);
+INSERT INTO "mini_to_types" VALUES (22,24,0);
+INSERT INTO "mini_to_types" VALUES (21,9,0);
+INSERT INTO "mini_to_types" VALUES (19,7,0);
+INSERT INTO "mini_to_types" VALUES (14,28,1);
+INSERT INTO "mini_to_types" VALUES (14,29,1);
+INSERT INTO "mini_to_types" VALUES (22,36,1);
+INSERT INTO "mini_to_types" VALUES (18,32,1);
+INSERT INTO "mini_to_types" VALUES (18,6,0);
+INSERT INTO "mini_to_types" VALUES (18,33,1);
+INSERT INTO "mini_to_types" VALUES (18,34,1);
+INSERT INTO "mini_to_types" VALUES (124,16,0);
+INSERT INTO "mini_to_types" VALUES (124,927,1);
+INSERT INTO "mini_to_types" VALUES (124,1625,1);
+INSERT INTO "mini_to_types" VALUES (25,44,0);
+INSERT INTO "mini_to_types" VALUES (17,5,0);
+INSERT INTO "mini_to_types" VALUES (24,43,0);
+INSERT INTO "mini_to_types" VALUES (81,4,0);
+INSERT INTO "type_to_categories" VALUES (7,11);
+INSERT INTO "type_to_categories" VALUES (9,17);
+INSERT INTO "type_to_categories" VALUES (24,16);
+INSERT INTO "type_to_categories" VALUES (28,16);
+INSERT INTO "type_to_categories" VALUES (29,16);
+INSERT INTO "type_to_categories" VALUES (30,16);
+INSERT INTO "type_to_categories" VALUES (32,16);
+INSERT INTO "type_to_categories" VALUES (33,16);
+INSERT INTO "type_to_categories" VALUES (34,16);
+INSERT INTO "type_to_categories" VALUES (35,16);
+INSERT INTO "type_to_categories" VALUES (36,16);
+INSERT INTO "type_to_categories" VALUES (43,12);
+INSERT INTO "type_to_categories" VALUES (44,39);
+INSERT INTO "type_to_categories" VALUES (1262,10);
+INSERT INTO "type_to_categories" VALUES (1263,10);
+INSERT INTO "type_to_categories" VALUES (1264,10);
+INSERT INTO "type_to_categories" VALUES (1265,10);
+INSERT INTO "type_to_categories" VALUES (1266,10);
+INSERT INTO "type_to_categories" VALUES (1267,10);
+INSERT INTO "type_to_categories" VALUES (1268,10);
+INSERT INTO "type_to_categories" VALUES (1269,10);
+INSERT INTO "type_to_categories" VALUES (1270,10);
+INSERT INTO "type_to_categories" VALUES (1271,10);
+INSERT INTO "type_to_categories" VALUES (1272,10);
+INSERT INTO "type_to_categories" VALUES (1273,10);
+INSERT INTO "type_to_categories" VALUES (1274,10);
+INSERT INTO "type_to_categories" VALUES (1275,10);
+INSERT INTO "type_to_categories" VALUES (1276,10);
+INSERT INTO "type_to_categories" VALUES (1277,10);
+INSERT INTO "type_to_categories" VALUES (1278,10);
+INSERT INTO "type_to_categories" VALUES (1279,10);
+INSERT INTO "type_to_categories" VALUES (1280,10);
+INSERT INTO "type_to_categories" VALUES (1281,10);
+INSERT INTO "type_to_categories" VALUES (1282,10);
+INSERT INTO "type_to_categories" VALUES (1283,10);
+INSERT INTO "type_to_categories" VALUES (1284,10);
+INSERT INTO "type_to_categories" VALUES (1285,10);
+INSERT INTO "type_to_categories" VALUES (1286,10);
+INSERT INTO "type_to_categories" VALUES (1287,10);
+INSERT INTO "type_to_categories" VALUES (1288,10);
+INSERT INTO "type_to_categories" VALUES (1289,10);
+INSERT INTO "type_to_categories" VALUES (1290,10);
+INSERT INTO "type_to_categories" VALUES (1291,10);
+INSERT INTO "type_to_categories" VALUES (1292,10);
+INSERT INTO "type_to_categories" VALUES (1293,10);
+INSERT INTO "type_to_categories" VALUES (1294,10);
+INSERT INTO "type_to_categories" VALUES (1295,10);
+INSERT INTO "type_to_categories" VALUES (1296,10);
+INSERT INTO "type_to_categories" VALUES (1297,10);
+INSERT INTO "type_to_categories" VALUES (1298,10);
+INSERT INTO "type_to_categories" VALUES (1299,10);
+INSERT INTO "type_to_categories" VALUES (1300,10);
+INSERT INTO "type_to_categories" VALUES (1301,10);
+INSERT INTO "type_to_categories" VALUES (1302,10);
+INSERT INTO "type_to_categories" VALUES (1303,10);
+INSERT INTO "type_to_categories" VALUES (1304,10);
+INSERT INTO "type_to_categories" VALUES (1305,10);
+INSERT INTO "type_to_categories" VALUES (1306,10);
+INSERT INTO "type_to_categories" VALUES (1307,10);
+INSERT INTO "type_to_categories" VALUES (1309,10);
+INSERT INTO "type_to_categories" VALUES (1310,10);
+INSERT INTO "type_to_categories" VALUES (1311,10);
+INSERT INTO "type_to_categories" VALUES (1312,10);
+INSERT INTO "type_to_categories" VALUES (1313,10);
+INSERT INTO "type_to_categories" VALUES (1314,10);
+INSERT INTO "type_to_categories" VALUES (1315,10);
+INSERT INTO "type_to_categories" VALUES (1316,10);
+INSERT INTO "type_to_categories" VALUES (1317,10);
+INSERT INTO "type_to_categories" VALUES (1318,10);
+INSERT INTO "type_to_categories" VALUES (1321,10);
+INSERT INTO "type_to_categories" VALUES (1322,10);
+INSERT INTO "type_to_categories" VALUES (1325,10);
+INSERT INTO "type_to_categories" VALUES (1326,10);
+INSERT INTO "type_to_categories" VALUES (1327,10);
+INSERT INTO "type_to_categories" VALUES (1328,10);
+INSERT INTO "type_to_categories" VALUES (1329,10);
+INSERT INTO "type_to_categories" VALUES (1330,10);
+INSERT INTO "type_to_categories" VALUES (1331,10);
+INSERT INTO "type_to_categories" VALUES (1332,10);
+INSERT INTO "type_to_categories" VALUES (1333,10);
+INSERT INTO "type_to_categories" VALUES (1334,10);
+INSERT INTO "type_to_categories" VALUES (1335,10);
+INSERT INTO "type_to_categories" VALUES (1336,10);
+INSERT INTO "type_to_categories" VALUES (1337,10);
+INSERT INTO "type_to_categories" VALUES (1338,10);
+INSERT INTO "type_to_categories" VALUES (1339,10);
+INSERT INTO "type_to_categories" VALUES (1340,10);
+INSERT INTO "type_to_categories" VALUES (1341,10);
+INSERT INTO "type_to_categories" VALUES (1342,10);
+INSERT INTO "type_to_categories" VALUES (1343,10);
+INSERT INTO "type_to_categories" VALUES (1344,10);
+INSERT INTO "type_to_categories" VALUES (1345,10);
+INSERT INTO "type_to_categories" VALUES (1346,10);
+INSERT INTO "type_to_categories" VALUES (1347,10);
+INSERT INTO "type_to_categories" VALUES (1348,11);
+INSERT INTO "type_to_categories" VALUES (1349,11);
+INSERT INTO "type_to_categories" VALUES (1350,11);
+INSERT INTO "type_to_categories" VALUES (1351,11);
+INSERT INTO "type_to_categories" VALUES (1352,11);
+INSERT INTO "type_to_categories" VALUES (1353,11);
+INSERT INTO "type_to_categories" VALUES (1354,11);
+INSERT INTO "type_to_categories" VALUES (1355,11);
+INSERT INTO "type_to_categories" VALUES (1356,11);
+INSERT INTO "type_to_categories" VALUES (1357,11);
+INSERT INTO "type_to_categories" VALUES (1358,11);
+INSERT INTO "type_to_categories" VALUES (1359,11);
+INSERT INTO "type_to_categories" VALUES (1360,11);
+INSERT INTO "type_to_categories" VALUES (1361,11);
+INSERT INTO "type_to_categories" VALUES (1362,11);
+INSERT INTO "type_to_categories" VALUES (1363,11);
+INSERT INTO "type_to_categories" VALUES (1364,11);
+INSERT INTO "type_to_categories" VALUES (1365,11);
+INSERT INTO "type_to_categories" VALUES (1371,11);
+INSERT INTO "type_to_categories" VALUES (1372,11);
+INSERT INTO "type_to_categories" VALUES (1373,11);
+INSERT INTO "type_to_categories" VALUES (1374,11);
+INSERT INTO "type_to_categories" VALUES (1375,11);
+INSERT INTO "type_to_categories" VALUES (1376,11);
+INSERT INTO "type_to_categories" VALUES (1377,11);
+INSERT INTO "type_to_categories" VALUES (1378,11);
+INSERT INTO "type_to_categories" VALUES (1379,11);
+INSERT INTO "type_to_categories" VALUES (1380,11);
+INSERT INTO "type_to_categories" VALUES (1381,11);
+INSERT INTO "type_to_categories" VALUES (1382,11);
+INSERT INTO "type_to_categories" VALUES (1383,11);
+INSERT INTO "type_to_categories" VALUES (1384,11);
+INSERT INTO "type_to_categories" VALUES (1385,11);
+INSERT INTO "type_to_categories" VALUES (1386,11);
+INSERT INTO "type_to_categories" VALUES (1387,11);
+INSERT INTO "type_to_categories" VALUES (1388,11);
+INSERT INTO "type_to_categories" VALUES (1389,11);
+INSERT INTO "type_to_categories" VALUES (1390,11);
+INSERT INTO "type_to_categories" VALUES (1391,11);
+INSERT INTO "type_to_categories" VALUES (1392,11);
+INSERT INTO "type_to_categories" VALUES (1393,11);
+INSERT INTO "type_to_categories" VALUES (1394,11);
+INSERT INTO "type_to_categories" VALUES (1395,11);
+INSERT INTO "type_to_categories" VALUES (1396,11);
+INSERT INTO "type_to_categories" VALUES (1397,11);
+INSERT INTO "type_to_categories" VALUES (1398,11);
+INSERT INTO "type_to_categories" VALUES (1399,11);
+INSERT INTO "type_to_categories" VALUES (1400,11);
+INSERT INTO "type_to_categories" VALUES (1401,11);
+INSERT INTO "type_to_categories" VALUES (1402,11);
+INSERT INTO "type_to_categories" VALUES (1403,11);
+INSERT INTO "type_to_categories" VALUES (1404,11);
+INSERT INTO "type_to_categories" VALUES (1405,11);
+INSERT INTO "type_to_categories" VALUES (1406,11);
+INSERT INTO "type_to_categories" VALUES (1407,11);
+INSERT INTO "type_to_categories" VALUES (1408,11);
+INSERT INTO "type_to_categories" VALUES (1409,11);
+INSERT INTO "type_to_categories" VALUES (1410,11);
+INSERT INTO "type_to_categories" VALUES (1411,11);
+INSERT INTO "type_to_categories" VALUES (1413,11);
+INSERT INTO "type_to_categories" VALUES (1415,11);
+INSERT INTO "type_to_categories" VALUES (1416,11);
+INSERT INTO "type_to_categories" VALUES (1417,11);
+INSERT INTO "type_to_categories" VALUES (1418,11);
+INSERT INTO "type_to_categories" VALUES (1419,11);
+INSERT INTO "type_to_categories" VALUES (1420,11);
+INSERT INTO "type_to_categories" VALUES (1421,11);
+INSERT INTO "type_to_categories" VALUES (1422,11);
+INSERT INTO "type_to_categories" VALUES (1423,11);
+INSERT INTO "type_to_categories" VALUES (1424,11);
+INSERT INTO "type_to_categories" VALUES (1425,11);
+INSERT INTO "type_to_categories" VALUES (1426,11);
+INSERT INTO "type_to_categories" VALUES (1427,11);
+INSERT INTO "type_to_categories" VALUES (1428,11);
+INSERT INTO "type_to_categories" VALUES (1429,11);
+INSERT INTO "type_to_categories" VALUES (1430,11);
+INSERT INTO "type_to_categories" VALUES (1431,11);
+INSERT INTO "type_to_categories" VALUES (1432,11);
+INSERT INTO "type_to_categories" VALUES (1433,11);
+INSERT INTO "type_to_categories" VALUES (1434,11);
+INSERT INTO "type_to_categories" VALUES (1435,11);
+INSERT INTO "type_to_categories" VALUES (1436,11);
+INSERT INTO "type_to_categories" VALUES (1437,11);
+INSERT INTO "type_to_categories" VALUES (1438,11);
+INSERT INTO "type_to_categories" VALUES (1439,11);
+INSERT INTO "type_to_categories" VALUES (1440,11);
+INSERT INTO "type_to_categories" VALUES (1441,11);
+INSERT INTO "type_to_categories" VALUES (1442,11);
+INSERT INTO "type_to_categories" VALUES (1443,11);
+INSERT INTO "type_to_categories" VALUES (1444,11);
+INSERT INTO "type_to_categories" VALUES (1445,11);
+INSERT INTO "type_to_categories" VALUES (1446,11);
+INSERT INTO "type_to_categories" VALUES (1449,11);
+INSERT INTO "type_to_categories" VALUES (1450,11);
+INSERT INTO "type_to_categories" VALUES (1451,11);
+INSERT INTO "type_to_categories" VALUES (1452,11);
+INSERT INTO "type_to_categories" VALUES (1453,11);
+INSERT INTO "type_to_categories" VALUES (1454,11);
+INSERT INTO "type_to_categories" VALUES (1455,11);
+INSERT INTO "type_to_categories" VALUES (1456,11);
+INSERT INTO "type_to_categories" VALUES (1458,11);
+INSERT INTO "type_to_categories" VALUES (1459,11);
+INSERT INTO "type_to_categories" VALUES (1461,11);
+INSERT INTO "type_to_categories" VALUES (1462,11);
+INSERT INTO "type_to_categories" VALUES (1463,11);
+INSERT INTO "type_to_categories" VALUES (1464,11);
+INSERT INTO "type_to_categories" VALUES (1465,11);
+INSERT INTO "type_to_categories" VALUES (1466,11);
+INSERT INTO "type_to_categories" VALUES (1467,11);
+INSERT INTO "type_to_categories" VALUES (1468,11);
+INSERT INTO "type_to_categories" VALUES (1469,11);
+INSERT INTO "type_to_categories" VALUES (1470,11);
+INSERT INTO "type_to_categories" VALUES (1471,11);
+INSERT INTO "type_to_categories" VALUES (1472,11);
+INSERT INTO "type_to_categories" VALUES (1473,11);
+INSERT INTO "type_to_categories" VALUES (1474,11);
+INSERT INTO "type_to_categories" VALUES (1475,11);
+INSERT INTO "type_to_categories" VALUES (1476,11);
+INSERT INTO "type_to_categories" VALUES (1477,11);
+INSERT INTO "type_to_categories" VALUES (1478,11);
+INSERT INTO "type_to_categories" VALUES (1479,11);
+INSERT INTO "type_to_categories" VALUES (1480,11);
+INSERT INTO "type_to_categories" VALUES (1481,11);
+INSERT INTO "type_to_categories" VALUES (1487,11);
+INSERT INTO "type_to_categories" VALUES (1488,11);
+INSERT INTO "type_to_categories" VALUES (1489,11);
+INSERT INTO "type_to_categories" VALUES (1490,11);
+INSERT INTO "type_to_categories" VALUES (1491,11);
+INSERT INTO "type_to_categories" VALUES (1492,11);
+INSERT INTO "type_to_categories" VALUES (1493,11);
+INSERT INTO "type_to_categories" VALUES (1494,11);
+INSERT INTO "type_to_categories" VALUES (1495,11);
+INSERT INTO "type_to_categories" VALUES (1496,11);
+INSERT INTO "type_to_categories" VALUES (1497,11);
+INSERT INTO "type_to_categories" VALUES (1498,11);
+INSERT INTO "type_to_categories" VALUES (1499,11);
+INSERT INTO "type_to_categories" VALUES (1500,11);
+INSERT INTO "type_to_categories" VALUES (1501,11);
+INSERT INTO "type_to_categories" VALUES (1502,11);
+INSERT INTO "type_to_categories" VALUES (1503,11);
+INSERT INTO "type_to_categories" VALUES (1504,11);
+INSERT INTO "type_to_categories" VALUES (1505,11);
+INSERT INTO "type_to_categories" VALUES (1506,11);
+INSERT INTO "type_to_categories" VALUES (1507,11);
+INSERT INTO "type_to_categories" VALUES (1508,11);
+INSERT INTO "type_to_categories" VALUES (1509,11);
+INSERT INTO "type_to_categories" VALUES (1510,11);
+INSERT INTO "type_to_categories" VALUES (1511,11);
+INSERT INTO "type_to_categories" VALUES (1512,11);
+INSERT INTO "type_to_categories" VALUES (1513,11);
+INSERT INTO "type_to_categories" VALUES (1514,11);
+INSERT INTO "type_to_categories" VALUES (1515,11);
+INSERT INTO "type_to_categories" VALUES (1516,11);
+INSERT INTO "type_to_categories" VALUES (1517,11);
+INSERT INTO "type_to_categories" VALUES (1518,11);
+INSERT INTO "type_to_categories" VALUES (1519,11);
+INSERT INTO "type_to_categories" VALUES (1520,11);
+INSERT INTO "type_to_categories" VALUES (1521,11);
+INSERT INTO "type_to_categories" VALUES (1522,11);
+INSERT INTO "type_to_categories" VALUES (1523,11);
+INSERT INTO "type_to_categories" VALUES (1526,12);
+INSERT INTO "type_to_categories" VALUES (1527,12);
+INSERT INTO "type_to_categories" VALUES (1528,12);
+INSERT INTO "type_to_categories" VALUES (1529,12);
+INSERT INTO "type_to_categories" VALUES (1530,12);
+INSERT INTO "type_to_categories" VALUES (1531,12);
+INSERT INTO "type_to_categories" VALUES (1532,12);
+INSERT INTO "type_to_categories" VALUES (1533,12);
+INSERT INTO "type_to_categories" VALUES (1534,12);
+INSERT INTO "type_to_categories" VALUES (1535,12);
+INSERT INTO "type_to_categories" VALUES (1536,12);
+INSERT INTO "type_to_categories" VALUES (1537,12);
+INSERT INTO "type_to_categories" VALUES (1538,12);
+INSERT INTO "type_to_categories" VALUES (1539,12);
+INSERT INTO "type_to_categories" VALUES (1540,12);
+INSERT INTO "type_to_categories" VALUES (1541,12);
+INSERT INTO "type_to_categories" VALUES (1548,12);
+INSERT INTO "type_to_categories" VALUES (1549,12);
+INSERT INTO "type_to_categories" VALUES (1550,12);
+INSERT INTO "type_to_categories" VALUES (1551,12);
+INSERT INTO "type_to_categories" VALUES (1552,12);
+INSERT INTO "type_to_categories" VALUES (1553,12);
+INSERT INTO "type_to_categories" VALUES (1554,12);
+INSERT INTO "type_to_categories" VALUES (1555,12);
+INSERT INTO "type_to_categories" VALUES (1556,12);
+INSERT INTO "type_to_categories" VALUES (1557,12);
+INSERT INTO "type_to_categories" VALUES (1558,12);
+INSERT INTO "type_to_categories" VALUES (1559,12);
+INSERT INTO "type_to_categories" VALUES (1560,12);
+INSERT INTO "type_to_categories" VALUES (1561,12);
+INSERT INTO "type_to_categories" VALUES (1562,12);
+INSERT INTO "type_to_categories" VALUES (1563,12);
+INSERT INTO "type_to_categories" VALUES (1564,12);
+INSERT INTO "type_to_categories" VALUES (1565,12);
+INSERT INTO "type_to_categories" VALUES (1566,12);
+INSERT INTO "type_to_categories" VALUES (1567,12);
+INSERT INTO "type_to_categories" VALUES (1568,12);
+INSERT INTO "type_to_categories" VALUES (1569,12);
+INSERT INTO "type_to_categories" VALUES (1570,12);
+INSERT INTO "type_to_categories" VALUES (1571,12);
+INSERT INTO "type_to_categories" VALUES (1572,12);
+INSERT INTO "type_to_categories" VALUES (1573,12);
+INSERT INTO "type_to_categories" VALUES (1574,12);
+INSERT INTO "type_to_categories" VALUES (1575,12);
+INSERT INTO "type_to_categories" VALUES (1576,12);
+INSERT INTO "type_to_categories" VALUES (1577,12);
+INSERT INTO "type_to_categories" VALUES (1578,12);
+INSERT INTO "type_to_categories" VALUES (1579,12);
+INSERT INTO "type_to_categories" VALUES (1580,12);
+INSERT INTO "type_to_categories" VALUES (1581,12);
+INSERT INTO "type_to_categories" VALUES (1582,12);
+INSERT INTO "type_to_categories" VALUES (1583,12);
+INSERT INTO "type_to_categories" VALUES (1584,12);
+INSERT INTO "type_to_categories" VALUES (1585,12);
+INSERT INTO "type_to_categories" VALUES (1586,12);
+INSERT INTO "type_to_categories" VALUES (1587,12);
+INSERT INTO "type_to_categories" VALUES (1588,12);
+INSERT INTO "type_to_categories" VALUES (1589,12);
+INSERT INTO "type_to_categories" VALUES (1590,12);
+INSERT INTO "type_to_categories" VALUES (1591,12);
+INSERT INTO "type_to_categories" VALUES (1592,12);
+INSERT INTO "type_to_categories" VALUES (1593,12);
+INSERT INTO "type_to_categories" VALUES (1594,12);
+INSERT INTO "type_to_categories" VALUES (1595,12);
+INSERT INTO "type_to_categories" VALUES (1596,12);
+INSERT INTO "type_to_categories" VALUES (1597,12);
+INSERT INTO "type_to_categories" VALUES (1598,12);
+INSERT INTO "type_to_categories" VALUES (1599,12);
+INSERT INTO "type_to_categories" VALUES (1600,12);
+INSERT INTO "type_to_categories" VALUES (1601,12);
+INSERT INTO "type_to_categories" VALUES (1602,12);
+INSERT INTO "type_to_categories" VALUES (1603,12);
+INSERT INTO "type_to_categories" VALUES (1604,12);
+INSERT INTO "type_to_categories" VALUES (1605,12);
+INSERT INTO "type_to_categories" VALUES (1606,12);
+INSERT INTO "type_to_categories" VALUES (1607,12);
+INSERT INTO "type_to_categories" VALUES (1608,12);
+INSERT INTO "type_to_categories" VALUES (1609,12);
+INSERT INTO "type_to_categories" VALUES (1610,12);
+INSERT INTO "type_to_categories" VALUES (1611,12);
+INSERT INTO "type_to_categories" VALUES (1612,12);
+INSERT INTO "type_to_categories" VALUES (1613,12);
+INSERT INTO "type_to_categories" VALUES (1614,12);
+INSERT INTO "type_to_categories" VALUES (1615,12);
+INSERT INTO "type_to_categories" VALUES (1616,12);
+INSERT INTO "type_to_categories" VALUES (1617,12);
+INSERT INTO "type_to_categories" VALUES (1618,12);
+INSERT INTO "type_to_categories" VALUES (1619,12);
+INSERT INTO "type_to_categories" VALUES (1620,12);
+INSERT INTO "type_to_categories" VALUES (1621,12);
+INSERT INTO "type_to_categories" VALUES (1622,12);
+INSERT INTO "type_to_categories" VALUES (1623,12);
+INSERT INTO "type_to_categories" VALUES (1624,12);
+INSERT INTO "type_to_categories" VALUES (1625,12);
+INSERT INTO "type_to_categories" VALUES (1626,12);
+INSERT INTO "type_to_categories" VALUES (1627,12);
+INSERT INTO "type_to_categories" VALUES (1628,12);
+INSERT INTO "type_to_categories" VALUES (1629,12);
+INSERT INTO "type_to_categories" VALUES (1630,12);
+INSERT INTO "type_to_categories" VALUES (1631,12);
+INSERT INTO "type_to_categories" VALUES (1632,12);
+INSERT INTO "type_to_categories" VALUES (1633,12);
+INSERT INTO "type_to_categories" VALUES (1634,12);
+INSERT INTO "type_to_categories" VALUES (1635,12);
+INSERT INTO "type_to_categories" VALUES (1636,12);
+INSERT INTO "type_to_categories" VALUES (1637,12);
+INSERT INTO "type_to_categories" VALUES (1638,12);
+INSERT INTO "type_to_categories" VALUES (1639,12);
+INSERT INTO "type_to_categories" VALUES (1640,12);
+INSERT INTO "type_to_categories" VALUES (1641,12);
+INSERT INTO "type_to_categories" VALUES (1642,12);
+INSERT INTO "type_to_categories" VALUES (1643,12);
+INSERT INTO "type_to_categories" VALUES (1644,12);
+INSERT INTO "type_to_categories" VALUES (1645,12);
+INSERT INTO "type_to_categories" VALUES (1646,12);
+INSERT INTO "type_to_categories" VALUES (1647,12);
+INSERT INTO "type_to_categories" VALUES (1648,12);
+INSERT INTO "type_to_categories" VALUES (1649,12);
+INSERT INTO "type_to_categories" VALUES (1650,12);
+INSERT INTO "type_to_categories" VALUES (1651,12);
+INSERT INTO "type_to_categories" VALUES (1652,12);
+INSERT INTO "type_to_categories" VALUES (1653,12);
+INSERT INTO "type_to_categories" VALUES (1654,12);
+INSERT INTO "type_to_categories" VALUES (1655,12);
+INSERT INTO "type_to_categories" VALUES (1656,12);
+INSERT INTO "type_to_categories" VALUES (1657,12);
+INSERT INTO "type_to_categories" VALUES (1658,12);
+INSERT INTO "type_to_categories" VALUES (1659,12);
+INSERT INTO "type_to_categories" VALUES (1660,12);
+INSERT INTO "type_to_categories" VALUES (1661,12);
+INSERT INTO "type_to_categories" VALUES (1662,12);
+INSERT INTO "type_to_categories" VALUES (1663,12);
+INSERT INTO "type_to_categories" VALUES (1664,12);
+INSERT INTO "type_to_categories" VALUES (1665,12);
+INSERT INTO "type_to_categories" VALUES (1666,12);
+INSERT INTO "type_to_categories" VALUES (1667,12);
+INSERT INTO "type_to_categories" VALUES (1668,12);
+INSERT INTO "type_to_categories" VALUES (1669,12);
+INSERT INTO "type_to_categories" VALUES (1670,12);
+INSERT INTO "type_to_categories" VALUES (1671,12);
+INSERT INTO "type_to_categories" VALUES (1672,12);
+INSERT INTO "type_to_categories" VALUES (1673,12);
+INSERT INTO "type_to_categories" VALUES (1674,12);
+INSERT INTO "type_to_categories" VALUES (1675,12);
+INSERT INTO "type_to_categories" VALUES (1676,12);
+INSERT INTO "type_to_categories" VALUES (1677,12);
+INSERT INTO "type_to_categories" VALUES (1678,12);
+INSERT INTO "type_to_categories" VALUES (1679,12);
+INSERT INTO "type_to_categories" VALUES (1680,12);
+INSERT INTO "type_to_categories" VALUES (1681,12);
+INSERT INTO "type_to_categories" VALUES (1682,12);
+INSERT INTO "type_to_categories" VALUES (1683,12);
+INSERT INTO "type_to_categories" VALUES (1684,12);
+INSERT INTO "type_to_categories" VALUES (1685,12);
+INSERT INTO "type_to_categories" VALUES (1686,12);
+INSERT INTO "type_to_categories" VALUES (1687,12);
+INSERT INTO "type_to_categories" VALUES (1688,12);
+INSERT INTO "type_to_categories" VALUES (1689,12);
+INSERT INTO "type_to_categories" VALUES (1690,12);
+INSERT INTO "type_to_categories" VALUES (1691,12);
+INSERT INTO "type_to_categories" VALUES (1692,12);
+INSERT INTO "type_to_categories" VALUES (1693,12);
+INSERT INTO "type_to_categories" VALUES (1694,12);
+INSERT INTO "type_to_categories" VALUES (1695,12);
+INSERT INTO "type_to_categories" VALUES (1696,12);
+INSERT INTO "type_to_categories" VALUES (1697,12);
+INSERT INTO "type_to_categories" VALUES (1698,12);
+INSERT INTO "type_to_categories" VALUES (1701,12);
+INSERT INTO "type_to_categories" VALUES (1702,12);
+INSERT INTO "type_to_categories" VALUES (1703,12);
+INSERT INTO "type_to_categories" VALUES (1704,12);
+INSERT INTO "type_to_categories" VALUES (1705,12);
+INSERT INTO "type_to_categories" VALUES (1706,12);
+INSERT INTO "type_to_categories" VALUES (1707,12);
+INSERT INTO "type_to_categories" VALUES (1708,12);
+INSERT INTO "type_to_categories" VALUES (1709,12);
+INSERT INTO "type_to_categories" VALUES (1710,12);
+INSERT INTO "type_to_categories" VALUES (1711,12);
+INSERT INTO "type_to_categories" VALUES (1712,12);
+INSERT INTO "type_to_categories" VALUES (1713,12);
+INSERT INTO "type_to_categories" VALUES (1714,12);
+INSERT INTO "type_to_categories" VALUES (1715,12);
+INSERT INTO "type_to_categories" VALUES (1716,12);
+INSERT INTO "type_to_categories" VALUES (1717,12);
+INSERT INTO "type_to_categories" VALUES (1718,12);
+INSERT INTO "type_to_categories" VALUES (1719,12);
+INSERT INTO "type_to_categories" VALUES (1720,12);
+INSERT INTO "type_to_categories" VALUES (1721,12);
+INSERT INTO "type_to_categories" VALUES (1722,12);
+INSERT INTO "type_to_categories" VALUES (1723,12);
+INSERT INTO "type_to_categories" VALUES (1724,12);
+INSERT INTO "type_to_categories" VALUES (1725,12);
+INSERT INTO "type_to_categories" VALUES (1726,12);
+INSERT INTO "type_to_categories" VALUES (1727,12);
+INSERT INTO "type_to_categories" VALUES (1728,12);
+INSERT INTO "type_to_categories" VALUES (1729,12);
+INSERT INTO "type_to_categories" VALUES (1730,12);
+INSERT INTO "type_to_categories" VALUES (1731,12);
+INSERT INTO "type_to_categories" VALUES (1732,12);
+INSERT INTO "type_to_categories" VALUES (1733,12);
+INSERT INTO "type_to_categories" VALUES (1734,12);
+INSERT INTO "type_to_categories" VALUES (1735,12);
+INSERT INTO "type_to_categories" VALUES (1736,12);
+INSERT INTO "type_to_categories" VALUES (1737,12);
+INSERT INTO "type_to_categories" VALUES (1738,12);
+INSERT INTO "type_to_categories" VALUES (1739,12);
+INSERT INTO "type_to_categories" VALUES (1740,12);
+INSERT INTO "type_to_categories" VALUES (1741,12);
+INSERT INTO "type_to_categories" VALUES (1747,12);
+INSERT INTO "type_to_categories" VALUES (1751,12);
+INSERT INTO "type_to_categories" VALUES (1752,12);
+INSERT INTO "type_to_categories" VALUES (1753,12);
+INSERT INTO "type_to_categories" VALUES (1754,12);
+INSERT INTO "type_to_categories" VALUES (1755,12);
+INSERT INTO "type_to_categories" VALUES (1756,12);
+INSERT INTO "type_to_categories" VALUES (1757,12);
+INSERT INTO "type_to_categories" VALUES (1758,12);
+INSERT INTO "type_to_categories" VALUES (1759,12);
+INSERT INTO "type_to_categories" VALUES (1760,12);
+INSERT INTO "type_to_categories" VALUES (1761,12);
+INSERT INTO "type_to_categories" VALUES (1762,12);
+INSERT INTO "type_to_categories" VALUES (1763,12);
+INSERT INTO "type_to_categories" VALUES (1764,12);
+INSERT INTO "type_to_categories" VALUES (1765,12);
+INSERT INTO "type_to_categories" VALUES (1766,12);
+INSERT INTO "type_to_categories" VALUES (1767,12);
+INSERT INTO "type_to_categories" VALUES (1768,12);
+INSERT INTO "type_to_categories" VALUES (1769,12);
+INSERT INTO "type_to_categories" VALUES (1770,12);
+INSERT INTO "type_to_categories" VALUES (1771,12);
+INSERT INTO "type_to_categories" VALUES (1772,12);
+INSERT INTO "type_to_categories" VALUES (1773,12);
+INSERT INTO "type_to_categories" VALUES (1774,12);
+INSERT INTO "type_to_categories" VALUES (1775,12);
+INSERT INTO "type_to_categories" VALUES (1776,12);
+INSERT INTO "type_to_categories" VALUES (1777,12);
+INSERT INTO "type_to_categories" VALUES (1778,12);
+INSERT INTO "type_to_categories" VALUES (1779,12);
+INSERT INTO "type_to_categories" VALUES (1780,12);
+INSERT INTO "type_to_categories" VALUES (1781,12);
+INSERT INTO "type_to_categories" VALUES (1782,12);
+INSERT INTO "type_to_categories" VALUES (1783,12);
+INSERT INTO "type_to_categories" VALUES (1784,12);
+INSERT INTO "type_to_categories" VALUES (1785,12);
+INSERT INTO "type_to_categories" VALUES (1786,12);
+INSERT INTO "type_to_categories" VALUES (1788,12);
+INSERT INTO "type_to_categories" VALUES (1796,12);
+INSERT INTO "type_to_categories" VALUES (1802,12);
+INSERT INTO "type_to_categories" VALUES (1803,12);
+INSERT INTO "type_to_categories" VALUES (1804,12);
+INSERT INTO "type_to_categories" VALUES (1805,12);
+INSERT INTO "type_to_categories" VALUES (1806,12);
+INSERT INTO "type_to_categories" VALUES (1807,12);
+INSERT INTO "type_to_categories" VALUES (1808,12);
+INSERT INTO "type_to_categories" VALUES (1809,12);
+INSERT INTO "type_to_categories" VALUES (1810,12);
+INSERT INTO "type_to_categories" VALUES (1811,12);
+INSERT INTO "type_to_categories" VALUES (1812,12);
+INSERT INTO "type_to_categories" VALUES (1813,12);
+INSERT INTO "type_to_categories" VALUES (1814,12);
+INSERT INTO "type_to_categories" VALUES (1815,12);
+INSERT INTO "type_to_categories" VALUES (1816,12);
+INSERT INTO "type_to_categories" VALUES (1817,12);
+INSERT INTO "type_to_categories" VALUES (1818,12);
+INSERT INTO "type_to_categories" VALUES (1819,12);
+INSERT INTO "type_to_categories" VALUES (1820,12);
+INSERT INTO "type_to_categories" VALUES (1821,12);
+INSERT INTO "type_to_categories" VALUES (1822,12);
+INSERT INTO "type_to_categories" VALUES (1823,12);
+INSERT INTO "type_to_categories" VALUES (1825,12);
+INSERT INTO "type_to_categories" VALUES (1826,12);
+INSERT INTO "type_to_categories" VALUES (1827,12);
+INSERT INTO "type_to_categories" VALUES (1828,12);
+INSERT INTO "type_to_categories" VALUES (1829,12);
+INSERT INTO "type_to_categories" VALUES (1830,12);
+INSERT INTO "type_to_categories" VALUES (1831,12);
+INSERT INTO "type_to_categories" VALUES (1832,12);
+INSERT INTO "type_to_categories" VALUES (1833,12);
+INSERT INTO "type_to_categories" VALUES (1834,12);
+INSERT INTO "type_to_categories" VALUES (1835,12);
+INSERT INTO "type_to_categories" VALUES (1836,12);
+INSERT INTO "type_to_categories" VALUES (1837,12);
+INSERT INTO "type_to_categories" VALUES (1838,12);
+INSERT INTO "type_to_categories" VALUES (1839,12);
+INSERT INTO "type_to_categories" VALUES (1840,12);
+INSERT INTO "type_to_categories" VALUES (1841,12);
+INSERT INTO "type_to_categories" VALUES (1842,12);
+INSERT INTO "type_to_categories" VALUES (1843,12);
+INSERT INTO "type_to_categories" VALUES (1844,12);
+INSERT INTO "type_to_categories" VALUES (1845,12);
+INSERT INTO "type_to_categories" VALUES (1846,12);
+INSERT INTO "type_to_categories" VALUES (1847,12);
+INSERT INTO "type_to_categories" VALUES (1848,12);
+INSERT INTO "type_to_categories" VALUES (1849,12);
+INSERT INTO "type_to_categories" VALUES (1850,12);
+INSERT INTO "type_to_categories" VALUES (1851,12);
+INSERT INTO "type_to_categories" VALUES (1852,12);
+INSERT INTO "type_to_categories" VALUES (1853,12);
+INSERT INTO "type_to_categories" VALUES (1854,13);
+INSERT INTO "type_to_categories" VALUES (1855,13);
+INSERT INTO "type_to_categories" VALUES (1856,13);
+INSERT INTO "type_to_categories" VALUES (1857,13);
+INSERT INTO "type_to_categories" VALUES (1858,13);
+INSERT INTO "type_to_categories" VALUES (1859,13);
+INSERT INTO "type_to_categories" VALUES (1860,13);
+INSERT INTO "type_to_categories" VALUES (1861,13);
+INSERT INTO "type_to_categories" VALUES (1862,13);
+INSERT INTO "type_to_categories" VALUES (1863,13);
+INSERT INTO "type_to_categories" VALUES (1864,13);
+INSERT INTO "type_to_categories" VALUES (1865,13);
+INSERT INTO "type_to_categories" VALUES (1866,13);
+INSERT INTO "type_to_categories" VALUES (1867,13);
+INSERT INTO "type_to_categories" VALUES (1868,13);
+INSERT INTO "type_to_categories" VALUES (1869,13);
+INSERT INTO "type_to_categories" VALUES (1870,13);
+INSERT INTO "type_to_categories" VALUES (1871,13);
+INSERT INTO "type_to_categories" VALUES (1872,13);
+INSERT INTO "type_to_categories" VALUES (1873,13);
+INSERT INTO "type_to_categories" VALUES (1874,13);
+INSERT INTO "type_to_categories" VALUES (1875,13);
+INSERT INTO "type_to_categories" VALUES (1876,13);
+INSERT INTO "type_to_categories" VALUES (1877,13);
+INSERT INTO "type_to_categories" VALUES (1878,13);
+INSERT INTO "type_to_categories" VALUES (1879,13);
+INSERT INTO "type_to_categories" VALUES (1884,13);
+INSERT INTO "type_to_categories" VALUES (1885,13);
+INSERT INTO "type_to_categories" VALUES (1886,13);
+INSERT INTO "type_to_categories" VALUES (1888,13);
+INSERT INTO "type_to_categories" VALUES (1889,13);
+INSERT INTO "type_to_categories" VALUES (1890,13);
+INSERT INTO "type_to_categories" VALUES (1891,13);
+INSERT INTO "type_to_categories" VALUES (1892,13);
+INSERT INTO "type_to_categories" VALUES (1893,13);
+INSERT INTO "type_to_categories" VALUES (1894,13);
+INSERT INTO "type_to_categories" VALUES (1898,13);
+INSERT INTO "type_to_categories" VALUES (1899,13);
+INSERT INTO "type_to_categories" VALUES (1900,13);
+INSERT INTO "type_to_categories" VALUES (1901,13);
+INSERT INTO "type_to_categories" VALUES (1902,13);
+INSERT INTO "type_to_categories" VALUES (1903,13);
+INSERT INTO "type_to_categories" VALUES (1904,13);
+INSERT INTO "type_to_categories" VALUES (1905,13);
+INSERT INTO "type_to_categories" VALUES (1906,13);
+INSERT INTO "type_to_categories" VALUES (1907,13);
+INSERT INTO "type_to_categories" VALUES (1908,13);
+INSERT INTO "type_to_categories" VALUES (1909,13);
+INSERT INTO "type_to_categories" VALUES (1910,13);
+INSERT INTO "type_to_categories" VALUES (1911,13);
+INSERT INTO "type_to_categories" VALUES (1912,13);
+INSERT INTO "type_to_categories" VALUES (1913,13);
+INSERT INTO "type_to_categories" VALUES (1914,13);
+INSERT INTO "type_to_categories" VALUES (1915,13);
+INSERT INTO "type_to_categories" VALUES (1916,13);
+INSERT INTO "type_to_categories" VALUES (1917,13);
+INSERT INTO "type_to_categories" VALUES (1918,13);
+INSERT INTO "type_to_categories" VALUES (1919,13);
+INSERT INTO "type_to_categories" VALUES (1920,13);
+INSERT INTO "type_to_categories" VALUES (1921,13);
+INSERT INTO "type_to_categories" VALUES (1922,13);
+INSERT INTO "type_to_categories" VALUES (1923,13);
+INSERT INTO "type_to_categories" VALUES (1924,13);
+INSERT INTO "type_to_categories" VALUES (1925,13);
+INSERT INTO "type_to_categories" VALUES (1926,13);
+INSERT INTO "type_to_categories" VALUES (1927,13);
+INSERT INTO "type_to_categories" VALUES (1928,13);
+INSERT INTO "type_to_categories" VALUES (1929,13);
+INSERT INTO "type_to_categories" VALUES (1930,13);
+INSERT INTO "type_to_categories" VALUES (1931,13);
+INSERT INTO "type_to_categories" VALUES (1932,13);
+INSERT INTO "type_to_categories" VALUES (1933,13);
+INSERT INTO "type_to_categories" VALUES (1934,13);
+INSERT INTO "type_to_categories" VALUES (1935,13);
+INSERT INTO "type_to_categories" VALUES (1936,13);
+INSERT INTO "type_to_categories" VALUES (1937,13);
+INSERT INTO "type_to_categories" VALUES (1938,13);
+INSERT INTO "type_to_categories" VALUES (1939,13);
+INSERT INTO "type_to_categories" VALUES (1940,13);
+INSERT INTO "type_to_categories" VALUES (1941,13);
+INSERT INTO "type_to_categories" VALUES (1942,13);
+INSERT INTO "type_to_categories" VALUES (1943,13);
+INSERT INTO "type_to_categories" VALUES (1944,13);
+INSERT INTO "type_to_categories" VALUES (1945,13);
+INSERT INTO "type_to_categories" VALUES (1946,13);
+INSERT INTO "type_to_categories" VALUES (1948,13);
+INSERT INTO "type_to_categories" VALUES (1949,13);
+INSERT INTO "type_to_categories" VALUES (1950,13);
+INSERT INTO "type_to_categories" VALUES (1951,13);
+INSERT INTO "type_to_categories" VALUES (1952,13);
+INSERT INTO "type_to_categories" VALUES (1953,13);
+INSERT INTO "type_to_categories" VALUES (1954,13);
+INSERT INTO "type_to_categories" VALUES (1955,13);
+INSERT INTO "type_to_categories" VALUES (1956,13);
+INSERT INTO "type_to_categories" VALUES (1957,13);
+INSERT INTO "type_to_categories" VALUES (1958,13);
+INSERT INTO "type_to_categories" VALUES (1959,13);
+INSERT INTO "type_to_categories" VALUES (1960,13);
+INSERT INTO "type_to_categories" VALUES (1961,13);
+INSERT INTO "type_to_categories" VALUES (1962,13);
+INSERT INTO "type_to_categories" VALUES (1963,13);
+INSERT INTO "type_to_categories" VALUES (1964,13);
+INSERT INTO "type_to_categories" VALUES (1965,13);
+INSERT INTO "type_to_categories" VALUES (1966,13);
+INSERT INTO "type_to_categories" VALUES (1967,13);
+INSERT INTO "type_to_categories" VALUES (1968,13);
+INSERT INTO "type_to_categories" VALUES (1969,13);
+INSERT INTO "type_to_categories" VALUES (1970,13);
+INSERT INTO "type_to_categories" VALUES (1971,13);
+INSERT INTO "type_to_categories" VALUES (1972,13);
+INSERT INTO "type_to_categories" VALUES (1973,13);
+INSERT INTO "type_to_categories" VALUES (1974,13);
+INSERT INTO "type_to_categories" VALUES (1975,13);
+INSERT INTO "type_to_categories" VALUES (1976,13);
+INSERT INTO "type_to_categories" VALUES (1977,13);
+INSERT INTO "type_to_categories" VALUES (1978,13);
+INSERT INTO "type_to_categories" VALUES (1983,13);
+INSERT INTO "type_to_categories" VALUES (1984,13);
+INSERT INTO "type_to_categories" VALUES (1985,13);
+INSERT INTO "type_to_categories" VALUES (1986,13);
+INSERT INTO "type_to_categories" VALUES (1987,13);
+INSERT INTO "type_to_categories" VALUES (1988,13);
+INSERT INTO "type_to_categories" VALUES (1989,13);
+INSERT INTO "type_to_categories" VALUES (1990,13);
+INSERT INTO "type_to_categories" VALUES (1991,13);
+INSERT INTO "type_to_categories" VALUES (1992,13);
+INSERT INTO "type_to_categories" VALUES (1993,13);
+INSERT INTO "type_to_categories" VALUES (1994,13);
+INSERT INTO "type_to_categories" VALUES (1995,13);
+INSERT INTO "type_to_categories" VALUES (1996,13);
+INSERT INTO "type_to_categories" VALUES (1999,13);
+INSERT INTO "type_to_categories" VALUES (2000,13);
+INSERT INTO "type_to_categories" VALUES (2001,13);
+INSERT INTO "type_to_categories" VALUES (2002,13);
+INSERT INTO "type_to_categories" VALUES (2003,13);
+INSERT INTO "type_to_categories" VALUES (2004,13);
+INSERT INTO "type_to_categories" VALUES (2005,13);
+INSERT INTO "type_to_categories" VALUES (2006,13);
+INSERT INTO "type_to_categories" VALUES (2007,13);
+INSERT INTO "type_to_categories" VALUES (2008,13);
+INSERT INTO "type_to_categories" VALUES (2009,13);
+INSERT INTO "type_to_categories" VALUES (2010,13);
+INSERT INTO "type_to_categories" VALUES (2011,13);
+INSERT INTO "type_to_categories" VALUES (2012,13);
+INSERT INTO "type_to_categories" VALUES (2013,13);
+INSERT INTO "type_to_categories" VALUES (2014,13);
+INSERT INTO "type_to_categories" VALUES (2015,13);
+INSERT INTO "type_to_categories" VALUES (2016,13);
+INSERT INTO "type_to_categories" VALUES (2017,13);
+INSERT INTO "type_to_categories" VALUES (2018,13);
+INSERT INTO "type_to_categories" VALUES (2019,13);
+INSERT INTO "type_to_categories" VALUES (2020,13);
+INSERT INTO "type_to_categories" VALUES (2021,13);
+INSERT INTO "type_to_categories" VALUES (2022,13);
+INSERT INTO "type_to_categories" VALUES (2023,13);
+INSERT INTO "type_to_categories" VALUES (2024,13);
+INSERT INTO "type_to_categories" VALUES (2025,13);
+INSERT INTO "type_to_categories" VALUES (2026,13);
+INSERT INTO "type_to_categories" VALUES (2027,13);
+INSERT INTO "type_to_categories" VALUES (2028,13);
+INSERT INTO "type_to_categories" VALUES (2029,13);
+INSERT INTO "type_to_categories" VALUES (2030,13);
+INSERT INTO "type_to_categories" VALUES (2081,15);
+INSERT INTO "type_to_categories" VALUES (2082,15);
+INSERT INTO "type_to_categories" VALUES (2083,15);
+INSERT INTO "type_to_categories" VALUES (2084,15);
+INSERT INTO "type_to_categories" VALUES (2085,15);
+INSERT INTO "type_to_categories" VALUES (2086,15);
+INSERT INTO "type_to_categories" VALUES (2087,15);
+INSERT INTO "type_to_categories" VALUES (2088,15);
+INSERT INTO "type_to_categories" VALUES (2089,15);
+INSERT INTO "type_to_categories" VALUES (2090,15);
+INSERT INTO "type_to_categories" VALUES (2091,15);
+INSERT INTO "type_to_categories" VALUES (2092,15);
+INSERT INTO "type_to_categories" VALUES (2093,15);
+INSERT INTO "type_to_categories" VALUES (2094,15);
+INSERT INTO "type_to_categories" VALUES (2095,15);
+INSERT INTO "type_to_categories" VALUES (2096,15);
+INSERT INTO "type_to_categories" VALUES (2097,15);
+INSERT INTO "type_to_categories" VALUES (2098,15);
+INSERT INTO "type_to_categories" VALUES (2099,15);
+INSERT INTO "type_to_categories" VALUES (2100,15);
+INSERT INTO "type_to_categories" VALUES (2101,15);
+INSERT INTO "type_to_categories" VALUES (2102,15);
+INSERT INTO "type_to_categories" VALUES (2103,15);
+INSERT INTO "type_to_categories" VALUES (2104,15);
+INSERT INTO "type_to_categories" VALUES (2105,15);
+INSERT INTO "type_to_categories" VALUES (2106,15);
+INSERT INTO "type_to_categories" VALUES (2107,15);
+INSERT INTO "type_to_categories" VALUES (2108,15);
+INSERT INTO "type_to_categories" VALUES (2109,15);
+INSERT INTO "type_to_categories" VALUES (2110,15);
+INSERT INTO "type_to_categories" VALUES (2111,15);
+INSERT INTO "type_to_categories" VALUES (2112,15);
+INSERT INTO "type_to_categories" VALUES (2113,15);
+INSERT INTO "type_to_categories" VALUES (2114,15);
+INSERT INTO "type_to_categories" VALUES (2115,15);
+INSERT INTO "type_to_categories" VALUES (2116,15);
+INSERT INTO "type_to_categories" VALUES (2117,15);
+INSERT INTO "type_to_categories" VALUES (2118,15);
+INSERT INTO "type_to_categories" VALUES (2119,15);
+INSERT INTO "type_to_categories" VALUES (2120,15);
+INSERT INTO "type_to_categories" VALUES (2121,15);
+INSERT INTO "type_to_categories" VALUES (2122,15);
+INSERT INTO "type_to_categories" VALUES (2123,15);
+INSERT INTO "type_to_categories" VALUES (2124,15);
+INSERT INTO "type_to_categories" VALUES (2125,15);
+INSERT INTO "type_to_categories" VALUES (2126,15);
+INSERT INTO "type_to_categories" VALUES (2127,15);
+INSERT INTO "type_to_categories" VALUES (2128,15);
+INSERT INTO "type_to_categories" VALUES (2129,15);
+INSERT INTO "type_to_categories" VALUES (2130,15);
+INSERT INTO "type_to_categories" VALUES (2131,15);
+INSERT INTO "type_to_categories" VALUES (2132,15);
+INSERT INTO "type_to_categories" VALUES (2133,15);
+INSERT INTO "type_to_categories" VALUES (2134,15);
+INSERT INTO "type_to_categories" VALUES (2135,15);
+INSERT INTO "type_to_categories" VALUES (2136,15);
+INSERT INTO "type_to_categories" VALUES (2137,15);
+INSERT INTO "type_to_categories" VALUES (2138,15);
+INSERT INTO "type_to_categories" VALUES (2139,15);
+INSERT INTO "type_to_categories" VALUES (2140,15);
+INSERT INTO "type_to_categories" VALUES (2141,15);
+INSERT INTO "type_to_categories" VALUES (2142,15);
+INSERT INTO "type_to_categories" VALUES (2143,15);
+INSERT INTO "type_to_categories" VALUES (2144,15);
+INSERT INTO "type_to_categories" VALUES (2145,15);
+INSERT INTO "type_to_categories" VALUES (2146,15);
+INSERT INTO "type_to_categories" VALUES (2147,15);
+INSERT INTO "type_to_categories" VALUES (2148,15);
+INSERT INTO "type_to_categories" VALUES (2150,15);
+INSERT INTO "type_to_categories" VALUES (2151,15);
+INSERT INTO "type_to_categories" VALUES (2152,15);
+INSERT INTO "type_to_categories" VALUES (2153,15);
+INSERT INTO "type_to_categories" VALUES (2154,15);
+INSERT INTO "type_to_categories" VALUES (2155,15);
+INSERT INTO "type_to_categories" VALUES (2156,15);
+INSERT INTO "type_to_categories" VALUES (2157,15);
+INSERT INTO "type_to_categories" VALUES (2158,15);
+INSERT INTO "type_to_categories" VALUES (2159,15);
+INSERT INTO "type_to_categories" VALUES (2160,15);
+INSERT INTO "type_to_categories" VALUES (2161,15);
+INSERT INTO "type_to_categories" VALUES (2162,15);
+INSERT INTO "type_to_categories" VALUES (2163,15);
+INSERT INTO "type_to_categories" VALUES (2164,15);
+INSERT INTO "type_to_categories" VALUES (2165,15);
+INSERT INTO "type_to_categories" VALUES (2166,15);
+INSERT INTO "type_to_categories" VALUES (2167,15);
+INSERT INTO "type_to_categories" VALUES (2168,15);
+INSERT INTO "type_to_categories" VALUES (2170,15);
+INSERT INTO "type_to_categories" VALUES (2171,15);
+INSERT INTO "type_to_categories" VALUES (2172,15);
+INSERT INTO "type_to_categories" VALUES (2173,15);
+INSERT INTO "type_to_categories" VALUES (2174,15);
+INSERT INTO "type_to_categories" VALUES (2175,15);
+INSERT INTO "type_to_categories" VALUES (2176,15);
+INSERT INTO "type_to_categories" VALUES (2177,15);
+INSERT INTO "type_to_categories" VALUES (2179,15);
+INSERT INTO "type_to_categories" VALUES (2180,15);
+INSERT INTO "type_to_categories" VALUES (2181,15);
+INSERT INTO "type_to_categories" VALUES (2182,15);
+INSERT INTO "type_to_categories" VALUES (2183,15);
+INSERT INTO "type_to_categories" VALUES (2184,15);
+INSERT INTO "type_to_categories" VALUES (2185,15);
+INSERT INTO "type_to_categories" VALUES (2186,15);
+INSERT INTO "type_to_categories" VALUES (2187,15);
+INSERT INTO "type_to_categories" VALUES (2188,15);
+INSERT INTO "type_to_categories" VALUES (2189,15);
+INSERT INTO "type_to_categories" VALUES (2190,15);
+INSERT INTO "type_to_categories" VALUES (2191,15);
+INSERT INTO "type_to_categories" VALUES (2192,15);
+INSERT INTO "type_to_categories" VALUES (2193,15);
+INSERT INTO "type_to_categories" VALUES (2194,15);
+INSERT INTO "type_to_categories" VALUES (2195,15);
+INSERT INTO "type_to_categories" VALUES (2196,15);
+INSERT INTO "type_to_categories" VALUES (2197,15);
+INSERT INTO "type_to_categories" VALUES (2198,15);
+INSERT INTO "type_to_categories" VALUES (2199,15);
+INSERT INTO "type_to_categories" VALUES (2200,15);
+INSERT INTO "type_to_categories" VALUES (2201,15);
+INSERT INTO "type_to_categories" VALUES (2202,15);
+INSERT INTO "type_to_categories" VALUES (2203,15);
+INSERT INTO "type_to_categories" VALUES (2204,15);
+INSERT INTO "type_to_categories" VALUES (2205,15);
+INSERT INTO "type_to_categories" VALUES (2206,15);
+INSERT INTO "type_to_categories" VALUES (2207,15);
+INSERT INTO "type_to_categories" VALUES (2208,15);
+INSERT INTO "type_to_categories" VALUES (2209,15);
+INSERT INTO "type_to_categories" VALUES (2210,15);
+INSERT INTO "type_to_categories" VALUES (2211,15);
+INSERT INTO "type_to_categories" VALUES (2212,15);
+INSERT INTO "type_to_categories" VALUES (2213,15);
+INSERT INTO "type_to_categories" VALUES (2214,15);
+INSERT INTO "type_to_categories" VALUES (2215,15);
+INSERT INTO "type_to_categories" VALUES (2216,15);
+INSERT INTO "type_to_categories" VALUES (2217,15);
+INSERT INTO "type_to_categories" VALUES (2218,15);
+INSERT INTO "type_to_categories" VALUES (2219,15);
+INSERT INTO "type_to_categories" VALUES (2220,15);
+INSERT INTO "type_to_categories" VALUES (2222,15);
+INSERT INTO "type_to_categories" VALUES (2223,15);
+INSERT INTO "type_to_categories" VALUES (2224,15);
+INSERT INTO "type_to_categories" VALUES (2225,15);
+INSERT INTO "type_to_categories" VALUES (2226,15);
+INSERT INTO "type_to_categories" VALUES (2227,15);
+INSERT INTO "type_to_categories" VALUES (2228,15);
+INSERT INTO "type_to_categories" VALUES (2229,15);
+INSERT INTO "type_to_categories" VALUES (2230,15);
+INSERT INTO "type_to_categories" VALUES (2231,15);
+INSERT INTO "type_to_categories" VALUES (2232,15);
+INSERT INTO "type_to_categories" VALUES (2233,15);
+INSERT INTO "type_to_categories" VALUES (2234,15);
+INSERT INTO "type_to_categories" VALUES (2235,15);
+INSERT INTO "type_to_categories" VALUES (2236,15);
+INSERT INTO "type_to_categories" VALUES (2237,15);
+INSERT INTO "type_to_categories" VALUES (2238,15);
+INSERT INTO "type_to_categories" VALUES (2239,15);
+INSERT INTO "type_to_categories" VALUES (2240,15);
+INSERT INTO "type_to_categories" VALUES (2241,15);
+INSERT INTO "type_to_categories" VALUES (2242,15);
+INSERT INTO "type_to_categories" VALUES (2243,15);
+INSERT INTO "type_to_categories" VALUES (2244,15);
+INSERT INTO "type_to_categories" VALUES (2245,15);
+INSERT INTO "type_to_categories" VALUES (2246,15);
+INSERT INTO "type_to_categories" VALUES (2247,15);
+INSERT INTO "type_to_categories" VALUES (2248,15);
+INSERT INTO "type_to_categories" VALUES (2249,15);
+INSERT INTO "type_to_categories" VALUES (2250,15);
+INSERT INTO "type_to_categories" VALUES (2251,15);
+INSERT INTO "type_to_categories" VALUES (2252,15);
+INSERT INTO "type_to_categories" VALUES (2253,15);
+INSERT INTO "type_to_categories" VALUES (2254,15);
+INSERT INTO "type_to_categories" VALUES (2255,15);
+INSERT INTO "type_to_categories" VALUES (2256,15);
+INSERT INTO "type_to_categories" VALUES (2257,15);
+INSERT INTO "type_to_categories" VALUES (2258,15);
+INSERT INTO "type_to_categories" VALUES (2259,15);
+INSERT INTO "type_to_categories" VALUES (2260,15);
+INSERT INTO "type_to_categories" VALUES (2261,15);
+INSERT INTO "type_to_categories" VALUES (2262,15);
+INSERT INTO "type_to_categories" VALUES (2263,15);
+INSERT INTO "type_to_categories" VALUES (2264,15);
+INSERT INTO "type_to_categories" VALUES (2265,15);
+INSERT INTO "type_to_categories" VALUES (2266,15);
+INSERT INTO "type_to_categories" VALUES (2268,15);
+INSERT INTO "type_to_categories" VALUES (2269,15);
+INSERT INTO "type_to_categories" VALUES (2270,15);
+INSERT INTO "type_to_categories" VALUES (2271,15);
+INSERT INTO "type_to_categories" VALUES (2272,15);
+INSERT INTO "type_to_categories" VALUES (2273,15);
+INSERT INTO "type_to_categories" VALUES (2274,15);
+INSERT INTO "type_to_categories" VALUES (2275,15);
+INSERT INTO "type_to_categories" VALUES (2276,15);
+INSERT INTO "type_to_categories" VALUES (2277,15);
+INSERT INTO "type_to_categories" VALUES (2278,15);
+INSERT INTO "type_to_categories" VALUES (2279,15);
+INSERT INTO "type_to_categories" VALUES (2280,15);
+INSERT INTO "type_to_categories" VALUES (2281,15);
+INSERT INTO "type_to_categories" VALUES (2282,15);
+INSERT INTO "type_to_categories" VALUES (2283,15);
+INSERT INTO "type_to_categories" VALUES (2284,15);
+INSERT INTO "type_to_categories" VALUES (2285,15);
+INSERT INTO "type_to_categories" VALUES (2286,15);
+INSERT INTO "type_to_categories" VALUES (2287,15);
+INSERT INTO "type_to_categories" VALUES (2288,15);
+INSERT INTO "type_to_categories" VALUES (2289,15);
+INSERT INTO "type_to_categories" VALUES (2290,15);
+INSERT INTO "type_to_categories" VALUES (2291,15);
+INSERT INTO "type_to_categories" VALUES (2292,15);
+INSERT INTO "type_to_categories" VALUES (2293,15);
+INSERT INTO "type_to_categories" VALUES (2294,15);
+INSERT INTO "type_to_categories" VALUES (2295,15);
+INSERT INTO "type_to_categories" VALUES (2296,15);
+INSERT INTO "type_to_categories" VALUES (2297,15);
+INSERT INTO "type_to_categories" VALUES (2298,15);
+INSERT INTO "type_to_categories" VALUES (2299,15);
+INSERT INTO "type_to_categories" VALUES (2301,15);
+INSERT INTO "type_to_categories" VALUES (2302,15);
+INSERT INTO "type_to_categories" VALUES (2303,15);
+INSERT INTO "type_to_categories" VALUES (2304,15);
+INSERT INTO "type_to_categories" VALUES (2305,15);
+INSERT INTO "type_to_categories" VALUES (2306,15);
+INSERT INTO "type_to_categories" VALUES (2307,15);
+INSERT INTO "type_to_categories" VALUES (2308,15);
+INSERT INTO "type_to_categories" VALUES (2309,15);
+INSERT INTO "type_to_categories" VALUES (2310,15);
+INSERT INTO "type_to_categories" VALUES (2311,15);
+INSERT INTO "type_to_categories" VALUES (2312,15);
+INSERT INTO "type_to_categories" VALUES (2313,15);
+INSERT INTO "type_to_categories" VALUES (2314,15);
+INSERT INTO "type_to_categories" VALUES (2315,15);
+INSERT INTO "type_to_categories" VALUES (2316,15);
+INSERT INTO "type_to_categories" VALUES (2317,15);
+INSERT INTO "type_to_categories" VALUES (2318,15);
+INSERT INTO "type_to_categories" VALUES (2319,15);
+INSERT INTO "type_to_categories" VALUES (2320,15);
+INSERT INTO "type_to_categories" VALUES (2321,15);
+INSERT INTO "type_to_categories" VALUES (2322,15);
+INSERT INTO "type_to_categories" VALUES (2323,15);
+INSERT INTO "type_to_categories" VALUES (2324,15);
+INSERT INTO "type_to_categories" VALUES (2325,15);
+INSERT INTO "type_to_categories" VALUES (2326,15);
+INSERT INTO "type_to_categories" VALUES (2327,15);
+INSERT INTO "type_to_categories" VALUES (2328,15);
+INSERT INTO "type_to_categories" VALUES (2329,15);
+INSERT INTO "type_to_categories" VALUES (2330,15);
+INSERT INTO "type_to_categories" VALUES (2331,15);
+INSERT INTO "type_to_categories" VALUES (2332,15);
+INSERT INTO "type_to_categories" VALUES (2333,15);
+INSERT INTO "type_to_categories" VALUES (2334,15);
+INSERT INTO "type_to_categories" VALUES (2335,15);
+INSERT INTO "type_to_categories" VALUES (2336,15);
+INSERT INTO "type_to_categories" VALUES (2337,15);
+INSERT INTO "type_to_categories" VALUES (2338,15);
+INSERT INTO "type_to_categories" VALUES (2339,15);
+INSERT INTO "type_to_categories" VALUES (2340,15);
+INSERT INTO "type_to_categories" VALUES (2341,15);
+INSERT INTO "type_to_categories" VALUES (2342,15);
+INSERT INTO "type_to_categories" VALUES (2344,15);
+INSERT INTO "type_to_categories" VALUES (2345,15);
+INSERT INTO "type_to_categories" VALUES (2346,15);
+INSERT INTO "type_to_categories" VALUES (2347,15);
+INSERT INTO "type_to_categories" VALUES (2348,15);
+INSERT INTO "type_to_categories" VALUES (2349,15);
+INSERT INTO "type_to_categories" VALUES (2350,15);
+INSERT INTO "type_to_categories" VALUES (2351,15);
+INSERT INTO "type_to_categories" VALUES (2352,15);
+INSERT INTO "type_to_categories" VALUES (2353,15);
+INSERT INTO "type_to_categories" VALUES (2354,15);
+INSERT INTO "type_to_categories" VALUES (2355,15);
+INSERT INTO "type_to_categories" VALUES (2356,15);
+INSERT INTO "type_to_categories" VALUES (2366,15);
+INSERT INTO "type_to_categories" VALUES (2367,15);
+INSERT INTO "type_to_categories" VALUES (2368,15);
+INSERT INTO "type_to_categories" VALUES (2369,15);
+INSERT INTO "type_to_categories" VALUES (2371,15);
+INSERT INTO "type_to_categories" VALUES (2372,15);
+INSERT INTO "type_to_categories" VALUES (2373,15);
+INSERT INTO "type_to_categories" VALUES (2374,15);
+INSERT INTO "type_to_categories" VALUES (2375,15);
+INSERT INTO "type_to_categories" VALUES (2376,15);
+INSERT INTO "type_to_categories" VALUES (2377,15);
+INSERT INTO "type_to_categories" VALUES (2378,15);
+INSERT INTO "type_to_categories" VALUES (2379,15);
+INSERT INTO "type_to_categories" VALUES (2381,15);
+INSERT INTO "type_to_categories" VALUES (2382,15);
+INSERT INTO "type_to_categories" VALUES (2383,15);
+INSERT INTO "type_to_categories" VALUES (2384,15);
+INSERT INTO "type_to_categories" VALUES (2385,15);
+INSERT INTO "type_to_categories" VALUES (2386,15);
+INSERT INTO "type_to_categories" VALUES (2387,15);
+INSERT INTO "type_to_categories" VALUES (2388,15);
+INSERT INTO "type_to_categories" VALUES (2389,15);
+INSERT INTO "type_to_categories" VALUES (2390,15);
+INSERT INTO "type_to_categories" VALUES (2391,15);
+INSERT INTO "type_to_categories" VALUES (2392,15);
+INSERT INTO "type_to_categories" VALUES (2395,15);
+INSERT INTO "type_to_categories" VALUES (2396,15);
+INSERT INTO "type_to_categories" VALUES (2397,15);
+INSERT INTO "type_to_categories" VALUES (2403,15);
+INSERT INTO "type_to_categories" VALUES (2404,15);
+INSERT INTO "type_to_categories" VALUES (2405,15);
+INSERT INTO "type_to_categories" VALUES (2406,15);
+INSERT INTO "type_to_categories" VALUES (2407,15);
+INSERT INTO "type_to_categories" VALUES (2408,15);
+INSERT INTO "type_to_categories" VALUES (2409,15);
+INSERT INTO "type_to_categories" VALUES (2410,15);
+INSERT INTO "type_to_categories" VALUES (2411,15);
+INSERT INTO "type_to_categories" VALUES (2412,15);
+INSERT INTO "type_to_categories" VALUES (2413,15);
+INSERT INTO "type_to_categories" VALUES (2414,15);
+INSERT INTO "type_to_categories" VALUES (2415,15);
+INSERT INTO "type_to_categories" VALUES (2416,15);
+INSERT INTO "type_to_categories" VALUES (2417,15);
+INSERT INTO "type_to_categories" VALUES (2418,15);
+INSERT INTO "type_to_categories" VALUES (2420,15);
+INSERT INTO "type_to_categories" VALUES (2421,15);
+INSERT INTO "type_to_categories" VALUES (2422,15);
+INSERT INTO "type_to_categories" VALUES (2423,15);
+INSERT INTO "type_to_categories" VALUES (2424,15);
+INSERT INTO "type_to_categories" VALUES (2425,15);
+INSERT INTO "type_to_categories" VALUES (2426,15);
+INSERT INTO "type_to_categories" VALUES (2427,15);
+INSERT INTO "type_to_categories" VALUES (2428,15);
+INSERT INTO "type_to_categories" VALUES (2429,15);
+INSERT INTO "type_to_categories" VALUES (2430,15);
+INSERT INTO "type_to_categories" VALUES (2431,15);
+INSERT INTO "type_to_categories" VALUES (2432,15);
+INSERT INTO "type_to_categories" VALUES (2433,15);
+INSERT INTO "type_to_categories" VALUES (2434,15);
+INSERT INTO "type_to_categories" VALUES (2435,15);
+INSERT INTO "type_to_categories" VALUES (2436,15);
+INSERT INTO "type_to_categories" VALUES (2437,15);
+INSERT INTO "type_to_categories" VALUES (2438,15);
+INSERT INTO "type_to_categories" VALUES (2439,15);
+INSERT INTO "type_to_categories" VALUES (2440,15);
+INSERT INTO "type_to_categories" VALUES (2441,15);
+INSERT INTO "type_to_categories" VALUES (2442,15);
+INSERT INTO "type_to_categories" VALUES (2443,15);
+INSERT INTO "type_to_categories" VALUES (2444,15);
+INSERT INTO "type_to_categories" VALUES (2445,15);
+INSERT INTO "type_to_categories" VALUES (2446,15);
+INSERT INTO "type_to_categories" VALUES (2447,15);
+INSERT INTO "type_to_categories" VALUES (2448,15);
+INSERT INTO "type_to_categories" VALUES (2449,15);
+INSERT INTO "type_to_categories" VALUES (2450,15);
+INSERT INTO "type_to_categories" VALUES (2452,15);
+INSERT INTO "type_to_categories" VALUES (2453,15);
+INSERT INTO "type_to_categories" VALUES (2454,15);
+INSERT INTO "type_to_categories" VALUES (2455,15);
+INSERT INTO "type_to_categories" VALUES (2456,15);
+INSERT INTO "type_to_categories" VALUES (2457,15);
+INSERT INTO "type_to_categories" VALUES (2458,15);
+INSERT INTO "type_to_categories" VALUES (2459,15);
+INSERT INTO "type_to_categories" VALUES (2460,15);
+INSERT INTO "type_to_categories" VALUES (2461,15);
+INSERT INTO "type_to_categories" VALUES (2462,15);
+INSERT INTO "type_to_categories" VALUES (2463,15);
+INSERT INTO "type_to_categories" VALUES (2464,15);
+INSERT INTO "type_to_categories" VALUES (2465,15);
+INSERT INTO "type_to_categories" VALUES (2466,15);
+INSERT INTO "type_to_categories" VALUES (2467,15);
+INSERT INTO "type_to_categories" VALUES (2468,15);
+INSERT INTO "type_to_categories" VALUES (2469,15);
+INSERT INTO "type_to_categories" VALUES (2470,15);
+INSERT INTO "type_to_categories" VALUES (2471,15);
+INSERT INTO "type_to_categories" VALUES (2472,15);
+INSERT INTO "type_to_categories" VALUES (2473,15);
+INSERT INTO "type_to_categories" VALUES (2474,15);
+INSERT INTO "type_to_categories" VALUES (2475,15);
+INSERT INTO "type_to_categories" VALUES (2476,15);
+INSERT INTO "type_to_categories" VALUES (2477,15);
+INSERT INTO "type_to_categories" VALUES (2478,15);
+INSERT INTO "type_to_categories" VALUES (2479,15);
+INSERT INTO "type_to_categories" VALUES (2480,15);
+INSERT INTO "type_to_categories" VALUES (2481,15);
+INSERT INTO "type_to_categories" VALUES (2482,15);
+INSERT INTO "type_to_categories" VALUES (2483,15);
+INSERT INTO "type_to_categories" VALUES (2484,15);
+INSERT INTO "type_to_categories" VALUES (2485,15);
+INSERT INTO "type_to_categories" VALUES (2486,15);
+INSERT INTO "type_to_categories" VALUES (2487,15);
+INSERT INTO "type_to_categories" VALUES (2488,15);
+INSERT INTO "type_to_categories" VALUES (2489,15);
+INSERT INTO "type_to_categories" VALUES (2490,15);
+INSERT INTO "type_to_categories" VALUES (2491,15);
+INSERT INTO "type_to_categories" VALUES (2492,15);
+INSERT INTO "type_to_categories" VALUES (2493,15);
+INSERT INTO "type_to_categories" VALUES (2494,15);
+INSERT INTO "type_to_categories" VALUES (2495,15);
+INSERT INTO "type_to_categories" VALUES (2496,15);
+INSERT INTO "type_to_categories" VALUES (2497,15);
+INSERT INTO "type_to_categories" VALUES (2498,15);
+INSERT INTO "type_to_categories" VALUES (2499,15);
+INSERT INTO "type_to_categories" VALUES (2500,15);
+INSERT INTO "type_to_categories" VALUES (2501,15);
+INSERT INTO "type_to_categories" VALUES (2502,15);
+INSERT INTO "type_to_categories" VALUES (2503,15);
+INSERT INTO "type_to_categories" VALUES (2504,15);
+INSERT INTO "type_to_categories" VALUES (2505,15);
+INSERT INTO "type_to_categories" VALUES (2506,15);
+INSERT INTO "type_to_categories" VALUES (2507,15);
+INSERT INTO "type_to_categories" VALUES (2508,15);
+INSERT INTO "type_to_categories" VALUES (2509,15);
+INSERT INTO "type_to_categories" VALUES (2510,15);
+INSERT INTO "type_to_categories" VALUES (2511,15);
+INSERT INTO "type_to_categories" VALUES (2512,15);
+INSERT INTO "type_to_categories" VALUES (2513,15);
+INSERT INTO "type_to_categories" VALUES (2514,15);
+INSERT INTO "type_to_categories" VALUES (2515,15);
+INSERT INTO "type_to_categories" VALUES (2516,15);
+INSERT INTO "type_to_categories" VALUES (2517,15);
+INSERT INTO "type_to_categories" VALUES (2518,15);
+INSERT INTO "type_to_categories" VALUES (2519,15);
+INSERT INTO "type_to_categories" VALUES (2520,15);
+INSERT INTO "type_to_categories" VALUES (2521,15);
+INSERT INTO "type_to_categories" VALUES (2522,15);
+INSERT INTO "type_to_categories" VALUES (2523,15);
+INSERT INTO "type_to_categories" VALUES (2524,15);
+INSERT INTO "type_to_categories" VALUES (2525,15);
+INSERT INTO "type_to_categories" VALUES (2526,15);
+INSERT INTO "type_to_categories" VALUES (2527,15);
+INSERT INTO "type_to_categories" VALUES (2528,15);
+INSERT INTO "type_to_categories" VALUES (2529,15);
+INSERT INTO "type_to_categories" VALUES (2530,15);
+INSERT INTO "type_to_categories" VALUES (2531,15);
+INSERT INTO "type_to_categories" VALUES (2532,15);
+INSERT INTO "type_to_categories" VALUES (2533,15);
+INSERT INTO "type_to_categories" VALUES (2534,15);
+INSERT INTO "type_to_categories" VALUES (2535,15);
+INSERT INTO "type_to_categories" VALUES (2536,15);
+INSERT INTO "type_to_categories" VALUES (2537,15);
+INSERT INTO "type_to_categories" VALUES (2538,15);
+INSERT INTO "type_to_categories" VALUES (2539,15);
+INSERT INTO "type_to_categories" VALUES (2540,15);
+INSERT INTO "type_to_categories" VALUES (2544,15);
+INSERT INTO "type_to_categories" VALUES (2545,15);
+INSERT INTO "type_to_categories" VALUES (2546,15);
+INSERT INTO "type_to_categories" VALUES (2547,15);
+INSERT INTO "type_to_categories" VALUES (2548,15);
+INSERT INTO "type_to_categories" VALUES (2549,15);
+INSERT INTO "type_to_categories" VALUES (2550,15);
+INSERT INTO "type_to_categories" VALUES (2551,15);
+INSERT INTO "type_to_categories" VALUES (2552,15);
+INSERT INTO "type_to_categories" VALUES (2553,15);
+INSERT INTO "type_to_categories" VALUES (2554,15);
+INSERT INTO "type_to_categories" VALUES (2555,15);
+INSERT INTO "type_to_categories" VALUES (2556,15);
+INSERT INTO "type_to_categories" VALUES (2557,15);
+INSERT INTO "type_to_categories" VALUES (2559,15);
+INSERT INTO "type_to_categories" VALUES (2560,15);
+INSERT INTO "type_to_categories" VALUES (2561,15);
+INSERT INTO "type_to_categories" VALUES (2562,15);
+INSERT INTO "type_to_categories" VALUES (2563,15);
+INSERT INTO "type_to_categories" VALUES (2564,15);
+INSERT INTO "type_to_categories" VALUES (2565,15);
+INSERT INTO "type_to_categories" VALUES (2567,15);
+INSERT INTO "type_to_categories" VALUES (2568,15);
+INSERT INTO "type_to_categories" VALUES (2569,15);
+INSERT INTO "type_to_categories" VALUES (2570,15);
+INSERT INTO "type_to_categories" VALUES (2571,15);
+INSERT INTO "type_to_categories" VALUES (2572,15);
+INSERT INTO "type_to_categories" VALUES (2573,15);
+INSERT INTO "type_to_categories" VALUES (2574,15);
+INSERT INTO "type_to_categories" VALUES (2575,15);
+INSERT INTO "type_to_categories" VALUES (2576,15);
+INSERT INTO "type_to_categories" VALUES (2577,15);
+INSERT INTO "type_to_categories" VALUES (2578,15);
+INSERT INTO "type_to_categories" VALUES (2583,15);
+INSERT INTO "type_to_categories" VALUES (2585,15);
+INSERT INTO "type_to_categories" VALUES (2586,15);
+INSERT INTO "type_to_categories" VALUES (2587,15);
+INSERT INTO "type_to_categories" VALUES (2588,15);
+INSERT INTO "type_to_categories" VALUES (2589,15);
+INSERT INTO "type_to_categories" VALUES (2593,15);
+INSERT INTO "type_to_categories" VALUES (2594,15);
+INSERT INTO "type_to_categories" VALUES (2595,15);
+INSERT INTO "type_to_categories" VALUES (2596,15);
+INSERT INTO "type_to_categories" VALUES (2597,15);
+INSERT INTO "type_to_categories" VALUES (2599,15);
+INSERT INTO "type_to_categories" VALUES (2600,15);
+INSERT INTO "type_to_categories" VALUES (2601,15);
+INSERT INTO "type_to_categories" VALUES (2602,15);
+INSERT INTO "type_to_categories" VALUES (2603,15);
+INSERT INTO "type_to_categories" VALUES (2605,15);
+INSERT INTO "type_to_categories" VALUES (2606,15);
+INSERT INTO "type_to_categories" VALUES (2607,15);
+INSERT INTO "type_to_categories" VALUES (2608,15);
+INSERT INTO "type_to_categories" VALUES (2609,15);
+INSERT INTO "type_to_categories" VALUES (2610,15);
+INSERT INTO "type_to_categories" VALUES (2611,15);
+INSERT INTO "type_to_categories" VALUES (2612,15);
+INSERT INTO "type_to_categories" VALUES (2613,15);
+INSERT INTO "type_to_categories" VALUES (2614,15);
+INSERT INTO "type_to_categories" VALUES (2615,15);
+INSERT INTO "type_to_categories" VALUES (2616,15);
+INSERT INTO "type_to_categories" VALUES (2617,15);
+INSERT INTO "type_to_categories" VALUES (2618,15);
+INSERT INTO "type_to_categories" VALUES (2619,15);
+INSERT INTO "type_to_categories" VALUES (2620,15);
+INSERT INTO "type_to_categories" VALUES (2621,15);
+INSERT INTO "type_to_categories" VALUES (2628,15);
+INSERT INTO "type_to_categories" VALUES (2629,15);
+INSERT INTO "type_to_categories" VALUES (2630,15);
+INSERT INTO "type_to_categories" VALUES (2631,15);
+INSERT INTO "type_to_categories" VALUES (2632,15);
+INSERT INTO "type_to_categories" VALUES (2633,15);
+INSERT INTO "type_to_categories" VALUES (2634,15);
+INSERT INTO "type_to_categories" VALUES (2635,15);
+INSERT INTO "type_to_categories" VALUES (2636,15);
+INSERT INTO "type_to_categories" VALUES (2637,15);
+INSERT INTO "type_to_categories" VALUES (2638,15);
+INSERT INTO "type_to_categories" VALUES (2639,15);
+INSERT INTO "type_to_categories" VALUES (2640,15);
+INSERT INTO "type_to_categories" VALUES (2641,15);
+INSERT INTO "type_to_categories" VALUES (2643,15);
+INSERT INTO "type_to_categories" VALUES (2644,15);
+INSERT INTO "type_to_categories" VALUES (2645,15);
+INSERT INTO "type_to_categories" VALUES (2646,15);
+INSERT INTO "type_to_categories" VALUES (2647,15);
+INSERT INTO "type_to_categories" VALUES (2648,15);
+INSERT INTO "type_to_categories" VALUES (2649,15);
+INSERT INTO "type_to_categories" VALUES (2650,15);
+INSERT INTO "type_to_categories" VALUES (2651,15);
+INSERT INTO "type_to_categories" VALUES (2652,15);
+INSERT INTO "type_to_categories" VALUES (2653,15);
+INSERT INTO "type_to_categories" VALUES (2654,15);
+INSERT INTO "type_to_categories" VALUES (2655,15);
+INSERT INTO "type_to_categories" VALUES (2656,15);
+INSERT INTO "type_to_categories" VALUES (2657,15);
+INSERT INTO "type_to_categories" VALUES (2658,15);
+INSERT INTO "type_to_categories" VALUES (2659,15);
+INSERT INTO "type_to_categories" VALUES (2660,15);
+INSERT INTO "type_to_categories" VALUES (2661,15);
+INSERT INTO "type_to_categories" VALUES (2662,15);
+INSERT INTO "type_to_categories" VALUES (2663,15);
+INSERT INTO "type_to_categories" VALUES (2664,15);
+INSERT INTO "type_to_categories" VALUES (2665,15);
+INSERT INTO "type_to_categories" VALUES (2666,16);
+INSERT INTO "type_to_categories" VALUES (2667,16);
+INSERT INTO "type_to_categories" VALUES (2668,16);
+INSERT INTO "type_to_categories" VALUES (2669,16);
+INSERT INTO "type_to_categories" VALUES (2670,16);
+INSERT INTO "type_to_categories" VALUES (2671,16);
+INSERT INTO "type_to_categories" VALUES (2672,16);
+INSERT INTO "type_to_categories" VALUES (2673,16);
+INSERT INTO "type_to_categories" VALUES (2674,16);
+INSERT INTO "type_to_categories" VALUES (2675,16);
+INSERT INTO "type_to_categories" VALUES (2676,16);
+INSERT INTO "type_to_categories" VALUES (2677,16);
+INSERT INTO "type_to_categories" VALUES (2678,16);
+INSERT INTO "type_to_categories" VALUES (2679,16);
+INSERT INTO "type_to_categories" VALUES (2680,16);
+INSERT INTO "type_to_categories" VALUES (2681,16);
+INSERT INTO "type_to_categories" VALUES (2682,16);
+INSERT INTO "type_to_categories" VALUES (2683,16);
+INSERT INTO "type_to_categories" VALUES (2684,16);
+INSERT INTO "type_to_categories" VALUES (2685,16);
+INSERT INTO "type_to_categories" VALUES (2686,16);
+INSERT INTO "type_to_categories" VALUES (2687,16);
+INSERT INTO "type_to_categories" VALUES (2688,16);
+INSERT INTO "type_to_categories" VALUES (2689,16);
+INSERT INTO "type_to_categories" VALUES (2690,16);
+INSERT INTO "type_to_categories" VALUES (2691,16);
+INSERT INTO "type_to_categories" VALUES (2692,16);
+INSERT INTO "type_to_categories" VALUES (2693,16);
+INSERT INTO "type_to_categories" VALUES (2694,16);
+INSERT INTO "type_to_categories" VALUES (2695,16);
+INSERT INTO "type_to_categories" VALUES (2696,16);
+INSERT INTO "type_to_categories" VALUES (2697,16);
+INSERT INTO "type_to_categories" VALUES (2698,16);
+INSERT INTO "type_to_categories" VALUES (2699,16);
+INSERT INTO "type_to_categories" VALUES (2700,16);
+INSERT INTO "type_to_categories" VALUES (2701,16);
+INSERT INTO "type_to_categories" VALUES (2702,16);
+INSERT INTO "type_to_categories" VALUES (2703,16);
+INSERT INTO "type_to_categories" VALUES (2704,16);
+INSERT INTO "type_to_categories" VALUES (2705,16);
+INSERT INTO "type_to_categories" VALUES (2706,16);
+INSERT INTO "type_to_categories" VALUES (2707,16);
+INSERT INTO "type_to_categories" VALUES (2708,16);
+INSERT INTO "type_to_categories" VALUES (2709,16);
+INSERT INTO "type_to_categories" VALUES (2710,16);
+INSERT INTO "type_to_categories" VALUES (2711,16);
+INSERT INTO "type_to_categories" VALUES (2712,16);
+INSERT INTO "type_to_categories" VALUES (2713,16);
+INSERT INTO "type_to_categories" VALUES (2714,16);
+INSERT INTO "type_to_categories" VALUES (2715,16);
+INSERT INTO "type_to_categories" VALUES (2716,16);
+INSERT INTO "type_to_categories" VALUES (2718,16);
+INSERT INTO "type_to_categories" VALUES (2719,16);
+INSERT INTO "type_to_categories" VALUES (2720,16);
+INSERT INTO "type_to_categories" VALUES (2721,16);
+INSERT INTO "type_to_categories" VALUES (2722,16);
+INSERT INTO "type_to_categories" VALUES (2723,16);
+INSERT INTO "type_to_categories" VALUES (2724,16);
+INSERT INTO "type_to_categories" VALUES (2725,16);
+INSERT INTO "type_to_categories" VALUES (2727,16);
+INSERT INTO "type_to_categories" VALUES (2728,16);
+INSERT INTO "type_to_categories" VALUES (2733,16);
+INSERT INTO "type_to_categories" VALUES (2734,16);
+INSERT INTO "type_to_categories" VALUES (2735,16);
+INSERT INTO "type_to_categories" VALUES (2736,16);
+INSERT INTO "type_to_categories" VALUES (2737,16);
+INSERT INTO "type_to_categories" VALUES (2738,16);
+INSERT INTO "type_to_categories" VALUES (2739,16);
+INSERT INTO "type_to_categories" VALUES (2740,16);
+INSERT INTO "type_to_categories" VALUES (2741,16);
+INSERT INTO "type_to_categories" VALUES (2742,16);
+INSERT INTO "type_to_categories" VALUES (2743,16);
+INSERT INTO "type_to_categories" VALUES (2744,16);
+INSERT INTO "type_to_categories" VALUES (2745,16);
+INSERT INTO "type_to_categories" VALUES (2746,16);
+INSERT INTO "type_to_categories" VALUES (2747,16);
+INSERT INTO "type_to_categories" VALUES (2748,16);
+INSERT INTO "type_to_categories" VALUES (2749,16);
+INSERT INTO "type_to_categories" VALUES (2750,36);
+INSERT INTO "type_to_categories" VALUES (2751,36);
+INSERT INTO "type_to_categories" VALUES (2752,36);
+INSERT INTO "type_to_categories" VALUES (2754,36);
+INSERT INTO "type_to_categories" VALUES (2755,36);
+INSERT INTO "type_to_categories" VALUES (2756,36);
+INSERT INTO "type_to_categories" VALUES (2757,36);
+INSERT INTO "type_to_categories" VALUES (2758,36);
+INSERT INTO "type_to_categories" VALUES (2759,36);
+INSERT INTO "type_to_categories" VALUES (2760,36);
+INSERT INTO "type_to_categories" VALUES (2761,36);
+INSERT INTO "type_to_categories" VALUES (2762,36);
+INSERT INTO "type_to_categories" VALUES (2763,36);
+INSERT INTO "type_to_categories" VALUES (2764,36);
+INSERT INTO "type_to_categories" VALUES (2765,36);
+INSERT INTO "type_to_categories" VALUES (2767,17);
+INSERT INTO "type_to_categories" VALUES (2768,17);
+INSERT INTO "type_to_categories" VALUES (2769,17);
+INSERT INTO "type_to_categories" VALUES (2770,17);
+INSERT INTO "type_to_categories" VALUES (2771,17);
+INSERT INTO "type_to_categories" VALUES (2772,17);
+INSERT INTO "type_to_categories" VALUES (2773,17);
+INSERT INTO "type_to_categories" VALUES (2774,17);
+INSERT INTO "type_to_categories" VALUES (2775,17);
+INSERT INTO "type_to_categories" VALUES (2776,17);
+INSERT INTO "type_to_categories" VALUES (2777,17);
+INSERT INTO "type_to_categories" VALUES (2778,17);
+INSERT INTO "type_to_categories" VALUES (2779,17);
+INSERT INTO "type_to_categories" VALUES (2780,17);
+INSERT INTO "type_to_categories" VALUES (2781,17);
+INSERT INTO "type_to_categories" VALUES (2782,17);
+INSERT INTO "type_to_categories" VALUES (2783,17);
+INSERT INTO "type_to_categories" VALUES (2784,17);
+INSERT INTO "type_to_categories" VALUES (2785,17);
+INSERT INTO "type_to_categories" VALUES (2786,17);
+INSERT INTO "type_to_categories" VALUES (2787,17);
+INSERT INTO "type_to_categories" VALUES (2788,17);
+INSERT INTO "type_to_categories" VALUES (2789,17);
+INSERT INTO "type_to_categories" VALUES (2790,17);
+INSERT INTO "type_to_categories" VALUES (2791,17);
+INSERT INTO "type_to_categories" VALUES (2792,17);
+INSERT INTO "type_to_categories" VALUES (2793,17);
+INSERT INTO "type_to_categories" VALUES (2794,17);
+INSERT INTO "type_to_categories" VALUES (2795,17);
+INSERT INTO "type_to_categories" VALUES (2796,17);
+INSERT INTO "type_to_categories" VALUES (2797,17);
+INSERT INTO "type_to_categories" VALUES (2798,17);
+INSERT INTO "type_to_categories" VALUES (2799,17);
+INSERT INTO "type_to_categories" VALUES (2800,17);
+INSERT INTO "type_to_categories" VALUES (2801,17);
+INSERT INTO "type_to_categories" VALUES (2802,17);
+INSERT INTO "type_to_categories" VALUES (2803,17);
+INSERT INTO "type_to_categories" VALUES (2804,17);
+INSERT INTO "type_to_categories" VALUES (2805,17);
+INSERT INTO "type_to_categories" VALUES (2806,17);
+INSERT INTO "type_to_categories" VALUES (2807,17);
+INSERT INTO "type_to_categories" VALUES (2808,17);
+INSERT INTO "type_to_categories" VALUES (2809,17);
+INSERT INTO "type_to_categories" VALUES (2810,17);
+INSERT INTO "type_to_categories" VALUES (2811,17);
+INSERT INTO "type_to_categories" VALUES (2812,17);
+INSERT INTO "type_to_categories" VALUES (2813,17);
+INSERT INTO "type_to_categories" VALUES (2814,17);
+INSERT INTO "type_to_categories" VALUES (2815,17);
+INSERT INTO "type_to_categories" VALUES (2816,17);
+INSERT INTO "type_to_categories" VALUES (2817,17);
+INSERT INTO "type_to_categories" VALUES (2818,17);
+INSERT INTO "type_to_categories" VALUES (2819,17);
+INSERT INTO "type_to_categories" VALUES (2820,17);
+INSERT INTO "type_to_categories" VALUES (2821,17);
+INSERT INTO "type_to_categories" VALUES (2822,17);
+INSERT INTO "type_to_categories" VALUES (2823,17);
+INSERT INTO "type_to_categories" VALUES (2824,17);
+INSERT INTO "type_to_categories" VALUES (2825,17);
+INSERT INTO "type_to_categories" VALUES (2826,17);
+INSERT INTO "type_to_categories" VALUES (2827,17);
+INSERT INTO "type_to_categories" VALUES (2828,17);
+INSERT INTO "type_to_categories" VALUES (2829,17);
+INSERT INTO "type_to_categories" VALUES (2830,17);
+INSERT INTO "type_to_categories" VALUES (2831,17);
+INSERT INTO "type_to_categories" VALUES (2833,17);
+INSERT INTO "type_to_categories" VALUES (2834,17);
+INSERT INTO "type_to_categories" VALUES (2835,17);
+INSERT INTO "type_to_categories" VALUES (2836,17);
+INSERT INTO "type_to_categories" VALUES (2837,17);
+INSERT INTO "type_to_categories" VALUES (2838,17);
+INSERT INTO "type_to_categories" VALUES (2839,17);
+INSERT INTO "type_to_categories" VALUES (2840,17);
+INSERT INTO "type_to_categories" VALUES (2841,17);
+INSERT INTO "type_to_categories" VALUES (2842,17);
+INSERT INTO "type_to_categories" VALUES (2843,17);
+INSERT INTO "type_to_categories" VALUES (2844,17);
+INSERT INTO "type_to_categories" VALUES (2845,17);
+INSERT INTO "type_to_categories" VALUES (2846,17);
+INSERT INTO "type_to_categories" VALUES (2847,17);
+INSERT INTO "type_to_categories" VALUES (2848,17);
+INSERT INTO "type_to_categories" VALUES (2849,17);
+INSERT INTO "type_to_categories" VALUES (2850,17);
+INSERT INTO "type_to_categories" VALUES (2851,17);
+INSERT INTO "type_to_categories" VALUES (2852,17);
+INSERT INTO "type_to_categories" VALUES (2853,17);
+INSERT INTO "type_to_categories" VALUES (2854,17);
+INSERT INTO "type_to_categories" VALUES (2855,17);
+INSERT INTO "type_to_categories" VALUES (2856,17);
+INSERT INTO "type_to_categories" VALUES (2857,17);
+INSERT INTO "type_to_categories" VALUES (2858,17);
+INSERT INTO "type_to_categories" VALUES (2859,17);
+INSERT INTO "type_to_categories" VALUES (2860,17);
+INSERT INTO "type_to_categories" VALUES (2861,17);
+INSERT INTO "type_to_categories" VALUES (2862,17);
+INSERT INTO "type_to_categories" VALUES (2863,17);
+INSERT INTO "type_to_categories" VALUES (2864,17);
+INSERT INTO "type_to_categories" VALUES (2865,17);
+INSERT INTO "type_to_categories" VALUES (2866,17);
+INSERT INTO "type_to_categories" VALUES (2867,17);
+INSERT INTO "type_to_categories" VALUES (2868,17);
+INSERT INTO "type_to_categories" VALUES (2869,17);
+INSERT INTO "type_to_categories" VALUES (2870,17);
+INSERT INTO "type_to_categories" VALUES (2871,17);
+INSERT INTO "type_to_categories" VALUES (2872,17);
+INSERT INTO "type_to_categories" VALUES (2873,17);
+INSERT INTO "type_to_categories" VALUES (2874,17);
+INSERT INTO "type_to_categories" VALUES (2875,17);
+INSERT INTO "type_to_categories" VALUES (2876,17);
+INSERT INTO "type_to_categories" VALUES (2877,17);
+INSERT INTO "type_to_categories" VALUES (2878,17);
+INSERT INTO "type_to_categories" VALUES (2879,17);
+INSERT INTO "type_to_categories" VALUES (2880,17);
+INSERT INTO "type_to_categories" VALUES (2881,17);
+INSERT INTO "type_to_categories" VALUES (2882,17);
+INSERT INTO "type_to_categories" VALUES (2883,17);
+INSERT INTO "type_to_categories" VALUES (2884,17);
+INSERT INTO "type_to_categories" VALUES (2886,17);
+INSERT INTO "type_to_categories" VALUES (2887,17);
+INSERT INTO "type_to_categories" VALUES (2888,17);
+INSERT INTO "type_to_categories" VALUES (2889,17);
+INSERT INTO "type_to_categories" VALUES (2890,17);
+INSERT INTO "type_to_categories" VALUES (2891,17);
+INSERT INTO "type_to_categories" VALUES (2892,17);
+INSERT INTO "type_to_categories" VALUES (2893,17);
+INSERT INTO "type_to_categories" VALUES (2894,17);
+INSERT INTO "type_to_categories" VALUES (2895,17);
+INSERT INTO "type_to_categories" VALUES (2896,17);
+INSERT INTO "type_to_categories" VALUES (2897,17);
+INSERT INTO "type_to_categories" VALUES (2898,17);
+INSERT INTO "type_to_categories" VALUES (2899,17);
+INSERT INTO "type_to_categories" VALUES (2900,17);
+INSERT INTO "type_to_categories" VALUES (2901,17);
+INSERT INTO "type_to_categories" VALUES (2902,17);
+INSERT INTO "type_to_categories" VALUES (2903,17);
+INSERT INTO "type_to_categories" VALUES (2904,17);
+INSERT INTO "type_to_categories" VALUES (2905,17);
+INSERT INTO "type_to_categories" VALUES (2906,17);
+INSERT INTO "type_to_categories" VALUES (2907,17);
+INSERT INTO "type_to_categories" VALUES (2908,17);
+INSERT INTO "type_to_categories" VALUES (2909,17);
+INSERT INTO "type_to_categories" VALUES (2910,17);
+INSERT INTO "type_to_categories" VALUES (2911,17);
+INSERT INTO "type_to_categories" VALUES (2912,17);
+INSERT INTO "type_to_categories" VALUES (2913,17);
+INSERT INTO "type_to_categories" VALUES (2914,17);
+INSERT INTO "type_to_categories" VALUES (2915,17);
+INSERT INTO "type_to_categories" VALUES (2916,17);
+INSERT INTO "type_to_categories" VALUES (2917,17);
+INSERT INTO "type_to_categories" VALUES (2918,17);
+INSERT INTO "type_to_categories" VALUES (2919,17);
+INSERT INTO "type_to_categories" VALUES (2920,17);
+INSERT INTO "type_to_categories" VALUES (2921,17);
+INSERT INTO "type_to_categories" VALUES (2922,17);
+INSERT INTO "type_to_categories" VALUES (2923,17);
+INSERT INTO "type_to_categories" VALUES (2924,17);
+INSERT INTO "type_to_categories" VALUES (2925,17);
+INSERT INTO "type_to_categories" VALUES (2926,17);
+INSERT INTO "type_to_categories" VALUES (2927,17);
+INSERT INTO "type_to_categories" VALUES (2928,17);
+INSERT INTO "type_to_categories" VALUES (2929,17);
+INSERT INTO "type_to_categories" VALUES (2930,17);
+INSERT INTO "type_to_categories" VALUES (2931,17);
+INSERT INTO "type_to_categories" VALUES (2932,17);
+INSERT INTO "type_to_categories" VALUES (2933,17);
+INSERT INTO "type_to_categories" VALUES (2934,17);
+INSERT INTO "type_to_categories" VALUES (2935,17);
+INSERT INTO "type_to_categories" VALUES (2936,17);
+INSERT INTO "type_to_categories" VALUES (2937,17);
+INSERT INTO "type_to_categories" VALUES (2938,17);
+INSERT INTO "type_to_categories" VALUES (2939,17);
+INSERT INTO "type_to_categories" VALUES (2940,17);
+INSERT INTO "type_to_categories" VALUES (2941,17);
+INSERT INTO "type_to_categories" VALUES (2942,17);
+INSERT INTO "type_to_categories" VALUES (2943,17);
+INSERT INTO "type_to_categories" VALUES (2944,17);
+INSERT INTO "type_to_categories" VALUES (2945,17);
+INSERT INTO "type_to_categories" VALUES (2946,17);
+INSERT INTO "type_to_categories" VALUES (2947,17);
+INSERT INTO "type_to_categories" VALUES (2948,17);
+INSERT INTO "type_to_categories" VALUES (2949,17);
+INSERT INTO "type_to_categories" VALUES (2950,17);
+INSERT INTO "type_to_categories" VALUES (2951,17);
+INSERT INTO "type_to_categories" VALUES (2952,17);
+INSERT INTO "type_to_categories" VALUES (2953,17);
+INSERT INTO "type_to_categories" VALUES (2954,17);
+INSERT INTO "type_to_categories" VALUES (2955,17);
+INSERT INTO "type_to_categories" VALUES (2956,17);
+INSERT INTO "type_to_categories" VALUES (2957,17);
+INSERT INTO "type_to_categories" VALUES (2958,17);
+INSERT INTO "type_to_categories" VALUES (2959,17);
+INSERT INTO "type_to_categories" VALUES (2960,17);
+INSERT INTO "type_to_categories" VALUES (2961,17);
+INSERT INTO "type_to_categories" VALUES (2962,17);
+INSERT INTO "type_to_categories" VALUES (2967,17);
+INSERT INTO "type_to_categories" VALUES (2968,17);
+INSERT INTO "type_to_categories" VALUES (2969,17);
+INSERT INTO "type_to_categories" VALUES (2970,17);
+INSERT INTO "type_to_categories" VALUES (2971,17);
+INSERT INTO "type_to_categories" VALUES (2972,17);
+INSERT INTO "type_to_categories" VALUES (2979,17);
+INSERT INTO "type_to_categories" VALUES (2980,17);
+INSERT INTO "type_to_categories" VALUES (2981,17);
+INSERT INTO "type_to_categories" VALUES (2982,17);
+INSERT INTO "type_to_categories" VALUES (2983,17);
+INSERT INTO "type_to_categories" VALUES (2984,17);
+INSERT INTO "type_to_categories" VALUES (2985,17);
+INSERT INTO "type_to_categories" VALUES (2986,17);
+INSERT INTO "type_to_categories" VALUES (2987,17);
+INSERT INTO "type_to_categories" VALUES (2988,17);
+INSERT INTO "type_to_categories" VALUES (2989,17);
+INSERT INTO "type_to_categories" VALUES (2990,17);
+INSERT INTO "type_to_categories" VALUES (2991,17);
+INSERT INTO "type_to_categories" VALUES (2992,17);
+INSERT INTO "type_to_categories" VALUES (2993,17);
+INSERT INTO "type_to_categories" VALUES (2994,17);
+INSERT INTO "type_to_categories" VALUES (2995,17);
+INSERT INTO "type_to_categories" VALUES (2996,17);
+INSERT INTO "type_to_categories" VALUES (2997,17);
+INSERT INTO "type_to_categories" VALUES (2998,17);
+INSERT INTO "type_to_categories" VALUES (2999,17);
+INSERT INTO "type_to_categories" VALUES (3000,17);
+INSERT INTO "type_to_categories" VALUES (3001,17);
+INSERT INTO "type_to_categories" VALUES (3002,17);
+INSERT INTO "type_to_categories" VALUES (3003,17);
+INSERT INTO "type_to_categories" VALUES (3004,17);
+INSERT INTO "type_to_categories" VALUES (3005,17);
+INSERT INTO "type_to_categories" VALUES (3006,17);
+INSERT INTO "type_to_categories" VALUES (3014,18);
+INSERT INTO "type_to_categories" VALUES (3015,18);
+INSERT INTO "type_to_categories" VALUES (3016,18);
+INSERT INTO "type_to_categories" VALUES (3017,18);
+INSERT INTO "type_to_categories" VALUES (3018,18);
+INSERT INTO "type_to_categories" VALUES (3019,18);
+INSERT INTO "type_to_categories" VALUES (3020,18);
+INSERT INTO "type_to_categories" VALUES (3021,18);
+INSERT INTO "type_to_categories" VALUES (3022,18);
+INSERT INTO "type_to_categories" VALUES (3023,18);
+INSERT INTO "type_to_categories" VALUES (3024,18);
+INSERT INTO "type_to_categories" VALUES (3025,18);
+INSERT INTO "type_to_categories" VALUES (3026,18);
+INSERT INTO "type_to_categories" VALUES (3027,18);
+INSERT INTO "type_to_categories" VALUES (3029,18);
+INSERT INTO "type_to_categories" VALUES (3030,18);
+INSERT INTO "type_to_categories" VALUES (3031,18);
+INSERT INTO "type_to_categories" VALUES (3032,18);
+INSERT INTO "type_to_categories" VALUES (3033,18);
+INSERT INTO "type_to_categories" VALUES (3034,18);
+INSERT INTO "type_to_categories" VALUES (3035,18);
+INSERT INTO "type_to_categories" VALUES (3036,18);
+INSERT INTO "type_to_categories" VALUES (3037,18);
+INSERT INTO "type_to_categories" VALUES (3038,18);
+INSERT INTO "type_to_categories" VALUES (3039,18);
+INSERT INTO "type_to_categories" VALUES (3041,18);
+INSERT INTO "type_to_categories" VALUES (3042,18);
+INSERT INTO "type_to_categories" VALUES (3043,18);
+INSERT INTO "type_to_categories" VALUES (3044,18);
+INSERT INTO "type_to_categories" VALUES (3045,18);
+INSERT INTO "type_to_categories" VALUES (3046,18);
+INSERT INTO "type_to_categories" VALUES (3047,18);
+INSERT INTO "type_to_categories" VALUES (3048,18);
+INSERT INTO "type_to_categories" VALUES (3049,18);
+INSERT INTO "type_to_categories" VALUES (3050,18);
+INSERT INTO "type_to_categories" VALUES (3051,18);
+INSERT INTO "type_to_categories" VALUES (3052,18);
+INSERT INTO "type_to_categories" VALUES (3053,18);
+INSERT INTO "type_to_categories" VALUES (3054,18);
+INSERT INTO "type_to_categories" VALUES (3055,18);
+INSERT INTO "type_to_categories" VALUES (3056,18);
+INSERT INTO "type_to_categories" VALUES (3057,18);
+INSERT INTO "type_to_categories" VALUES (3058,18);
+INSERT INTO "type_to_categories" VALUES (3059,18);
+INSERT INTO "type_to_categories" VALUES (3060,18);
+INSERT INTO "type_to_categories" VALUES (3061,18);
+INSERT INTO "type_to_categories" VALUES (3062,18);
+INSERT INTO "type_to_categories" VALUES (3063,18);
+INSERT INTO "type_to_categories" VALUES (3064,18);
+INSERT INTO "type_to_categories" VALUES (3070,18);
+INSERT INTO "type_to_categories" VALUES (3071,18);
+INSERT INTO "type_to_categories" VALUES (3072,18);
+INSERT INTO "type_to_categories" VALUES (3073,18);
+INSERT INTO "type_to_categories" VALUES (3074,18);
+INSERT INTO "type_to_categories" VALUES (3075,18);
+INSERT INTO "type_to_categories" VALUES (3076,18);
+INSERT INTO "type_to_categories" VALUES (3077,18);
+INSERT INTO "type_to_categories" VALUES (3078,18);
+INSERT INTO "type_to_categories" VALUES (3079,18);
+INSERT INTO "type_to_categories" VALUES (3080,18);
+INSERT INTO "type_to_categories" VALUES (3081,18);
+INSERT INTO "type_to_categories" VALUES (3082,18);
+INSERT INTO "type_to_categories" VALUES (3083,18);
+INSERT INTO "type_to_categories" VALUES (3084,18);
+INSERT INTO "type_to_categories" VALUES (3085,18);
+INSERT INTO "type_to_categories" VALUES (3086,18);
+INSERT INTO "type_to_categories" VALUES (3087,18);
+INSERT INTO "type_to_categories" VALUES (3088,18);
+INSERT INTO "type_to_categories" VALUES (3089,18);
+INSERT INTO "type_to_categories" VALUES (3092,18);
+INSERT INTO "type_to_categories" VALUES (3093,18);
+INSERT INTO "type_to_categories" VALUES (3103,18);
+INSERT INTO "type_to_categories" VALUES (3104,18);
+INSERT INTO "type_to_categories" VALUES (3105,18);
+INSERT INTO "type_to_categories" VALUES (3108,18);
+INSERT INTO "type_to_categories" VALUES (3109,18);
+INSERT INTO "type_to_categories" VALUES (3110,18);
+INSERT INTO "type_to_categories" VALUES (3111,18);
+INSERT INTO "type_to_categories" VALUES (3112,18);
+INSERT INTO "type_to_categories" VALUES (3113,18);
+INSERT INTO "type_to_categories" VALUES (3114,18);
+INSERT INTO "type_to_categories" VALUES (3115,18);
+INSERT INTO "type_to_categories" VALUES (3116,18);
+INSERT INTO "type_to_categories" VALUES (15,7);
+INSERT INTO "type_to_categories" VALUES (16,7);
+INSERT INTO "type_to_categories" VALUES (17,7);
+INSERT INTO "type_to_categories" VALUES (18,7);
+INSERT INTO "type_to_categories" VALUES (19,7);
+INSERT INTO "type_to_categories" VALUES (20,7);
+INSERT INTO "type_to_categories" VALUES (21,7);
+INSERT INTO "type_to_categories" VALUES (22,7);
+INSERT INTO "type_to_categories" VALUES (23,7);
+INSERT INTO "type_to_categories" VALUES (906,7);
+INSERT INTO "type_to_categories" VALUES (907,7);
+INSERT INTO "type_to_categories" VALUES (908,7);
+INSERT INTO "type_to_categories" VALUES (910,7);
+INSERT INTO "type_to_categories" VALUES (911,7);
+INSERT INTO "type_to_categories" VALUES (912,7);
+INSERT INTO "type_to_categories" VALUES (913,7);
+INSERT INTO "type_to_categories" VALUES (915,7);
+INSERT INTO "type_to_categories" VALUES (916,7);
+INSERT INTO "type_to_categories" VALUES (917,7);
+INSERT INTO "type_to_categories" VALUES (918,7);
+INSERT INTO "type_to_categories" VALUES (919,7);
+INSERT INTO "type_to_categories" VALUES (920,7);
+INSERT INTO "type_to_categories" VALUES (921,7);
+INSERT INTO "type_to_categories" VALUES (922,7);
+INSERT INTO "type_to_categories" VALUES (923,7);
+INSERT INTO "type_to_categories" VALUES (924,7);
+INSERT INTO "type_to_categories" VALUES (925,7);
+INSERT INTO "type_to_categories" VALUES (926,7);
+INSERT INTO "type_to_categories" VALUES (927,7);
+INSERT INTO "type_to_categories" VALUES (928,7);
+INSERT INTO "type_to_categories" VALUES (929,7);
+INSERT INTO "type_to_categories" VALUES (930,7);
+INSERT INTO "type_to_categories" VALUES (933,7);
+INSERT INTO "type_to_categories" VALUES (934,7);
+INSERT INTO "type_to_categories" VALUES (937,7);
+INSERT INTO "type_to_categories" VALUES (938,7);
+INSERT INTO "type_to_categories" VALUES (939,7);
+INSERT INTO "type_to_categories" VALUES (940,7);
+INSERT INTO "type_to_categories" VALUES (941,7);
+INSERT INTO "type_to_categories" VALUES (942,7);
+INSERT INTO "type_to_categories" VALUES (944,7);
+INSERT INTO "type_to_categories" VALUES (946,7);
+INSERT INTO "type_to_categories" VALUES (947,7);
+INSERT INTO "type_to_categories" VALUES (948,7);
+INSERT INTO "type_to_categories" VALUES (949,7);
+INSERT INTO "type_to_categories" VALUES (950,7);
+INSERT INTO "type_to_categories" VALUES (951,7);
+INSERT INTO "type_to_categories" VALUES (952,7);
+INSERT INTO "type_to_categories" VALUES (954,7);
+INSERT INTO "type_to_categories" VALUES (956,7);
+INSERT INTO "type_to_categories" VALUES (959,7);
+INSERT INTO "type_to_categories" VALUES (960,7);
+INSERT INTO "type_to_categories" VALUES (961,7);
+INSERT INTO "type_to_categories" VALUES (962,7);
+INSERT INTO "type_to_categories" VALUES (964,7);
+INSERT INTO "type_to_categories" VALUES (965,7);
+INSERT INTO "type_to_categories" VALUES (966,7);
+INSERT INTO "type_to_categories" VALUES (967,7);
+INSERT INTO "type_to_categories" VALUES (968,7);
+INSERT INTO "type_to_categories" VALUES (969,7);
+INSERT INTO "type_to_categories" VALUES (970,7);
+INSERT INTO "type_to_categories" VALUES (972,7);
+INSERT INTO "type_to_categories" VALUES (973,7);
+INSERT INTO "type_to_categories" VALUES (974,7);
+INSERT INTO "type_to_categories" VALUES (975,7);
+INSERT INTO "type_to_categories" VALUES (977,7);
+INSERT INTO "type_to_categories" VALUES (978,7);
+INSERT INTO "type_to_categories" VALUES (979,7);
+INSERT INTO "type_to_categories" VALUES (980,7);
+INSERT INTO "type_to_categories" VALUES (981,7);
+INSERT INTO "type_to_categories" VALUES (982,7);
+INSERT INTO "type_to_categories" VALUES (983,7);
+INSERT INTO "type_to_categories" VALUES (985,7);
+INSERT INTO "type_to_categories" VALUES (987,7);
+INSERT INTO "type_to_categories" VALUES (988,7);
+INSERT INTO "type_to_categories" VALUES (989,7);
+INSERT INTO "type_to_categories" VALUES (990,7);
+INSERT INTO "type_to_categories" VALUES (991,7);
+INSERT INTO "type_to_categories" VALUES (992,7);
+INSERT INTO "type_to_categories" VALUES (993,7);
+INSERT INTO "type_to_categories" VALUES (994,7);
+INSERT INTO "type_to_categories" VALUES (995,7);
+INSERT INTO "type_to_categories" VALUES (996,7);
+INSERT INTO "type_to_categories" VALUES (997,7);
+INSERT INTO "type_to_categories" VALUES (998,7);
+INSERT INTO "type_to_categories" VALUES (999,7);
+INSERT INTO "type_to_categories" VALUES (1000,7);
+INSERT INTO "type_to_categories" VALUES (1001,7);
+INSERT INTO "type_to_categories" VALUES (1002,7);
+INSERT INTO "type_to_categories" VALUES (1003,7);
+INSERT INTO "type_to_categories" VALUES (1004,7);
+INSERT INTO "type_to_categories" VALUES (1005,7);
+INSERT INTO "type_to_categories" VALUES (1006,7);
+INSERT INTO "type_to_categories" VALUES (1007,7);
+INSERT INTO "type_to_categories" VALUES (1009,7);
+INSERT INTO "type_to_categories" VALUES (1010,7);
+INSERT INTO "type_to_categories" VALUES (1011,7);
+INSERT INTO "type_to_categories" VALUES (1012,7);
+INSERT INTO "type_to_categories" VALUES (1013,7);
+INSERT INTO "type_to_categories" VALUES (1014,7);
+INSERT INTO "type_to_categories" VALUES (1015,7);
+INSERT INTO "type_to_categories" VALUES (1016,7);
+INSERT INTO "type_to_categories" VALUES (1017,7);
+INSERT INTO "type_to_categories" VALUES (1018,7);
+INSERT INTO "type_to_categories" VALUES (1019,7);
+INSERT INTO "type_to_categories" VALUES (1020,7);
+INSERT INTO "type_to_categories" VALUES (1021,7);
+INSERT INTO "type_to_categories" VALUES (1022,7);
+INSERT INTO "type_to_categories" VALUES (1023,7);
+INSERT INTO "type_to_categories" VALUES (1024,7);
+INSERT INTO "type_to_categories" VALUES (1025,7);
+INSERT INTO "type_to_categories" VALUES (1026,7);
+INSERT INTO "type_to_categories" VALUES (1027,7);
+INSERT INTO "type_to_categories" VALUES (1028,7);
+INSERT INTO "type_to_categories" VALUES (1029,7);
+INSERT INTO "type_to_categories" VALUES (1030,7);
+INSERT INTO "type_to_categories" VALUES (1031,7);
+INSERT INTO "type_to_categories" VALUES (1032,7);
+INSERT INTO "type_to_categories" VALUES (1033,7);
+INSERT INTO "type_to_categories" VALUES (1034,7);
+INSERT INTO "type_to_categories" VALUES (1035,7);
+INSERT INTO "type_to_categories" VALUES (1036,7);
+INSERT INTO "type_to_categories" VALUES (1037,7);
+INSERT INTO "type_to_categories" VALUES (1038,7);
+INSERT INTO "type_to_categories" VALUES (1039,7);
+INSERT INTO "type_to_categories" VALUES (1040,7);
+INSERT INTO "type_to_categories" VALUES (1041,7);
+INSERT INTO "type_to_categories" VALUES (1042,7);
+INSERT INTO "type_to_categories" VALUES (1043,7);
+INSERT INTO "type_to_categories" VALUES (1044,7);
+INSERT INTO "type_to_categories" VALUES (1045,7);
+INSERT INTO "type_to_categories" VALUES (1046,7);
+INSERT INTO "type_to_categories" VALUES (1047,7);
+INSERT INTO "type_to_categories" VALUES (1048,7);
+INSERT INTO "type_to_categories" VALUES (1049,7);
+INSERT INTO "type_to_categories" VALUES (1050,7);
+INSERT INTO "type_to_categories" VALUES (1051,7);
+INSERT INTO "type_to_categories" VALUES (1052,7);
+INSERT INTO "type_to_categories" VALUES (1053,7);
+INSERT INTO "type_to_categories" VALUES (1054,7);
+INSERT INTO "type_to_categories" VALUES (1056,7);
+INSERT INTO "type_to_categories" VALUES (1057,7);
+INSERT INTO "type_to_categories" VALUES (1058,7);
+INSERT INTO "type_to_categories" VALUES (1059,7);
+INSERT INTO "type_to_categories" VALUES (1060,7);
+INSERT INTO "type_to_categories" VALUES (1061,7);
+INSERT INTO "type_to_categories" VALUES (1062,7);
+INSERT INTO "type_to_categories" VALUES (1063,7);
+INSERT INTO "type_to_categories" VALUES (1064,7);
+INSERT INTO "type_to_categories" VALUES (1065,7);
+INSERT INTO "type_to_categories" VALUES (1066,7);
+INSERT INTO "type_to_categories" VALUES (1067,7);
+INSERT INTO "type_to_categories" VALUES (1068,7);
+INSERT INTO "type_to_categories" VALUES (1069,7);
+INSERT INTO "type_to_categories" VALUES (1070,7);
+INSERT INTO "type_to_categories" VALUES (1071,7);
+INSERT INTO "type_to_categories" VALUES (1072,7);
+INSERT INTO "type_to_categories" VALUES (1073,7);
+INSERT INTO "type_to_categories" VALUES (1074,8);
+INSERT INTO "type_to_categories" VALUES (1075,8);
+INSERT INTO "type_to_categories" VALUES (1076,8);
+INSERT INTO "type_to_categories" VALUES (1077,8);
+INSERT INTO "type_to_categories" VALUES (1078,8);
+INSERT INTO "type_to_categories" VALUES (1079,8);
+INSERT INTO "type_to_categories" VALUES (1080,8);
+INSERT INTO "type_to_categories" VALUES (1081,8);
+INSERT INTO "type_to_categories" VALUES (1082,8);
+INSERT INTO "type_to_categories" VALUES (1083,8);
+INSERT INTO "type_to_categories" VALUES (1084,8);
+INSERT INTO "type_to_categories" VALUES (1085,8);
+INSERT INTO "type_to_categories" VALUES (1086,8);
+INSERT INTO "type_to_categories" VALUES (1087,8);
+INSERT INTO "type_to_categories" VALUES (1088,8);
+INSERT INTO "type_to_categories" VALUES (1089,8);
+INSERT INTO "type_to_categories" VALUES (1090,8);
+INSERT INTO "type_to_categories" VALUES (1091,8);
+INSERT INTO "type_to_categories" VALUES (1092,8);
+INSERT INTO "type_to_categories" VALUES (1093,8);
+INSERT INTO "type_to_categories" VALUES (1094,8);
+INSERT INTO "type_to_categories" VALUES (1095,8);
+INSERT INTO "type_to_categories" VALUES (1096,8);
+INSERT INTO "type_to_categories" VALUES (1097,8);
+INSERT INTO "type_to_categories" VALUES (1098,8);
+INSERT INTO "type_to_categories" VALUES (1100,8);
+INSERT INTO "type_to_categories" VALUES (1102,8);
+INSERT INTO "type_to_categories" VALUES (1104,8);
+INSERT INTO "type_to_categories" VALUES (1105,8);
+INSERT INTO "type_to_categories" VALUES (1106,8);
+INSERT INTO "type_to_categories" VALUES (1107,8);
+INSERT INTO "type_to_categories" VALUES (1108,8);
+INSERT INTO "type_to_categories" VALUES (1110,8);
+INSERT INTO "type_to_categories" VALUES (1111,8);
+INSERT INTO "type_to_categories" VALUES (1112,8);
+INSERT INTO "type_to_categories" VALUES (1113,8);
+INSERT INTO "type_to_categories" VALUES (1114,8);
+INSERT INTO "type_to_categories" VALUES (1115,8);
+INSERT INTO "type_to_categories" VALUES (1116,8);
+INSERT INTO "type_to_categories" VALUES (1117,8);
+INSERT INTO "type_to_categories" VALUES (1118,8);
+INSERT INTO "type_to_categories" VALUES (1119,8);
+INSERT INTO "type_to_categories" VALUES (1120,8);
+INSERT INTO "type_to_categories" VALUES (1121,8);
+INSERT INTO "type_to_categories" VALUES (1131,8);
+INSERT INTO "type_to_categories" VALUES (1132,8);
+INSERT INTO "type_to_categories" VALUES (1133,8);
+INSERT INTO "type_to_categories" VALUES (1134,8);
+INSERT INTO "type_to_categories" VALUES (1135,8);
+INSERT INTO "type_to_categories" VALUES (1136,8);
+INSERT INTO "type_to_categories" VALUES (1137,8);
+INSERT INTO "type_to_categories" VALUES (1138,8);
+INSERT INTO "type_to_categories" VALUES (1139,8);
+INSERT INTO "type_to_categories" VALUES (1140,8);
+INSERT INTO "type_to_categories" VALUES (1141,8);
+INSERT INTO "type_to_categories" VALUES (1142,8);
+INSERT INTO "type_to_categories" VALUES (1143,8);
+INSERT INTO "type_to_categories" VALUES (1144,8);
+INSERT INTO "type_to_categories" VALUES (1145,8);
+INSERT INTO "type_to_categories" VALUES (1146,8);
+INSERT INTO "type_to_categories" VALUES (1147,8);
+INSERT INTO "type_to_categories" VALUES (1148,8);
+INSERT INTO "type_to_categories" VALUES (1149,8);
+INSERT INTO "type_to_categories" VALUES (1155,8);
+INSERT INTO "type_to_categories" VALUES (1156,8);
+INSERT INTO "type_to_categories" VALUES (1157,8);
+INSERT INTO "type_to_categories" VALUES (1158,8);
+INSERT INTO "type_to_categories" VALUES (1164,8);
+INSERT INTO "type_to_categories" VALUES (1165,8);
+INSERT INTO "type_to_categories" VALUES (1166,8);
+INSERT INTO "type_to_categories" VALUES (1167,8);
+INSERT INTO "type_to_categories" VALUES (1168,8);
+INSERT INTO "type_to_categories" VALUES (1169,8);
+INSERT INTO "type_to_categories" VALUES (1170,8);
+INSERT INTO "type_to_categories" VALUES (1171,8);
+INSERT INTO "type_to_categories" VALUES (1172,8);
+INSERT INTO "type_to_categories" VALUES (1173,8);
+INSERT INTO "type_to_categories" VALUES (1174,8);
+INSERT INTO "type_to_categories" VALUES (2032,14);
+INSERT INTO "type_to_categories" VALUES (2033,14);
+INSERT INTO "type_to_categories" VALUES (2034,14);
+INSERT INTO "type_to_categories" VALUES (2035,14);
+INSERT INTO "type_to_categories" VALUES (2036,14);
+INSERT INTO "type_to_categories" VALUES (2037,14);
+INSERT INTO "type_to_categories" VALUES (2038,14);
+INSERT INTO "type_to_categories" VALUES (2039,14);
+INSERT INTO "type_to_categories" VALUES (2040,14);
+INSERT INTO "type_to_categories" VALUES (2041,14);
+INSERT INTO "type_to_categories" VALUES (2042,14);
+INSERT INTO "type_to_categories" VALUES (2043,14);
+INSERT INTO "type_to_categories" VALUES (2044,14);
+INSERT INTO "type_to_categories" VALUES (2045,14);
+INSERT INTO "type_to_categories" VALUES (2046,14);
+INSERT INTO "type_to_categories" VALUES (2047,14);
+INSERT INTO "type_to_categories" VALUES (2048,14);
+INSERT INTO "type_to_categories" VALUES (2049,14);
+INSERT INTO "type_to_categories" VALUES (2050,14);
+INSERT INTO "type_to_categories" VALUES (2051,14);
+INSERT INTO "type_to_categories" VALUES (2052,14);
+INSERT INTO "type_to_categories" VALUES (2053,14);
+INSERT INTO "type_to_categories" VALUES (2055,14);
+INSERT INTO "type_to_categories" VALUES (2056,14);
+INSERT INTO "type_to_categories" VALUES (2057,14);
+INSERT INTO "type_to_categories" VALUES (2058,14);
+INSERT INTO "type_to_categories" VALUES (2059,14);
+INSERT INTO "type_to_categories" VALUES (2060,14);
+INSERT INTO "type_to_categories" VALUES (2061,14);
+INSERT INTO "type_to_categories" VALUES (2062,14);
+INSERT INTO "type_to_categories" VALUES (2063,14);
+INSERT INTO "type_to_categories" VALUES (2064,14);
+INSERT INTO "type_to_categories" VALUES (2065,14);
+INSERT INTO "type_to_categories" VALUES (2066,14);
+INSERT INTO "type_to_categories" VALUES (2067,14);
+INSERT INTO "type_to_categories" VALUES (2068,14);
+INSERT INTO "type_to_categories" VALUES (2069,14);
+INSERT INTO "type_to_categories" VALUES (2070,14);
+INSERT INTO "type_to_categories" VALUES (2071,14);
+INSERT INTO "type_to_categories" VALUES (2072,14);
+INSERT INTO "type_to_categories" VALUES (2073,14);
+INSERT INTO "type_to_categories" VALUES (2074,14);
+INSERT INTO "type_to_categories" VALUES (2076,14);
+INSERT INTO "type_to_categories" VALUES (2077,14);
+INSERT INTO "type_to_categories" VALUES (2078,14);
+INSERT INTO "type_to_categories" VALUES (2079,14);
+INSERT INTO "type_to_categories" VALUES (2080,14);
+INSERT INTO "type_to_categories" VALUES (5,7);
+INSERT INTO "type_to_categories" VALUES (8,7);
+INSERT INTO "type_to_categories" VALUES (10,7);
+INSERT INTO "type_to_categories" VALUES (11,7);
+INSERT INTO "type_to_categories" VALUES (12,7);
+INSERT INTO "type_to_categories" VALUES (13,7);
+INSERT INTO "type_to_categories" VALUES (14,7);
+INSERT INTO "type_to_categories" VALUES (4,11);
+INSERT INTO "type_to_categories" VALUES (2031,14);
+CREATE UNIQUE INDEX IF NOT EXISTS "idx_unique_main_type" ON "mini_to_types" (
+	"mini_id"
+) WHERE "proxy_type" = 0;
+CREATE INDEX IF NOT EXISTS "idx_mini_categories_name" ON "mini_categories" (
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_product_types_active" ON "product_types" (
-	"is_active"
+CREATE INDEX IF NOT EXISTS "idx_mini_types_name" ON "mini_types" (
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_regions_active" ON "regions" (
-	"is_active"
+CREATE INDEX IF NOT EXISTS "idx_product_companies_name" ON "product_companies" (
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_rating_groups_region" ON "rating_groups" (
-	"region_id"
+CREATE INDEX IF NOT EXISTS "idx_product_lines_company" ON "product_lines" (
+	"company_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_rating_groups_active" ON "rating_groups" (
-	"is_active"
+CREATE INDEX IF NOT EXISTS "idx_product_lines_name" ON "product_lines" (
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_ratings_group" ON "ratings" (
-	"rating_group_id"
+CREATE INDEX IF NOT EXISTS "idx_product_sets_line" ON "product_sets" (
+	"product_line_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_ratings_active" ON "ratings" (
-	"is_active"
+CREATE INDEX IF NOT EXISTS "idx_product_sets_name" ON "product_sets" (
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_group" ON "products" (
-	"product_group_id"
+CREATE INDEX IF NOT EXISTS "idx_tags_name" ON "tags" (
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_type" ON "products" (
-	"product_type_id"
+CREATE INDEX IF NOT EXISTS "idx_mini_to_types_type" ON "mini_to_types" (
+	"type_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_region" ON "products" (
-	"region_id"
+CREATE INDEX IF NOT EXISTS "idx_type_to_categories_category" ON "type_to_categories" (
+	"category_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_rating" ON "products" (
-	"rating_id"
+CREATE INDEX IF NOT EXISTS "idx_mini_to_types_mini" ON "mini_to_types" (
+	"mini_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_pricecharting" ON "products" (
-	"pricecharting_id"
+CREATE INDEX IF NOT EXISTS "idx_type_to_categories_type" ON "type_to_categories" (
+	"type_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_active" ON "products" (
-	"is_active"
+CREATE INDEX IF NOT EXISTS "idx_mini_to_tags_mini" ON "mini_to_tags" (
+	"mini_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_title" ON "products" (
-	"title"
+CREATE INDEX IF NOT EXISTS "idx_mini_to_tags_tag" ON "mini_to_tags" (
+	"tag_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_products_release_year" ON "products" (
-	"release_year"
+CREATE INDEX IF NOT EXISTS "idx_minis_painted" ON "minis" (
+	"painted_by_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_inventory_product" ON "inventory" (
-	"product_id"
+CREATE INDEX IF NOT EXISTS "idx_minis_base" ON "minis" (
+	"base_size_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_inventory_active" ON "inventory" (
-	"is_active"
+CREATE INDEX IF NOT EXISTS "idx_minis_product" ON "minis" (
+	"product_set_id"
 );
-CREATE INDEX IF NOT EXISTS "idx_inventory_barcode" ON "inventory" (
-	"barcode"
+CREATE INDEX IF NOT EXISTS "idx_minis_name" ON "minis" (
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_product_attribute_values_product" ON "product_attribute_values" (
-	"product_id"
+CREATE INDEX IF NOT EXISTS "idx_mini_types_id_name" ON "mini_types" (
+	"id",
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_product_attribute_values_attribute" ON "product_attribute_values" (
-	"attribute_id"
+CREATE INDEX IF NOT EXISTS "idx_mini_categories_id_name" ON "mini_categories" (
+	"id",
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_inventory_attribute_values_inventory" ON "inventory_attribute_values" (
-	"inventory_id"
+CREATE INDEX IF NOT EXISTS "idx_tags_id_name" ON "tags" (
+	"id",
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_inventory_attribute_values_attribute" ON "inventory_attribute_values" (
-	"attribute_id"
+CREATE INDEX IF NOT EXISTS "idx_product_sets_composite" ON "product_sets" (
+	"id",
+	"product_line_id",
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_pricecharting_prices_product" ON "pricecharting_prices" (
-	"product_id"
+CREATE INDEX IF NOT EXISTS "idx_product_lines_composite" ON "product_lines" (
+	"id",
+	"company_id",
+	"name"
 );
-CREATE INDEX IF NOT EXISTS "idx_pricecharting_prices_active" ON "pricecharting_prices" (
-	"is_active"
-);
-CREATE INDEX IF NOT EXISTS "idx_product_sites_active" ON "product_sites" (
-	"is_active"
-);
-CREATE INDEX IF NOT EXISTS "idx_product_site_links_product" ON "product_site_links" (
-	"product_id"
-);
-CREATE INDEX IF NOT EXISTS "idx_product_site_links_site" ON "product_site_links" (
-	"site_id"
-);
-CREATE INDEX IF NOT EXISTS "idx_product_site_links_active" ON "product_site_links" (
-	"is_active"
-);
-CREATE INDEX IF NOT EXISTS "idx_attributes_type" ON "attributes" (
-	"type"
-);
-CREATE INDEX IF NOT EXISTS "idx_attributes_scope" ON "attributes" (
-	"scope"
-);
-CREATE INDEX IF NOT EXISTS "idx_attributes_active" ON "attributes" (
-	"is_active"
-);
-CREATE TRIGGER update_product_groups_timestamp 
-   AFTER UPDATE ON product_groups
-BEGIN
-   UPDATE product_groups SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_product_types_timestamp 
-   AFTER UPDATE ON product_types
-BEGIN
-   UPDATE product_types SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_regions_timestamp 
-   AFTER UPDATE ON regions
-BEGIN
-   UPDATE regions SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_rating_groups_timestamp 
-   AFTER UPDATE ON rating_groups
-BEGIN
-   UPDATE rating_groups SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_ratings_timestamp 
-   AFTER UPDATE ON ratings
-BEGIN
-   UPDATE ratings SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_products_timestamp 
-   AFTER UPDATE ON products
-BEGIN
-   UPDATE products SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_inventory_timestamp 
-   AFTER UPDATE ON inventory
-BEGIN
-   UPDATE inventory SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_product_attribute_values_timestamp 
-   AFTER UPDATE ON product_attribute_values
-BEGIN
-   UPDATE product_attribute_values SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_inventory_attribute_values_timestamp 
-   AFTER UPDATE ON inventory_attribute_values
-BEGIN
-   UPDATE inventory_attribute_values SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_pricecharting_prices_timestamp 
-   AFTER UPDATE ON pricecharting_prices
-BEGIN
-   UPDATE pricecharting_prices SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_product_sites_timestamp 
-   AFTER UPDATE ON product_sites
-BEGIN
-   UPDATE product_sites SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER update_product_site_links_timestamp 
-   AFTER UPDATE ON product_site_links
-BEGIN
-   UPDATE product_site_links SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
-CREATE TRIGGER validate_product_rating_region
-   BEFORE INSERT ON products
-   WHEN NEW.rating_id IS NOT NULL
-BEGIN
-   SELECT CASE 
-       WHEN NOT EXISTS (
-           SELECT 1 FROM ratings r
-           JOIN rating_groups rg ON r.rating_group_id = rg.id
-           WHERE r.id = NEW.rating_id 
-           AND rg.region_id = NEW.region_id
-       )
-       THEN RAISE(ABORT, 'Rating must belong to the specified region')
-   END;
-END;
-CREATE TRIGGER validate_product_rating_region_update
-   BEFORE UPDATE ON products
-   WHEN NEW.rating_id IS NOT NULL
-BEGIN
-   SELECT CASE 
-       WHEN NOT EXISTS (
-           SELECT 1 FROM ratings r
-           JOIN rating_groups rg ON r.rating_group_id = rg.id
-           WHERE r.id = NEW.rating_id 
-           AND rg.region_id = NEW.region_id
-       )
-       THEN RAISE(ABORT, 'Rating must belong to the specified region')
-   END;
-END;
-CREATE TRIGGER validate_attribute_value_insert
-   BEFORE INSERT ON product_attribute_values
-BEGIN
-   SELECT CASE
-       WHEN (SELECT type FROM attributes WHERE id = NEW.attribute_id) = 'boolean'
-           AND NEW.value NOT IN ('0', '1')
-           THEN RAISE(ABORT, 'Boolean attribute must be 0 or 1')
-           
-       WHEN (SELECT type FROM attributes WHERE id = NEW.attribute_id) = 'number'
-           AND NOT NEW.value GLOB '[0-9]*[.][0-9]*' 
-           AND NOT NEW.value GLOB '[0-9]*'
-           THEN RAISE(ABORT, 'Number attribute must be numeric')
-           
-       WHEN (SELECT type FROM attributes WHERE id = NEW.attribute_id) = 'set'
-           AND NOT EXISTS (
-               SELECT 1 FROM json_each(
-                   (SELECT allowed_values FROM attributes WHERE id = NEW.attribute_id)
-               ) 
-               WHERE value = NEW.value
-           )
-           THEN RAISE(ABORT, 'Set attribute value must be one of the allowed values')
-   END;
-END;
-CREATE TRIGGER validate_inventory_attribute_value_insert
-   BEFORE INSERT ON inventory_attribute_values
-BEGIN
-   SELECT CASE
-       WHEN (SELECT type FROM attributes WHERE id = NEW.attribute_id) = 'boolean'
-           AND NEW.value NOT IN ('0', '1')
-           THEN RAISE(ABORT, 'Boolean attribute must be 0 or 1')
-           
-       WHEN (SELECT type FROM attributes WHERE id = NEW.attribute_id) = 'number'
-           AND NOT NEW.value GLOB '[0-9]*[.][0-9]*' 
-           AND NOT NEW.value GLOB '[0-9]*'
-           THEN RAISE(ABORT, 'Number attribute must be numeric')
-           
-       WHEN (SELECT type FROM attributes WHERE id = NEW.attribute_id) = 'set'
-           AND NOT EXISTS (
-               SELECT 1 FROM json_each(
-                   (SELECT allowed_values FROM attributes WHERE id = NEW.attribute_id)
-               ) 
-               WHERE value = NEW.value
-           )
-           THEN RAISE(ABORT, 'Set attribute value must be one of the allowed values')
-   END;
-END;
-CREATE TRIGGER validate_attribute_scope_product
-   BEFORE INSERT ON product_attribute_values
-BEGIN
-   SELECT CASE
-       WHEN (SELECT scope FROM attributes WHERE id = NEW.attribute_id) != 'product'
-       THEN RAISE(ABORT, 'This attribute cannot be used for products')
-   END;
-END;
-CREATE TRIGGER validate_attribute_scope_inventory
-   BEFORE INSERT ON inventory_attribute_values
-BEGIN
-   SELECT CASE
-       WHEN (SELECT scope FROM attributes WHERE id = NEW.attribute_id) != 'inventory'
-       THEN RAISE(ABORT, 'This attribute cannot be used for inventory items')
-   END;
-END;
-CREATE TRIGGER validate_product_attribute_constraints
-   BEFORE INSERT ON product_attribute_values
-   WHEN (SELECT product_type_ids FROM attributes WHERE id = NEW.attribute_id) IS NOT NULL 
-   OR (SELECT product_group_ids FROM attributes WHERE id = NEW.attribute_id) IS NOT NULL
-BEGIN
-   SELECT CASE
-       WHEN (SELECT product_type_ids FROM attributes WHERE id = NEW.attribute_id) IS NOT NULL
-       AND NOT EXISTS (
-           SELECT 1 FROM products p
-           WHERE p.id = NEW.product_id
-           AND p.product_type_id IN (
-               SELECT value FROM json_each(
-                   (SELECT product_type_ids FROM attributes WHERE id = NEW.attribute_id)
-               )
-           )
-       )
-       THEN RAISE(ABORT, 'This attribute is not allowed for this product type')
-       
-       WHEN (SELECT product_group_ids FROM attributes WHERE id = NEW.attribute_id) IS NOT NULL
-       AND NOT EXISTS (
-           SELECT 1 FROM products p
-           WHERE p.id = NEW.product_id
-           AND p.product_group_id IN (
-               SELECT value FROM json_each(
-                   (SELECT product_group_ids FROM attributes WHERE id = NEW.attribute_id)
-               )
-           )
-       )
-       THEN RAISE(ABORT, 'This attribute is not allowed for this product group')
-   END;
-END;
-CREATE TRIGGER update_attributes_timestamp 
-   AFTER UPDATE ON attributes
-BEGIN
-   UPDATE attributes SET updated_at = CURRENT_TIMESTAMP
-   WHERE id = NEW.id;
-END;
 COMMIT;
