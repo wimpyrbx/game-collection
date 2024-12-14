@@ -3,16 +3,16 @@ import { Link, Outlet } from 'react-router-dom';
 export default function Layout() {
   return (
     <div className="h-screen flex flex-col">
-      {/* Top bar - now at the top level */}
-      <div className="h-16 bgTopBar flex items-center justify-between px-6 w-full">
+      {/* Top bar - fixed height */}
+      <div className="h-16 min-h-[4rem] flex-none bgTopBar flex items-center justify-between px-6 w-full">
         <div className="text-gray-100">Logo</div>
         <div className="text-gray-100">Stats: 123 Games</div>
       </div>
 
       {/* Content area - flex row for sidebar and main */}
-      <div className="flex flex-1">
+      <div className="flex flex-1 overflow-hidden">
         {/* Sidebar */}
-        <div className="w-64 bgSidebar text-gray-100 flex-shrink-0">
+        <div className="w-64 bgSidebar text-gray-100 flex-shrink-0 overflow-y-auto">
           <div className="p-4">
             <h1 className="text-xl font-bold mb-8">Game Collection</h1>
             <nav>
@@ -48,7 +48,7 @@ export default function Layout() {
         </div>
 
         {/* Main content */}
-        <div className="flex-1 p-6 bgBody overflow-auto">
+        <div className="flex-1 p-6 bgBody overflow-y-auto">
           <Outlet />
         </div>
       </div>

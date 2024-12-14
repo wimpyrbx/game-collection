@@ -1,16 +1,30 @@
 import React, { useState } from 'react'
-import { FaDragon, FaArchive, FaEgg, FaEllo, FaExpand, FaDog, FaHotdog, FaAlgolia, FaBullseye, FaCarCrash, FaChessKing, FaChessBishop, FaChessPawn } from 'react-icons/fa'
-import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderBigNumber } from '../components/ui'
-import { AdminTableSection } from '../components/ui/AdminTableSection'
+import { FaDragon, FaArchive, FaEgg, FaEllo, FaExpand, FaDog, FaHotdog, FaAlgolia, FaBullseye, FaCarCrash, FaChessKing, FaChessBishop, FaChessPawn, FaDiceD20, FaTable, FaTabletAlt, FaListUl, FaThList, FaRegListAlt, FaToolbox, FaStroopwafel, FaDiceD6 } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
+import { useAdminPagination, useAdminSearch } from '../hooks'
+import * as UI from '../components/ui'
 import type { Mini } from '../types/mini'
+import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
 
-const MiniatureOverview = () => {
-  const { minis, loading, error } = useMinis()
+const getMiniImagePath = (id: number, type: 'thumb' | 'original' = 'original') => {
+  const idStr = id.toString()
+  const x = idStr[0]
+  const y = idStr.length > 1 ? idStr[1] : '0'
+  return `/public/images/miniatures/${type}/${x}/${y}/${id}.webp`
+}
+
+export default function MiniatureOverview() {
   const [selectedMini, setSelectedMini] = useState<Mini | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
+  const miniSearch = useAdminSearch({ searchFields: ['name'] })
   const [currentPage, setCurrentPage] = useState(1)
-  
+  const itemsPerPage = 10
+
+  const { minis, loading, error, totalMinis } = useMinis(
+    currentPage,
+    itemsPerPage,
+    miniSearch.searchTerm
+  )
+
   const getItemColumns = (mini: Mini) => {
     const types = mini.types?.map(t => {
       const categories = t.type.categories?.map(c => c.category.name).join(', ') || 'No categories'
@@ -25,8 +39,26 @@ const MiniatureOverview = () => {
     const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
     const quantity = mini.quantity || 0
 
+    const imagePath = getMiniImagePath(mini.id)
+    const thumbPath = getMiniImagePath(mini.id, 'thumb')
+
     return [
-      mini.name,
+      <div key="image" className="flex items-center gap-4">
+        <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-800 flex items-center justify-center">
+          <img
+            src={thumbPath}
+            alt={mini.name}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.onerror = null
+              e.currentTarget.style.display = 'none'
+              e.currentTarget.nextElementSibling?.classList.remove('hidden')
+            }}
+          />
+          <FaDiceD20 className="absolute w-6 h-6 text-gray-600 hidden" />
+        </div>
+        <span>{mini.name}</span>
+      </div>,
       types,
       company,
       productLine,
@@ -71,32 +103,12 @@ const MiniatureOverview = () => {
 
   return (
     <>
-      <PageHeader bgColor="bg-cyan-900">
-        <PageHeaderIcon
-          icon={FaDragon}
-          className="text-white"
-          bgClassName="bg-cyan-700"
-        />
-          <PageHeaderText>Miniature Overview</PageHeaderText>
-          <PageHeaderSubText>Manage your miniature collection</PageHeaderSubText>
-        <PageHeaderBigNumber
-          icon={FaChessBishop}
-          number="12"
-          text="Miniatures"
-        />
-        <PageHeaderBigNumber
-          icon={FaChessPawn}
-          number="25"
-          text="Miniatures in Total"
-        />
-      </PageHeader>
-      
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12">
-          <AdminTableSection
+          <UI.AdminTableSection
             title="Miniatures"
-            icon={FaDragon}
-            iconColor="text-purple-600"
+            icon={FaDiceD6}
+            iconColor="text-white"
             items={minis}
             selectedItem={selectedMini}
             onSelect={setSelectedMini}
@@ -107,15 +119,16 @@ const MiniatureOverview = () => {
             addButtonLabel="+ Add Miniature"
             emptyMessage="No miniatures found"
             headerSubText="Manage your miniature collection"
+            headerItalicText='Add, edit, and delete miniatures from your collection'
             searchProps={{
-              value: searchTerm,
-              onChange: setSearchTerm,
+              value: miniSearch.searchTerm,
+              onChange: miniSearch.handleSearch,
               placeholder: "Search miniatures..."
             }}
             pagination={{
               currentPage,
-              totalItems: minis.length,
-              itemsPerPage: 10,
+              totalItems: totalMinis || 0,
+              itemsPerPage,
               onPageChange: setCurrentPage
             }}
             columnHeaders={columnHeaders}
@@ -126,6 +139,4 @@ const MiniatureOverview = () => {
       </div>
     </>
   )
-}
-
-export default MiniatureOverview 
+} 

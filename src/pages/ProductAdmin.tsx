@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useProductAdmin } from '../hooks/useProductAdmin'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
-import { ProductLineModal, ProductSetModal, ProductCompanyModal } from '../components/productadmin'
-import { FaBuilding, FaList, FaListAlt, FaBox, FaArchive } from 'react-icons/fa'
 import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { FaBuilding, FaList, FaListAlt, FaBox, FaArchive } from 'react-icons/fa'
+
+import { useProductAdmin } from '../hooks/useProductAdmin'
+import { ProductLineModal, ProductSetModal, ProductCompanyModal } from '../components/productadmin'
 import { supabase } from '../lib/supabase'
 
 interface Company {

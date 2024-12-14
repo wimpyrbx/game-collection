@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
+import * as UI from '../components/ui'
+import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { FaArchive, FaSchlix, FaShareAltSquare, FaUsersCog, FaExclamationTriangle } from 'react-icons/fa'
+
+import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 import type { MiniType, MiniCategory } from '../lib/supabase'
 import AddTypeModal from '../components/AddTypeModal'
 import EditTypeModal from '../components/EditTypeModal'
@@ -9,9 +13,6 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal'
 import DeleteTypeConfirmationModal from '../components/DeleteTypeConfirmationModal'
 import { CategoryModal } from '../components/typecategoryadmin/CategoryModal'
 import { DeleteConfirmModal } from '../components/ui'
-import * as UI from '../components/ui'
-import { FaArchive, FaSchlix, FaShareAltSquare, FaUsersCog, FaExclamationTriangle } from 'react-icons/fa'
-import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
 
 export default function TypeCategoryAdmin() {
   // Essential state
