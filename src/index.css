@@ -4,6 +4,35 @@
 
 :root {
   --focus-color: #556677;
+  /* Table Theme */
+  --color-table-border: theme(colors.gray.200);
+  --color-table-header: theme(colors.gray.50);
+  --color-table-header-text: theme(colors.gray.500);
+  --color-table-body: theme(colors.white);
+  --color-table-text: theme(colors.gray.900);
+  --color-table-row-hover: theme(colors.gray.50);
+  --color-table-row-selected: theme(colors.blue.50);
+  --color-table-action-edit: theme(colors.indigo.600);
+  --color-table-action-edit-hover: theme(colors.indigo.900);
+  --color-table-action-delete: theme(colors.red.600);
+  --color-table-action-delete-hover: theme(colors.red.900);
+}
+
+.dark {
+  /* ... existing dark theme variables ... */
+
+  /* Table Theme - Dark */
+  --color-table-border: theme(colors.gray.700);
+  --color-table-header: theme(colors.gray.800);
+  --color-table-header-text: theme(colors.gray.300);
+  --color-table-body: theme(colors.gray.900);
+  --color-table-text: theme(colors.gray.100);
+  --color-table-row-hover: theme(colors.gray.800);
+  --color-table-row-selected: theme(colors.blue.900);
+  --color-table-action-edit: theme(colors.indigo.400);
+  --color-table-action-edit-hover: theme(colors.indigo.300);
+  --color-table-action-delete: theme(colors.red.400);
+  --color-table-action-delete-hover: theme(colors.red.300);
 }
 
 /* Global styles */
@@ -118,5 +147,10 @@
   .bgTopBar {
     background-color: #1F2228;
     border-bottom: 1px solid #333333 !important;
+  }
+
+  .bgPageHeader {
+    background-color: #334455;
+    color: #eeeeee;
   }
 }

@@ -4,7 +4,9 @@ import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
 import { ProductLineModal, ProductSetModal, ProductCompanyModal } from '../components/productadmin'
-import { FaBuilding, FaList, FaListAlt } from 'react-icons/fa'
+import { FaBuilding, FaList, FaListAlt, FaBox, FaArchive } from 'react-icons/fa'
+import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { supabase } from '../lib/supabase'
 
 interface Company {
   id: number
@@ -34,6 +36,11 @@ export default function ProductAdmin() {
       lines: number
       sets: number
     }
+    overallTotals: {
+      companies: number
+      lines: number
+      sets: number
+    }
     selected: {
       company: Company | null
       line: ProductLine | null
@@ -51,6 +58,7 @@ export default function ProductAdmin() {
     productLines: [],
     productSets: [],
     totals: { companies: 0, lines: 0, sets: 0 },
+    overallTotals: { companies: 0, lines: 0, sets: 0 },
     selected: { company: null, line: null, set: null },
     modal: { type: null, isOpen: false }
   })
@@ -91,9 +99,9 @@ export default function ProductAdmin() {
   const { showSuccess, showError } = useNotifications()
 
   // Generic refresh function
-  const refresh = async (type: 'companies' | 'lines' | 'sets', params?: any) => {
+  const refresh = async (type: 'companies' | 'lines' | 'sets') => {
     try {
-      let result
+      let result: { error?: any; data: any; count: any }
       switch (type) {
         case 'companies':
           result = await loading.withLoading(
@@ -147,12 +155,43 @@ export default function ProductAdmin() {
           }))
           break
       }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        showError(`Failed to load ${type}: ${error.message}`)
+      } else {
+        showError(`Failed to load ${type}: Unknown error occurred`)
+      }
+    }
+  }
+
+  // Load overall totals
+  const loadOverallTotals = async () => {
+    try {
+      const [companiesResult, linesResult, setsResult] = await Promise.all([
+        supabase.from('product_companies').select('*', { count: 'exact', head: true }),
+        supabase.from('product_lines').select('*', { count: 'exact', head: true }),
+        supabase.from('product_sets').select('*', { count: 'exact', head: true })
+      ])
+
+      setState(prev => ({
+        ...prev,
+        overallTotals: {
+          companies: companiesResult.count || 0,
+          lines: linesResult.count || 0,
+          sets: setsResult.count || 0
+        }
+      }))
     } catch (error) {
-      showError(`Failed to load ${type}: ${error.message}`)
+      console.error('Error loading overall totals:', error)
+      showError('Failed to load overall totals')
     }
   }
 
   // Load data effects
+  useEffect(() => {
+    loadOverallTotals()
+  }, [])
+
   useEffect(() => {
     refresh('companies')
   }, [companyPagination.currentPage, companySearch.searchTerm])
@@ -191,6 +230,7 @@ export default function ProductAdmin() {
           if (result.error) throw new Error(result.error)
           showSuccess('Company added successfully')
           refresh('companies')
+          loadOverallTotals()
           break
 
         case 'editCompany':
@@ -211,6 +251,7 @@ export default function ProductAdmin() {
             }))
           }
           refresh('companies')
+          loadOverallTotals()
           break
 
         case 'addLine':
@@ -253,6 +294,7 @@ export default function ProductAdmin() {
           if (result.error) throw new Error(result.error)
           showSuccess('Product set added successfully')
           refresh('sets')
+          loadOverallTotals()
           break
 
         case 'editSet':
@@ -273,178 +315,214 @@ export default function ProductAdmin() {
             }))
           }
           refresh('sets')
+          loadOverallTotals()
           break
       }
       setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))
-    } catch (error) {
-      showError(error.message)
+    } catch (error: unknown) {
+      showError(error instanceof Error ? error.message : String(error))
     }
   }
 
   return (
-    <div className="grid grid-cols-12 gap-4">
-      {/* Companies Section */}
-      <div className="col-span-4">
-        <UI.AdminTableSection
-          title="Companies"
-          icon={FaBuilding}
-          items={state.companies}
-          selectedItem={state.selected.company}
-          onSelect={(company) => setState(prev => ({
-            ...prev,
-            selected: { ...prev.selected, company }
-          }))}
-          onAdd={() => setState(prev => ({
-            ...prev,
-            modal: { type: 'addCompany', isOpen: true }
-          }))}
-          onEdit={(company) => setState(prev => ({
-            ...prev,
-            modal: { type: 'editCompany', isOpen: true, data: company }
-          }))}
-          onDelete={(company) => setState(prev => ({
-            ...prev,
-            modal: { type: 'deleteCompany', isOpen: true, data: company }
-          }))}
-          loading={loading.isLoading}
-          searchProps={{
-            ...companySearch.searchProps,
-            placeholder: "Search companies..."
-          }}
-          pagination={{
-            currentPage: companyPagination.currentPage,
-            totalItems: state.totals.companies,
-            itemsPerPage: companyPagination.itemsPerPage,
-            onPageChange: companyPagination.handlePageChange
-          }}
-          getItemName={(item) => item.name}
+    <>
+      <PageHeader bgColor="bg-cyan-900">
+            <PageHeaderIcon
+              icon={FaBuilding}
+              className="text-white"
+              bgClassName="bg-cyan-700"
+            />
+            <PageHeaderTextGroup> 
+              <PageHeaderText>Product Management</PageHeaderText>
+              <PageHeaderSubText>Manage your product companies, lines and sets</PageHeaderSubText>
+            </PageHeaderTextGroup>
+              <PageHeaderBigNumber
+                icon={FaArchive}
+                number={state.overallTotals.companies}
+                text="Total Companies"
+              />
+              <PageHeaderBigNumber
+                icon={FaList}
+                number={state.overallTotals.lines}
+                text="Total Product Lines"
+              />
+              <PageHeaderBigNumber
+                icon={FaListAlt}
+                number={state.overallTotals.sets}
+                text="Total Product Sets"
+              />
+          
+      </PageHeader>
+
+      <div className="grid grid-cols-12 gap-4">
+        {/* Companies Section */}
+        <div className="col-span-4">
+          <UI.AdminTableSection
+            title="Companies"
+            icon={FaBuilding}
+            iconColor="text-yellow-600"
+            items={state.companies}
+            headerSubText="Manage companies"
+            headerItalicText="* This section is for managing companies"
+            selectedItem={state.selected.company}
+            onSelect={(company) => setState(prev => ({
+              ...prev,
+              selected: { ...prev.selected, company }
+            }))}
+            onAdd={() => setState(prev => ({
+              ...prev,
+              modal: { type: 'addCompany', isOpen: true }
+            }))}
+            onEdit={(company) => setState(prev => ({
+              ...prev,
+              modal: { type: 'editCompany', isOpen: true, data: company }
+            }))}
+            onDelete={(company) => setState(prev => ({
+              ...prev,
+              modal: { type: 'deleteCompany', isOpen: true, data: company }
+            }))}
+            loading={loading.isLoading}
+            searchProps={{
+              ...companySearch.searchProps,
+              placeholder: "Search companies..."
+            }}
+            pagination={{
+              currentPage: companyPagination.currentPage,
+              totalItems: state.totals.companies,
+              itemsPerPage: companyPagination.itemsPerPage,
+              onPageChange: companyPagination.handlePageChange
+            }}
+            getItemName={(item) => item.name}
+          />
+        </div>
+
+        {/* Product Lines Section */}
+        <div className="col-span-4">
+          <UI.AdminTableSection
+            title="Product Lines"
+            icon={FaList}
+            iconColor="text-cyan-600"
+            items={state.productLines}
+            selectedItem={state.selected.line}
+            onSelect={(line) => setState(prev => ({
+              ...prev,
+              selected: { ...prev.selected, line }
+            }))}
+            onAdd={() => setState(prev => ({
+              ...prev,
+              modal: { type: 'addLine', isOpen: true }
+            }))}
+            onEdit={(line) => setState(prev => ({
+              ...prev,
+              modal: { type: 'editLine', isOpen: true, data: line }
+            }))}
+            onDelete={(line) => setState(prev => ({
+              ...prev,
+              modal: { type: 'deleteLine', isOpen: true, data: line }
+            }))}
+            loading={loading.isLoading}
+            addButtonDisabled={!state.selected.company}
+            headerSubText={`Selected company: ${state.selected.company?.name || 'None'}`}
+            headerItalicText={!state.selected.company 
+              ? "* Select a company to manage its product lines" 
+              : `${state.productLines.length} product line${state.productLines.length === 1 ? '' : 's'}`
+            }
+            emptyMessage={!state.selected.company ? "* Select a company to view product lines" : "No product lines found"}
+            searchProps={{
+              ...lineSearch.searchProps,
+              placeholder: "Search product lines..."
+            }}
+            pagination={{
+              currentPage: linePagination.currentPage,
+              totalItems: state.totals.lines,
+              itemsPerPage: linePagination.itemsPerPage,
+              onPageChange: linePagination.handlePageChange
+            }}
+            getItemName={(item) => item.name}
+          />
+        </div>
+
+        {/* Product Sets Section */}
+        <div className="col-span-4">
+          <UI.AdminTableSection
+            title="Product Sets"
+            icon={FaListAlt}
+            iconColor="text-white"
+            items={state.productSets}
+            selectedItem={state.selected.set}
+            onSelect={(set) => setState(prev => ({
+              ...prev,
+              selected: { ...prev.selected, set }
+            }))}
+            onAdd={() => setState(prev => ({
+              ...prev,
+              modal: { type: 'addSet', isOpen: true }
+            }))}
+            onEdit={(set) => setState(prev => ({
+              ...prev,
+              modal: { type: 'editSet', isOpen: true, data: set }
+            }))}
+            onDelete={(set) => setState(prev => ({
+              ...prev,
+              modal: { type: 'deleteSet', isOpen: true, data: set }
+            }))}
+            loading={loading.isLoading}
+            addButtonDisabled={!state.selected.line}
+            headerSubText={`Selected line: ${state.selected.line?.name || 'None'}`}
+            headerItalicText={!state.selected.line 
+              ? "Select a product line to manage its sets" 
+              : `${state.productSets.length} set${state.productSets.length === 1 ? '' : 's'}`
+            }
+            emptyMessage={!state.selected.line ? "Select a product line to view sets" : "No product sets found"}
+            searchProps={{
+              ...setSearch.searchProps,
+              placeholder: "Search product sets..."
+            }}
+            pagination={{
+              currentPage: setPagination.currentPage,
+              totalItems: state.totals.sets,
+              itemsPerPage: setPagination.itemsPerPage,
+              onPageChange: setPagination.handlePageChange
+            }}
+            getItemName={(item) => item.name}
+          />
+        </div>
+
+        {/* Modals */}
+        <ProductCompanyModal
+          isOpen={['addCompany', 'editCompany'].includes(state.modal.type || '')}
+          onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+          onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
+          company={state.modal.type === 'editCompany' ? state.modal.data : null}
+          isLoading={loading.isLoading}
+        />
+
+        <ProductLineModal
+          isOpen={['addLine', 'editLine'].includes(state.modal.type || '')}
+          onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+          onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
+          productLine={state.modal.type === 'editLine' ? state.modal.data : null}
+          isLoading={loading.isLoading}
+        />
+
+        <ProductSetModal
+          isOpen={['addSet', 'editSet'].includes(state.modal.type || '')}
+          onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+          onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
+          productSet={state.modal.type === 'editSet' ? state.modal.data : null}
+          isLoading={loading.isLoading}
+        />
+
+        <UI.DeleteConfirmModal
+          isOpen={state.modal.type?.startsWith('delete') || false}
+          onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
+          onConfirm={() => handleModalAction(state.modal.type || '')}
+          title={`Delete ${state.modal.type?.replace('delete', '')}`}
+          message={`Are you sure you want to delete this ${state.modal.type?.replace('delete', '').toLowerCase()}?`}
+          itemName={state.modal.data?.name || ''}
+          isLoading={loading.isLoading}
         />
       </div>
-
-      {/* Product Lines Section */}
-      <div className="col-span-4">
-        <UI.AdminTableSection
-          title="Product Lines"
-          icon={FaList}
-          items={state.productLines}
-          selectedItem={state.selected.line}
-          onSelect={(line) => setState(prev => ({
-            ...prev,
-            selected: { ...prev.selected, line }
-          }))}
-          onAdd={() => setState(prev => ({
-            ...prev,
-            modal: { type: 'addLine', isOpen: true }
-          }))}
-          onEdit={(line) => setState(prev => ({
-            ...prev,
-            modal: { type: 'editLine', isOpen: true, data: line }
-          }))}
-          onDelete={(line) => setState(prev => ({
-            ...prev,
-            modal: { type: 'deleteLine', isOpen: true, data: line }
-          }))}
-          loading={loading.isLoading}
-          addButtonDisabled={!state.selected.company}
-          headerSubText={`Selected company: ${state.selected.company?.name || 'None'}`}
-          headerItalicText={!state.selected.company 
-            ? "Select a company to manage its product lines" 
-            : `${state.productLines.length} product line${state.productLines.length === 1 ? '' : 's'}`
-          }
-          emptyMessage={!state.selected.company ? "Select a company to view product lines" : "No product lines found"}
-          searchProps={{
-            ...lineSearch.searchProps,
-            placeholder: "Search product lines..."
-          }}
-          pagination={{
-            currentPage: linePagination.currentPage,
-            totalItems: state.totals.lines,
-            itemsPerPage: linePagination.itemsPerPage,
-            onPageChange: linePagination.handlePageChange
-          }}
-          getItemName={(item) => item.name}
-        />
-      </div>
-
-      {/* Product Sets Section */}
-      <div className="col-span-4">
-        <UI.AdminTableSection
-          title="Product Sets"
-          icon={FaListAlt}
-          items={state.productSets}
-          selectedItem={state.selected.set}
-          onSelect={(set) => setState(prev => ({
-            ...prev,
-            selected: { ...prev.selected, set }
-          }))}
-          onAdd={() => setState(prev => ({
-            ...prev,
-            modal: { type: 'addSet', isOpen: true }
-          }))}
-          onEdit={(set) => setState(prev => ({
-            ...prev,
-            modal: { type: 'editSet', isOpen: true, data: set }
-          }))}
-          onDelete={(set) => setState(prev => ({
-            ...prev,
-            modal: { type: 'deleteSet', isOpen: true, data: set }
-          }))}
-          loading={loading.isLoading}
-          addButtonDisabled={!state.selected.line}
-          headerSubText={`Selected line: ${state.selected.line?.name || 'None'}`}
-          headerItalicText={!state.selected.line 
-            ? "Select a product line to manage its sets" 
-            : `${state.productSets.length} set${state.productSets.length === 1 ? '' : 's'}`
-          }
-          emptyMessage={!state.selected.line ? "Select a product line to view sets" : "No product sets found"}
-          searchProps={{
-            ...setSearch.searchProps,
-            placeholder: "Search product sets..."
-          }}
-          pagination={{
-            currentPage: setPagination.currentPage,
-            totalItems: state.totals.sets,
-            itemsPerPage: setPagination.itemsPerPage,
-            onPageChange: setPagination.handlePageChange
-          }}
-          getItemName={(item) => item.name}
-        />
-      </div>
-
-      {/* Modals */}
-      <ProductCompanyModal
-        isOpen={['addCompany', 'editCompany'].includes(state.modal.type || '')}
-        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
-        onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
-        company={state.modal.type === 'editCompany' ? state.modal.data : null}
-        isLoading={loading.isLoading}
-      />
-
-      <ProductLineModal
-        isOpen={['addLine', 'editLine'].includes(state.modal.type || '')}
-        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
-        onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
-        productLine={state.modal.type === 'editLine' ? state.modal.data : null}
-        isLoading={loading.isLoading}
-      />
-
-      <ProductSetModal
-        isOpen={['addSet', 'editSet'].includes(state.modal.type || '')}
-        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
-        onSubmit={(name) => handleModalAction(state.modal.type || '', name)}
-        productSet={state.modal.type === 'editSet' ? state.modal.data : null}
-        isLoading={loading.isLoading}
-      />
-
-      <UI.DeleteConfirmModal
-        isOpen={state.modal.type?.startsWith('delete') || false}
-        onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
-        onConfirm={() => handleModalAction(state.modal.type || '')}
-        title={`Delete ${state.modal.type?.replace('delete', '')}`}
-        message={`Are you sure you want to delete this ${state.modal.type?.replace('delete', '').toLowerCase()}?`}
-        itemName={state.modal.data?.name || ''}
-        isLoading={loading.isLoading}
-      />
-    </div>
+    </>
   )
 }

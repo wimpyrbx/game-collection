@@ -4,6 +4,7 @@ import Home from './pages/Home'
 import Testing from './pages/Testing'
 import TypeCategoryAdmin from './pages/TypeCategoryAdmin'
 import ProductAdmin from './pages/ProductAdmin'
+import MiniatureOverview from './pages/MiniatureOverview'
 
 export function AppRoutes() {
   return (
@@ -13,6 +14,7 @@ export function AppRoutes() {
         <Route path="testing" element={<Testing />} />
         <Route path="type-category-admin" element={<TypeCategoryAdmin />} />
         <Route path="product-admin" element={<ProductAdmin />} />
+        <Route path="/miniature-overview" element={<MiniatureOverview />} />
       </Route>
     </Routes>
   )

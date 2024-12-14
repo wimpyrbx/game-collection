@@ -21,6 +21,7 @@ interface AdminTableSectionProps<T> {
     value: string
     onChange: (value: string) => void
     placeholder?: string
+    rightElement?: React.ReactNode
   }
   pagination?: {
     currentPage: number
@@ -28,7 +29,10 @@ interface AdminTableSectionProps<T> {
     itemsPerPage: number
     onPageChange: (page: number) => void
   }
-  getItemName: (item: T) => string
+  useTable?: boolean
+  columnHeaders?: string[]
+  getItemColumns?: (item: T) => string[]
+  getItemName?: (item: T) => string
 }
 
 export function AdminTableSection<T extends { id: number }>({
@@ -49,6 +53,9 @@ export function AdminTableSection<T extends { id: number }>({
   headerItalicText,
   searchProps,
   pagination,
+  useTable = false,
+  columnHeaders = [],
+  getItemColumns,
   getItemName
 }: AdminTableSectionProps<T>) {
   return (
@@ -101,16 +108,78 @@ export function AdminTableSection<T extends { id: number }>({
             </div>
           )}
 
-          <UI.TableHeader title={title} />
-
           <div className={loading ? 'opacity-50 pointer-events-none' : ''}>
             {items.length === 0 ? (
               <UI.EmptyTableState icon={<Icon />} message={emptyMessage} />
+            ) : useTable && columnHeaders.length > 0 && getItemColumns ? (
+              <div className="overflow-x-auto">
+                <table className="w-full divide-y divide-[#333333]">
+                  <thead>
+                    <tr>
+                      {columnHeaders.map((header, index) => (
+                        <th
+                          key={index}
+                          className="px-6 py-3 bgTableHeader text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                        >
+                          {header}
+                        </th>
+                      ))}
+                      <th className="px-6 py-3 bgTableHeader" />
+                    </tr>
+                  </thead>
+                  <tbody className="bgCardBody divide-y divide-[#333333]">
+                    {items.map((item) => (
+                      <tr
+                        key={item.id}
+                        className={`bgRow hover:bgRowHover transition-colors ${
+                          selectedItem?.id === item.id ? 'bgSelected' : ''
+                        } cursor-pointer`}
+                        onClick={onSelect ? () => onSelect(item) : undefined}
+                      >
+                        {getItemColumns(item).map((column, index) => (
+                          <td
+                            key={index}
+                            className="px-6 py-4 text-sm text-gray-300"
+                          >
+                            {column}
+                          </td>
+                        ))}
+                        <td className="px-6 py-4 text-right text-sm font-medium">
+                          <div className="flex justify-end gap-2">
+                            {onEdit && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onEdit(item)
+                                }}
+                                className="text-blue-400 hover:text-blue-300"
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {onDelete && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDelete(item)
+                                }}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             ) : (
               items.map((item) => (
                 <UI.TableRow
                   key={item.id}
-                  title={getItemName(item)}
+                  title={getItemName?.(item) || ''}
                   isSelected={selectedItem?.id === item.id}
                   onSelect={onSelect ? () => onSelect(item) : undefined}
                   onEdit={onEdit ? () => onEdit(item) : undefined}

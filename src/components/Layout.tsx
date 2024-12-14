@@ -37,6 +37,11 @@ export default function Layout() {
                     Product Admin
                   </Link>
                 </li>
+                <li>
+                  <Link to="/miniature-overview" className="block p-2 hover:bg-gray-700 rounded">
+                    Miniature Overview
+                  </Link>
+                </li>
               </ul>
             </nav>
           </div>

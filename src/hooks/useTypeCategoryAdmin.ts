@@ -42,7 +42,20 @@ export function useTypeCategoryAdmin() {
       if (cats) setCategories(cats)
       if (count !== null) setTotalCount(count)
 
-      return { data: types || [], count }
+      // Get count of types without categories
+      const { count: typesWithoutCategories } = await supabase
+        .from('mini_types')
+        .select('id, type_to_categories(*)', { 
+          count: 'exact',
+          head: true 
+        })
+        .is('type_to_categories', null);
+
+      return { 
+        data: types || [], 
+        count, 
+        typesWithoutCategories: typesWithoutCategories || 0
+      }
     } catch (err) {
       console.error('Error loading data:', err)
       const errorMessage = err instanceof Error ? err.message : 'An error occurred'
@@ -52,12 +65,17 @@ export function useTypeCategoryAdmin() {
   }
 
   async function loadTypeCategoryIds(typeId: number) {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('type_to_categories')
       .select('category_id')
       .eq('type_id', typeId)
     
+    if (error) {
+      return { error: error.message }
+    }
+    
     setSelectedTypeCategories(data?.map(item => item.category_id) || [])
+    return { error: null }
   }
 
   async function addType(name: string) {
@@ -228,6 +246,146 @@ export function useTypeCategoryAdmin() {
     return currentPaginationState
   }
 
+  // Category CRUD operations
+  const loadCategories = async (
+    offset: number,
+    limit: number,
+    searchTerm?: string
+  ) => {
+    try {
+      let query = supabase
+        .from('mini_categories')
+        .select('*', { count: 'exact' })
+
+      if (searchTerm) {
+        query = query.ilike('name', `%${searchTerm}%`)
+      }
+
+      const { data, error, count } = await query
+        .range(offset, offset + limit - 1)
+        .order('name')
+
+      return { data, error, count }
+    } catch (error) {
+      return { data: null, error, count: 0 }
+    }
+  }
+
+  const addCategory = async (name: string) => {
+    try {
+      if (!name || !name.trim()) {
+        return { error: { message: 'Category name is required' } }
+      }
+
+      // First check if name already exists
+      const { data: existingCategory, error: checkError } = await supabase
+        .from('mini_categories')
+        .select('id')
+        .ilike('name', name.trim())
+        .maybeSingle()
+
+      if (checkError) {
+        console.error('Error checking existing category:', checkError)
+        return { error: checkError }
+      }
+
+      if (existingCategory) {
+        return { error: { message: 'A category with this name already exists' } }
+      }
+
+      const { data, error } = await supabase
+        .from('mini_categories')
+        .insert({ name: name.trim() })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error adding category:', error)
+        return { error }
+      }
+
+      return { data }
+    } catch (error) {
+      console.error('Unexpected error in addCategory:', error)
+      return { error: { message: 'An unexpected error occurred' } }
+    }
+  }
+
+  const editCategory = async (id: number, name: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('mini_categories')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single()
+
+      return { data, error }
+    } catch (error) {
+      return { data: null, error }
+    }
+  }
+
+  const checkCategoryUsage = async (categoryId: number) => {
+    try {
+      // Check if category is used in type_to_categories
+      const { data: typeUsage, error: typeError } = await supabase
+        .from('type_to_categories')
+        .select('type_id')
+        .eq('category_id', categoryId)
+        .limit(1)
+
+      if (typeError) {
+        console.error('Error checking category usage:', typeError)
+        return { error: typeError, canDelete: false }
+      }
+
+      return {
+        canDelete: !typeUsage?.length,
+        inUseBy: {
+          types: typeUsage?.length > 0
+        }
+      }
+    } catch (error) {
+      console.error('Unexpected error in checkCategoryUsage:', error)
+      return { error, canDelete: false }
+    }
+  }
+
+  const deleteCategory = async (id: number) => {
+    try {
+      // First check if category can be deleted
+      const { canDelete, error: checkError, inUseBy } = await checkCategoryUsage(id)
+      
+      if (checkError) {
+        return { error: checkError }
+      }
+
+      if (!canDelete) {
+        return { 
+          error: { 
+            message: `Cannot delete category because it is in use by ${inUseBy?.types ? 'types' : ''}`
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('mini_categories')
+        .delete()
+        .eq('id', id)
+
+      if (error) {
+        console.error('Error deleting category:', error)
+        return { error }
+      }
+
+      return { error: null }
+    } catch (error) {
+      console.error('Unexpected error in deleteCategory:', error)
+      return { error: { message: 'An unexpected error occurred while deleting the category' } }
+    }
+  }
+
   return {
     miniTypes,
     categories,
@@ -240,6 +398,11 @@ export function useTypeCategoryAdmin() {
     deleteType,
     loadTypeCategoryIds,
     updateTypeCategories,
-    checkTypeUsage
+    checkTypeUsage,
+    loadCategories,
+    addCategory,
+    editCategory,
+    deleteCategory,
+    checkCategoryUsage
   }
 } 
