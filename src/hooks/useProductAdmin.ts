@@ -2,23 +2,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 
-interface Company {
-  id: number
-  name: string
-}
-
-interface ProductLine {
-  id: number
-  name: string
-  company_id: number
-}
-
-interface ProductSet {
-  id: number
-  name: string
-  product_line_id: number
-}
-
 export function useProductAdmin() {
   const [error, setError] = useState<string>('')
 
@@ -235,7 +218,7 @@ export function useProductAdmin() {
   }
 
   const deleteCompany = async (id: number) => {
-    const { canDelete, inUseBy, error: checkError } = await checkCompanyUsage(id)
+    const { canDelete, error: checkError } = await checkCompanyUsage(id)
     
     if (checkError) {
       setError(checkError)
@@ -262,7 +245,7 @@ export function useProductAdmin() {
   }
 
   const deleteProductLine = async (id: number) => {
-    const { canDelete, inUseBy, error: checkError } = await checkLineUsage(id)
+    const { canDelete, error: checkError } = await checkLineUsage(id)
     
     if (checkError) {
       setError(checkError)
@@ -289,7 +272,7 @@ export function useProductAdmin() {
   }
 
   const deleteProductSet = async (id: number) => {
-    const { canDelete, inUseBy, error: checkError } = await checkSetUsage(id)
+    const { canDelete, error: checkError } = await checkSetUsage(id)
     
     if (checkError) {
       setError(checkError)

@@ -10,12 +10,19 @@ export interface Mini {
   base_size_id: number
   product_set_id: number | null
   types?: {
-    id: number
-    name: string
-    categories: {
+    type: {
       id: number
       name: string
+      categories: {
+        category: {
+          id: number
+          name: string
+        }
+      }[]
     }[]
+    proxy_type: any
+    mini_id: number
+    type_id: number
   }[]
   painted_by?: {
     id: number
@@ -25,16 +32,29 @@ export interface Mini {
     id: number
     base_size_name: string
   }
-  product_set?: {
-    id: number
+  product_sets?: {
     name: string
-    product_line: {
-      id: number
+    product_lines?: {
       name: string
-      company: {
-        id: number
+      company?: {
         name: string
       }
     }
   }
+}
+
+export interface MiniType {
+  id: number
+  name: string
+  categories?: {
+    category: {
+      id: number
+      name: string
+    }
+  }[]
+}
+
+export interface MiniCategory {
+  id: number
+  name: string
 } 

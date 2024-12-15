@@ -103,7 +103,6 @@ export default function AdminTableSection<T extends { id: number }>({
                 onChange={(e) => searchProps.onChange(e.target.value)}
                 placeholder={searchProps.placeholder}
                 className="w-full"
-                disabled={loading}
               />
             </div>
           )}

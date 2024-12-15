@@ -39,7 +39,12 @@ export function useMinis(
           description,
           quantity,
           location,
+          created_at,
+          updated_at,
           types:mini_to_types(
+            mini_id,
+            type_id,
+            proxy_type,
             type:mini_types(
               id,
               name,
@@ -83,7 +88,25 @@ export function useMinis(
 
       if (error) throw error
 
-      return data
+      return data?.map(item => ({
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        location: item.location,
+        quantity: item.quantity,
+        created_at: item.created_at,
+        updated_at: item.updated_at,
+        painted_by_id: item.painted_by?.[0]?.id || 0,
+        base_size_id: item.base_sizes?.[0]?.id || 0,
+        product_set_id: item.product_sets?.[0]?.id || null, 
+        types: item.types?.map(t => ({
+          type: t.type[0],
+          proxy_type: t.proxy_type
+        })) || [],
+        painted_by: item.painted_by?.[0],
+        base_size: item.base_sizes?.[0],
+        product_set: item.product_sets?.[0]
+      })) || null
     } catch (err) {
       console.error('Error loading minis:', err)
       return null
@@ -104,7 +127,12 @@ export function useMinis(
             description,
             quantity,
             location,
+            created_at,
+            updated_at,
             types:mini_to_types(
+              mini_id,
+              type_id,
+              proxy_type,
               type:mini_types(
                 id,
                 name,

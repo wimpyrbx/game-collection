@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import type { MiniType, MiniCategory } from '../lib/supabase'
+import type { MiniType, MiniCategory } from '../types/mini'
 
 export function useTypeCategoryAdmin() {
   const [miniTypes, setMiniTypes] = useState<MiniType[]>([])

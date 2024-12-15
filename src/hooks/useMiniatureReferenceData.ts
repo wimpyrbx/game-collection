@@ -110,7 +110,9 @@ export function useMiniatureReferenceData() {
             name: type.name,
             categories: type.categories
               ?.map(c => c.category)
-              .filter(c => c !== null)
+              .filter((cat): cat is { id: number; name: string } => 
+                cat !== null && typeof cat.id === 'number' && typeof cat.name === 'string'
+              ) || []
           }))
 
           allTypes.push(...transformedTypes)

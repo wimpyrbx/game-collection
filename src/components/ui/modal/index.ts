@@ -1,2 +1,2 @@
-export { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
-export { DeleteConfirmModal } from './DeleteConfirmModal' 
+export { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal.tsx'
+export { DeleteConfirmModal } from './DeleteConfirmModal.tsx'

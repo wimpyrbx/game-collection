@@ -4,7 +4,7 @@ import { FaExclamationTriangle } from 'react-icons/fa'
 interface DeleteCategoryModalProps {
   isOpen: boolean
   onClose: () => void
-  onConfirm: () => void
+  onConfirm: () => Promise<void>
   category: { name: string } | null
   isLoading?: boolean
 }

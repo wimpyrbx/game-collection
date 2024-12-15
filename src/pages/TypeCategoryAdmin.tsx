@@ -2,13 +2,12 @@ import { useState, useEffect } from 'react'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
-import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
 import { FaArchive, FaSchlix, FaShareAltSquare, FaUsersCog, FaExclamationTriangle } from 'react-icons/fa'
 
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
-import type { MiniType, MiniCategory } from '../lib/supabase'
+import type { MiniType, MiniCategory } from '../types/mini'
 import { AddTypeModal, EditTypeModal, ManageCategoriesModal, CategoryModal } from '../components/typecategoryadmin'
-import { DeleteConfirmModal } from '../components/ui/modal'
 import { supabase } from '../lib/supabase'
 
 export default function TypeCategoryAdmin() {

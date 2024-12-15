@@ -1,6 +1,10 @@
-import React from 'react';
+import { FC } from 'react';
 
-const PageHeader = ({ title }) => {
+interface PageHeaderProps {
+  title: string;
+}
+
+const PageHeader: FC<PageHeaderProps> = ({ title }) => {
   return (
     <header className="page-header">
       <h1>{title}</h1>

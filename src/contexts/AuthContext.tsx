@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (event === 'SIGNED_IN' && currentSession) {
         setSession(currentSession)
         setUser(currentSession.user)
-      } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+      } else if (event === 'SIGNED_OUT') {
         setSession(null)
         setUser(null)
       } else if (event === 'TOKEN_REFRESHED' && currentSession) {

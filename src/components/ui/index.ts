@@ -17,3 +17,14 @@ export { TableRow } from './TableRow'
 export { Pagination } from './Pagination'
 export { PageTransition } from './PageTransition'
 export { DndQuote } from './DndQuote'
+export interface SearchInputProps {
+  value: string
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
+  placeholder?: string
+  onFocus?: () => void
+  onBlur?: () => void
+  showClearButton?: boolean
+  onClear?: () => void
+  error?: string
+}
+

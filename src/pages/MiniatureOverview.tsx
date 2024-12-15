@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react'
-import { FaDragon, FaArchive, FaEgg, FaEllo, FaExpand, FaDog, FaHotdog, FaAlgolia, FaBullseye, FaCarCrash, FaChessKing, FaChessBishop, FaChessPawn, FaDiceD20, FaTable, FaTabletAlt, FaListUl, FaThList, FaRegListAlt, FaToolbox, FaStroopwafel, FaExclamationTriangle, FaDiceD6, FaThLarge, FaShareAltSquare, FaPlus } from 'react-icons/fa'
+import { useState, useEffect } from 'react'
+import { FaTable, FaExpand, FaDiceD6, FaThLarge, FaShareAltSquare, FaDiceD20 } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
-import { useAdminPagination, useAdminSearch } from '../hooks'
+import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
 import type { Mini } from '../types/mini'
-import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
 import { getMiniImagePath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 import { useNotifications } from '../contexts/NotificationContext'
@@ -85,7 +85,7 @@ export default function MiniatureOverview() {
 
   const getItemColumns = (mini: Mini) => {
     const types = mini.types?.map(t => {
-      const categories = t.type.categories?.map(c => c.category.name).join(', ') || 'No categories'
+      const categories = t.type.categories?.map((c: { category: { name: any } }) => c.category.name).join(', ') || 'No categories'
       return `${t.type.name} (${categories})`
     }).join(' | ') || 'No type'
     
@@ -94,7 +94,7 @@ export default function MiniatureOverview() {
     const productSet = mini.product_sets?.name || 'No set'
     const location = mini.location || 'No location'
     const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
-    const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
+    const baseSize = mini.base_size?.base_size_name || 'Unknown size'
     const quantity = mini.quantity || 0
 
     const thumbPath = getMiniImagePath(mini.id, 'thumb')
@@ -150,7 +150,7 @@ export default function MiniatureOverview() {
     setIsModalOpen(true)
   }
 
-  const handleSave = async (data: Partial<Mini>) => {
+  const handleSave = async () => {
     try {
       setIsModalOpen(false)
       setSelectedMini(undefined)
@@ -198,7 +198,7 @@ export default function MiniatureOverview() {
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const productSet = mini.product_sets?.name || 'No set'
-          const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
+          const baseSize = mini.base_size?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
 
@@ -245,7 +245,7 @@ export default function MiniatureOverview() {
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const productSet = mini.product_sets?.name || 'No set'
-          const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
+          const baseSize = mini.base_size?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
           const types = mini.types?.map(t => t.type.name).join(', ') || 'No type'

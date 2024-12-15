@@ -1,5 +1,4 @@
 import { supabase } from '../lib/supabase'
-import type { Mini } from '../types/mini'
 
 interface MiniatureType {
   id: number

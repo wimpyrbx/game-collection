@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaImage, FaTimesCircle, FaLayerGroup, FaDiceD20, FaTrash } from 'react-icons/fa'
+import { FaDiceD6, FaImage, FaTimesCircle, FaDiceD20, FaTrash } from 'react-icons/fa'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath } from '../../utils/imageUtils'
@@ -61,7 +61,7 @@ export function MiniatureOverviewModal({
   const [showProductDropdown, setShowProductDropdown] = useState(false)
 
   // State for drag & drop
-  const [image, setImage] = useState<File | null>(null)
+  const [, setImage] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const {
@@ -89,7 +89,7 @@ export function MiniatureOverviewModal({
   const baseSizeSelectRef = useRef<HTMLSelectElement>(null)
   const quantityInputRef = useRef<HTMLInputElement>(null)
 
-  const { showSuccess, showError } = useNotifications()
+  const { showError } = useNotifications()
 
   // Add validation function
   const validateForm = () => {
@@ -138,26 +138,26 @@ export function MiniatureOverviewModal({
         location: mini.location || '',
         quantity: mini.quantity || 1,
         painted_by_id: mini.painted_by?.id || 0,
-        base_size_id: mini.base_sizes?.id || 0,
-        product_set_id: mini.product_sets?.id || null,
+        base_size_id: mini.base_size?.id || 0,
+        product_set_id: mini.product_sets?.[0]?.id || null,
         types: mini.types?.map(t => ({
-          id: t.type.id,
-          proxy_type: false
+          id: t.id,
+          proxy_type: t.proxy_type
         })) || []
       }
       setFormData(formDataToSet)
 
-      // Set selected types with their names
+      // Set selected types with their names and categories
       const types = mini.types?.map(t => ({
         id: t.type.id,
         name: t.type.name,
-        proxy_type: false
+        proxy_type: t.proxy_type
       })) || []
       setSelectedTypes(types)
 
       // Set product search term if product set exists
-      if (mini.product_sets) {
-        const productSetName = `${mini.product_sets.product_lines.company.name} → ${mini.product_sets.product_lines.name} → ${mini.product_sets.name}`
+      if (mini.product_set) {
+        const productSetName = `${mini.product_set.product_line.company.name} → ${mini.product_set.product_line.name} → ${mini.product_set.name}`
         setProductSearchTerm(productSetName)
       }
 
@@ -242,7 +242,16 @@ export function MiniatureOverviewModal({
       }
 
       // Call the parent's onSave callback
-      await onSave(miniatureData)
+      await onSave({
+        ...miniatureData,
+        types: selectedTypes.map(t => ({
+          type: { id: t.id, name: t.name, categories: [] },
+          proxy_type: t.proxy_type,
+          id: t.id,
+          name: t.name,
+          categories: []
+        }))
+      })
 
     } catch (error) {
       console.error('Error saving miniature:', error)
@@ -281,6 +290,7 @@ export function MiniatureOverviewModal({
       const newType = {
         id: type.id,
         name: type.name,
+        categories: type.categories,
         proxy_type: selectedTypes.some(t => !t.proxy_type) // If there's already a main type, this is a proxy
       }
       
