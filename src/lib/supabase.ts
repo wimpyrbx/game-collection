@@ -1,22 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 
-export type MiniType = {
-  id: number
-  name: string
-  category_count?: number
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables')
 }
 
-export type MiniCategory = {
-  id: number
-  name: string
-}
-
-export type TypeToCategory = {
-  type_id: number
-  category_id: number
-}
-
-export const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
-)
+export const supabase = createClient(supabaseUrl, supabaseAnonKey)

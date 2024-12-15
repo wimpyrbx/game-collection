@@ -1,57 +1,71 @@
-import { Link, Outlet } from 'react-router-dom';
+import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
 
-export default function Layout() {
+export function Layout() {
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+
+  const handleSignOut = async () => {
+    try {
+      await signOut()
+      navigate('/login')
+    } catch (error) {
+      console.error('Error signing out:', error)
+    }
+  }
+
   return (
-    <div className="h-screen flex flex-col">
-      {/* Top bar - fixed height */}
-      <div className="h-16 min-h-[4rem] flex-none bgTopBar flex items-center justify-between px-6 w-full">
-        <div className="text-gray-100">Logo</div>
-        <div className="text-gray-100">Stats: 123 Games</div>
+    <div className="min-h-screen flex flex-col">
+      {/* Background image with overlay - spans entire page */}
+      <div 
+        className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
+        style={{ backgroundImage: 'url(/images/login/login_background.webp)' }}
+      >
+        <div className="absolute inset-0 bg-black/90" />
       </div>
 
-      {/* Content area - flex row for sidebar and main */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-64 bgSidebar text-gray-100 flex-shrink-0 overflow-y-auto">
-          <div className="p-4">
-            <h1 className="text-xl font-bold mb-8">Game Collection</h1>
-            <nav>
-              <ul className="space-y-2">
-                <li>
-                  <Link to="/" className="block p-2 hover:bg-gray-700 rounded">
-                    Home
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/testing" className="block p-2 hover:bg-gray-700 rounded">
-                    Testing
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/type-category-admin" className="block p-2 hover:bg-gray-700 rounded">
-                    Type/Category Admin
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/product-admin" className="block p-2 hover:bg-gray-700 rounded">
-                    Product Admin
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/miniature-overview" className="block p-2 hover:bg-gray-700 rounded">
-                    Miniature Overview
-                  </Link>
-                </li>
-              </ul>
-            </nav>
+      {/* Top Navigation Bar */}
+      <nav className="bg-gray-800/90 backdrop-blur-sm shadow-lg relative z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16">
+            {/* Left side - Navigation Links */}
+            <div className="flex">
+              <div className="flex space-x-4 items-center">
+                <Link to="/" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                  Home
+                </Link>
+                <Link to="/miniature-overview" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                  Miniatures
+                </Link>
+                <Link to="/type-category-admin" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                  Categories
+                </Link>
+                <Link to="/product-admin" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
+                  Products
+                </Link>
+              </div>
+            </div>
+
+            {/* Right side - User Info & Sign Out */}
+            <div className="flex items-center space-x-4">
+              <span className="text-gray-300 text-sm">{user?.email}</span>
+              <button
+                onClick={handleSignOut}
+                className="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
+      </nav>
 
-        {/* Main content */}
-        <div className="flex-1 p-6 bgBody overflow-y-auto">
+      {/* Main Content */}
+      <main className="flex-1 container mx-auto px-4 py-6 relative z-0">
+        <div className="bg-gray-900/50 backdrop-blur-sm rounded-lg shadow-xl p-6">
           <Outlet />
         </div>
-      </div>
+      </main>
     </div>
   )
 }
