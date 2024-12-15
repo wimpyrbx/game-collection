@@ -13,6 +13,7 @@ export function useMiniAdmin() {
         .select(`
           id,
           name,
+          description,
           quantity,
           location,
           types:mini_to_types!inner(

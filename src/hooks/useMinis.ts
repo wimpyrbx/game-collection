@@ -36,6 +36,7 @@ export function useMinis(
         .select(`
           id,
           name,
+          description,
           quantity,
           location,
           types:mini_to_types(
@@ -100,6 +101,7 @@ export function useMinis(
           .select(`
             id,
             name,
+            description,
             quantity,
             location,
             types:mini_to_types(
@@ -162,5 +164,5 @@ export function useMinis(
     loadMinis()
   }, [page, pageSize, searchTerm, getTotalQuantity])
 
-  return { minis, loading, error, totalMinis, totalQuantity, getPageMinis }
+  return { minis, loading, error, totalMinis, totalQuantity, getPageMinis, setMinis, getTotalQuantity }
 } 

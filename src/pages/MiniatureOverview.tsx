@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { FaDragon, FaArchive, FaEgg, FaEllo, FaExpand, FaDog, FaHotdog, FaAlgolia, FaBullseye, FaCarCrash, FaChessKing, FaChessBishop, FaChessPawn, FaDiceD20, FaTable, FaTabletAlt, FaListUl, FaThList, FaRegListAlt, FaToolbox, FaStroopwafel, FaExclamationTriangle, FaDiceD6, FaThLarge, FaShareAltSquare } from 'react-icons/fa'
+import { FaDragon, FaArchive, FaEgg, FaEllo, FaExpand, FaDog, FaHotdog, FaAlgolia, FaBullseye, FaCarCrash, FaChessKing, FaChessBishop, FaChessPawn, FaDiceD20, FaTable, FaTabletAlt, FaListUl, FaThList, FaRegListAlt, FaToolbox, FaStroopwafel, FaExclamationTriangle, FaDiceD6, FaThLarge, FaShareAltSquare, FaPlus } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminPagination, useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
@@ -7,6 +7,8 @@ import type { Mini } from '../types/mini'
 import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
 import { getMiniImagePath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
+import { useNotifications } from '../contexts/NotificationContext'
+import { deleteMiniature } from '../services/miniatureService'
 
 type ViewMode = 'table' | 'cards' | 'banner'
 
@@ -26,11 +28,13 @@ export default function MiniatureOverview() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
 
-  const { minis, loading, error, totalMinis, totalQuantity, getPageMinis } = useMinis(
+  const { minis, loading, error, totalMinis, totalQuantity, getPageMinis, setMinis, getTotalQuantity } = useMinis(
     currentPage,
     itemsPerPage,
     miniSearch.searchTerm
   )
+
+  const { showSuccess, showError } = useNotifications()
 
   // Preload images for adjacent pages
   useEffect(() => {
@@ -148,11 +152,43 @@ export default function MiniatureOverview() {
 
   const handleSave = async (data: Partial<Mini>) => {
     try {
-      // TODO: Implement save functionality
       setIsModalOpen(false)
       setSelectedMini(undefined)
+      
+      // Refresh the minis list
+      const updatedMinis = await getPageMinis(currentPage)
+      if (updatedMinis) {
+        // Force a re-render by updating the state
+        setMinis(updatedMinis)
+        // Update total quantity
+        await getTotalQuantity()
+      }
+      
+      // Show success notification
+      showSuccess(`Miniature ${selectedMini ? 'updated' : 'added'} successfully`)
     } catch (error) {
       console.error('Error saving miniature:', error)
+      showError('Failed to save miniature')
+    }
+  }
+
+  const handleDelete = async (miniId: number) => {
+    try {
+      await deleteMiniature(miniId)
+      
+      // Refresh the minis list
+      const updatedMinis = await getPageMinis(currentPage)
+      if (updatedMinis) {
+        // Force a re-render by updating the state
+        setMinis(updatedMinis)
+        // Update total quantity
+        await getTotalQuantity()
+      }
+      
+      showSuccess('Miniature deleted successfully')
+    } catch (error) {
+      console.error('Error deleting miniature:', error)
+      showError('Failed to delete miniature')
     }
   }
 
@@ -169,7 +205,7 @@ export default function MiniatureOverview() {
           return (
             <div 
               key={mini.id} 
-              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]"
+              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] hover:rotate-1"
               onClick={() => handleEdit(mini)}
             >
               <div className="relative aspect-square bg-gray-800 overflow-hidden">
@@ -217,7 +253,7 @@ export default function MiniatureOverview() {
           return (
             <div 
               key={mini.id} 
-              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 flex"
+              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:rotate-1 hover:-translate-y-1 flex"
               onClick={() => handleEdit(mini)}
             >
               <div className="relative w-1/3 bg-gray-800 overflow-hidden">
@@ -414,6 +450,7 @@ export default function MiniatureOverview() {
         }}
         mini={selectedMini}
         onSave={handleSave}
+        onDelete={handleDelete}
       />
     </>
   )

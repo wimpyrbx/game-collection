@@ -1,15 +1,19 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaImage, FaTimesCircle, FaLayerGroup } from 'react-icons/fa'
+import { FaDiceD6, FaImage, FaTimesCircle, FaLayerGroup, FaDiceD20, FaTrash } from 'react-icons/fa'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath } from '../../utils/imageUtils'
+import { createMiniature, updateMiniature } from '../../services/miniatureService'
+import { useNotifications } from '../../contexts/NotificationContext'
 
 interface MiniatureOverviewModalProps {
   isOpen: boolean
   onClose: () => void
   mini?: Mini
   onSave: (data: Partial<Mini>) => Promise<void>
+  onDelete?: (miniId: number) => Promise<void>
   isLoading?: boolean
 }
 
@@ -19,11 +23,21 @@ interface SelectedType {
   proxy_type: boolean
 }
 
+// Add new interface for validation errors
+interface ValidationErrors {
+  name?: string
+  location?: string
+  base_size_id?: string
+  painted_by_id?: string
+  quantity?: string
+}
+
 export function MiniatureOverviewModal({ 
   isOpen, 
   onClose, 
   mini, 
   onSave,
+  onDelete,
   isLoading 
 }: MiniatureOverviewModalProps) {
   const [formData, setFormData] = useState({
@@ -66,35 +80,94 @@ export function MiniatureOverviewModal({
   // Add ref for type search input
   const typeSearchInputRef = useRef<HTMLInputElement>(null)
 
-  // Find default IDs
-  useEffect(() => {
-    const prepaintedId = paintedByOptions.find(p => 
-      p.painted_by_name.toLowerCase() === 'prepainted'
-    )?.id || 0
-    const mediumId = baseSizeOptions.find(b => 
-      b.base_size_name.toLowerCase() === 'medium'
-    )?.id || 0
+  // Add new state for validation errors
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
 
-    if (!mini) {
-      setFormData({
-        name: '',
-        description: '',
-        location: '',
-        quantity: 1,
-        painted_by_id: prepaintedId,
-        base_size_id: mediumId,
-        product_set_id: null,
-        types: []
-      })
-      setSelectedTypes([])
-      setPreviewUrl(null)
-      setImage(null)
-      setProductSearchTerm('')
-      setTypeSearchTerm('')
-      setShowProductDropdown(false)
-      setShowTypeDropdown(false)
+  // Add refs for each required field
+  const nameInputRef = useRef<HTMLInputElement>(null)
+  const locationInputRef = useRef<HTMLInputElement>(null)
+  const baseSizeSelectRef = useRef<HTMLSelectElement>(null)
+  const quantityInputRef = useRef<HTMLInputElement>(null)
+
+  const { showSuccess, showError } = useNotifications()
+
+  // Add validation function
+  const validateForm = () => {
+    const errors: ValidationErrors = {}
+    let isValid = true
+
+    if (!formData.name.trim()) {
+      errors.name = 'Name is required'
+      nameInputRef.current?.focus()
+      isValid = false
     }
-  }, [paintedByOptions, baseSizeOptions, mini, isOpen])
+
+    if (!formData.location.trim()) {
+      errors.location = 'Location is required'
+      if (isValid) locationInputRef.current?.focus()
+      isValid = false
+    }
+
+    if (!formData.base_size_id) {
+      errors.base_size_id = 'Base size is required'
+      if (isValid) baseSizeSelectRef.current?.focus()
+      isValid = false
+    }
+
+    if (!formData.painted_by_id) {
+      errors.painted_by_id = 'Painted by is required'
+      isValid = false
+    }
+
+    if (!formData.quantity || formData.quantity < 1) {
+      errors.quantity = 'Quantity must be at least 1'
+      if (isValid) quantityInputRef.current?.focus()
+      isValid = false
+    }
+
+    setValidationErrors(errors)
+    return isValid
+  }
+
+  useEffect(() => {
+    if (mini) {
+      // Set form data
+      const formDataToSet = {
+        name: mini.name,
+        description: mini.description || '',
+        location: mini.location || '',
+        quantity: mini.quantity || 1,
+        painted_by_id: mini.painted_by?.id || 0,
+        base_size_id: mini.base_sizes?.id || 0,
+        product_set_id: mini.product_sets?.id || null,
+        types: mini.types?.map(t => ({
+          id: t.type.id,
+          proxy_type: false
+        })) || []
+      }
+      setFormData(formDataToSet)
+
+      // Set selected types with their names
+      const types = mini.types?.map(t => ({
+        id: t.type.id,
+        name: t.type.name,
+        proxy_type: false
+      })) || []
+      setSelectedTypes(types)
+
+      // Set product search term if product set exists
+      if (mini.product_sets) {
+        const productSetName = `${mini.product_sets.product_lines.company.name} → ${mini.product_sets.product_lines.name} → ${mini.product_sets.name}`
+        setProductSearchTerm(productSetName)
+      }
+
+      // Set preview image if exists
+      if (mini.id) {
+        const previewPath = getMiniImagePath(mini.id, 'original')
+        setPreviewUrl(previewPath)
+      }
+    }
+  }, [mini])
 
   useEffect(() => {
     if (!isOpen) {
@@ -119,55 +192,64 @@ export function MiniatureOverviewModal({
   }, [isOpen])
 
   useEffect(() => {
-    if (mini) {
-      setFormData({
-        name: mini.name,
-        description: mini.description || '',
-        location: mini.location || '',
-        quantity: mini.quantity || 1,
-        painted_by_id: mini.painted_by_id,
-        base_size_id: mini.base_size_id,
-        product_set_id: mini.product_set_id,
-        types: mini.types?.map(t => ({
-          id: t.id,
-          proxy_type: false
-        })) || []
-      })
+    if (!mini && isOpen) {
+      const prepaintedId = paintedByOptions.find(p => 
+        p.painted_by_name.toLowerCase() === 'prepainted'
+      )?.id || 0
+      const mediumId = baseSizeOptions.find(b => 
+        b.base_size_name.toLowerCase() === 'medium'
+      )?.id || 0
 
-      // Set selected types
-      const types = mini.types?.map(t => ({
-        id: t.id,
-        name: t.name,
-        proxy_type: false
-      })) || []
-      setSelectedTypes(types)
-
-      // Set preview image if exists
-      if (mini.id) {
-        setPreviewUrl(getMiniImagePath(mini.id, 'original'))
-      }
+      setFormData(prev => ({
+        ...prev,
+        painted_by_id: prepaintedId,
+        base_size_id: mediumId
+      }))
     }
-  }, [mini])
+  }, [paintedByOptions, baseSizeOptions, mini, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name.trim()) return
+    
+    // Clear previous validation errors
+    setValidationErrors({})
 
-    // Transform types to include required fields
-    const transformedTypes = formData.types.map(t => {
-      const typeData = miniTypes.find(mt => mt.id === t.id)
-      return {
-        id: t.id,
-        name: typeData?.name || '',
-        categories: typeData?.categories || [],
-        proxy_type: t.proxy_type
+    // Validate form
+    if (!validateForm()) {
+      return
+    }
+
+    try {
+      // Prepare the data
+      const miniatureData = {
+        name: formData.name.trim(),
+        description: formData.description.trim(),
+        location: formData.location.trim(),
+        quantity: formData.quantity,
+        painted_by_id: formData.painted_by_id,
+        base_size_id: formData.base_size_id,
+        product_set_id: formData.product_set_id || null,
+        types: selectedTypes.map(t => ({
+          id: t.id,
+          proxy_type: t.proxy_type
+        }))
       }
-    })
 
-    await onSave({
-      ...formData,
-      types: transformedTypes
-    })
+      if (isEditMode && mini?.id) {
+        await updateMiniature(mini.id, miniatureData)
+      } else {
+        await createMiniature(miniatureData)
+      }
+
+      // Call the parent's onSave callback
+      await onSave(miniatureData)
+
+    } catch (error) {
+      console.error('Error saving miniature:', error)
+      if (error instanceof Error) {
+        showError(error.message)
+      }
+    }
   }
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -329,6 +411,30 @@ export function MiniatureOverviewModal({
     return ''
   }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine])
 
+  // Add state for invalid product set
+  const [isInvalidProductSet, setIsInvalidProductSet] = useState(false)
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const handleDelete = async () => {
+    if (!mini?.id || !onDelete) return
+    
+    try {
+      setIsDeleting(true)
+      await onDelete(mini.id)
+      setShowDeleteConfirm(false)
+      onClose()
+    } catch (error) {
+      console.error('Error deleting miniature:', error)
+      if (error instanceof Error) {
+        showError(error.message)
+      }
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   if (loadingRef) {
     return (
       <UI.Modal isOpen={isOpen} onClose={onClose}>
@@ -367,7 +473,7 @@ export function MiniatureOverviewModal({
             <div className="space-y-4">
               {/* Image Drop Zone */}
               <div
-                className="w-full aspect-square border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors relative overflow-hidden"
+                className="w-full aspect-square border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors relative overflow-hidden bg-gray-900/50"
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
                 onClick={handleImageClick}
@@ -378,38 +484,66 @@ export function MiniatureOverviewModal({
                       src={previewUrl}
                       alt="Preview"
                       className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.currentTarget.onerror = null
+                        e.currentTarget.style.display = 'none'
+                        e.currentTarget.parentElement?.querySelector('.placeholder-icon')?.classList.remove('hidden')
+                      }}
                     />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center hidden placeholder-icon">
+                      <FaDiceD20 className="w-20 h-20 text-gray-700/50" />
+                      <span className="text-sm text-center px-4 text-gray-700/50 mt-2">Drop image here or click to select</span>
+                    </div>
                     <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                       <FaImage className="w-8 h-8 text-white" />
                     </div>
                   </div>
                 ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
-                    <FaImage className="w-12 h-12 mb-2" />
-                    <span className="text-sm text-center px-4">Drop image here or click to select</span>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-700/50">
+                    <FaDiceD20 className="w-20 h-20" />
+                    <span className="text-sm text-center px-4 mt-2">Drop image here or click to select</span>
                   </div>
                 )}
               </div>
 
               {/* Location and Quantity */}
               <div className="grid grid-cols-[1fr_80px] gap-4">
-                <UI.Input
+                <Input
                   label="Location"
                   value={formData.location}
-                  onChange={(e) => setFormData(prev => ({ ...prev, location: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, location: e.target.value }))
+                    if (validationErrors.location) {
+                      setValidationErrors(prev => ({ ...prev, location: undefined }))
+                    }
+                  }}
                   placeholder="Enter storage location"
+                  required
+                  ref={locationInputRef}
+                  error={validationErrors.location}
                 />
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-1">Qty</label>
                   <input
                     type="number"
-                    min={0}
+                    min={1}
                     value={formData.quantity}
-                    onChange={(e) => setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))
+                      if (validationErrors.quantity) {
+                        setValidationErrors(prev => ({ ...prev, quantity: undefined }))
+                      }
+                    }}
                     placeholder="Qty"
                     required
-                    className="w-full px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                    ref={quantityInputRef}
+                    className={`w-full px-3 py-2 bg-gray-800 rounded border ${
+                      validationErrors.quantity ? 'border-red-500' : 'border-gray-700'
+                    } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
                   />
+                  {validationErrors.quantity && (
+                    <div className="text-sm text-red-500 mt-1">{validationErrors.quantity}</div>
+                  )}
                 </div>
               </div>
 
@@ -418,9 +552,17 @@ export function MiniatureOverviewModal({
                 <label className="block text-sm font-medium text-gray-300 mb-1">Base Size</label>
                 <select
                   value={formData.base_size_id}
-                  onChange={(e) => setFormData(prev => ({ ...prev, base_size_id: parseInt(e.target.value) }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, base_size_id: parseInt(e.target.value) }))
+                    if (validationErrors.base_size_id) {
+                      setValidationErrors(prev => ({ ...prev, base_size_id: undefined }))
+                    }
+                  }}
                   required
-                  className="w-full px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  ref={baseSizeSelectRef}
+                  className={`w-full px-3 py-2 bg-gray-800 rounded border ${
+                    validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
+                  } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
                 >
                   {baseSizeOptions.map(size => (
                     <option key={size.id} value={size.id}>
@@ -428,6 +570,9 @@ export function MiniatureOverviewModal({
                     </option>
                   ))}
                 </select>
+                {validationErrors.base_size_id && (
+                  <div className="text-sm text-red-500 mt-1">{validationErrors.base_size_id}</div>
+                )}
               </div>
 
               {/* Painted By Boxes */}
@@ -441,27 +586,44 @@ export function MiniatureOverviewModal({
                       className={`p-3 rounded border capitalize ${
                         formData.painted_by_id === painter.id
                           ? 'border-green-600 bg-green-600/20'
-                          : 'border-gray-600 hover:border-gray-500'
+                          : validationErrors.painted_by_id 
+                            ? 'border-red-500'
+                            : 'border-gray-600 hover:border-gray-500'
                       } transition-colors text-sm`}
-                      onClick={() => setFormData(prev => ({ ...prev, painted_by_id: painter.id }))}
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, painted_by_id: painter.id }))
+                        if (validationErrors.painted_by_id) {
+                          setValidationErrors(prev => ({ ...prev, painted_by_id: undefined }))
+                        }
+                      }}
                     >
                       {painter.painted_by_name.toLowerCase()}
                     </button>
                   ))}
                 </div>
+                {validationErrors.painted_by_id && (
+                  <div className="text-sm text-red-500 mt-1">{validationErrors.painted_by_id}</div>
+                )}
               </div>
             </div>
 
             {/* Right Column */}
             <div className="space-y-4 h-full flex flex-col">
               {/* Name Input */}
-              <UI.Input
+              <Input
                 label="Name"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, name: e.target.value }))
+                  if (validationErrors.name) {
+                    setValidationErrors(prev => ({ ...prev, name: undefined }))
+                  }
+                }}
                 placeholder="Enter miniature name"
                 required
                 autoFocus
+                ref={nameInputRef}
+                error={validationErrors.name}
               />
 
               {/* Product Set Selection */}
@@ -470,11 +632,16 @@ export function MiniatureOverviewModal({
                 <UI.SearchInput
                   value={selectedProductDisplay || productSearchTerm}
                   onChange={(e) => {
-                    setProductSearchTerm(e.target.value)
+                    const newValue = e.target.value
+                    setProductSearchTerm(newValue)
                     setShowProductDropdown(true)
                     if (formData.product_set_id) {
                       setFormData(prev => ({ ...prev, product_set_id: null }))
                     }
+                    // Mark as invalid if there's input but no match in filtered products
+                    setIsInvalidProductSet(newValue !== '' && !filteredProducts.some(p => 
+                      `${p.company} → ${p.line} → ${p.set}`.toLowerCase().includes(newValue.toLowerCase())
+                    ))
                   }}
                   placeholder="Search for Company → Line → Set..."
                   onFocus={() => {
@@ -484,12 +651,24 @@ export function MiniatureOverviewModal({
                     }
                     setShowProductDropdown(true)
                   }}
+                  onBlur={() => {
+                    // On blur, if the input doesn't match any product and isn't empty, clear it
+                    setTimeout(() => {
+                      if (isInvalidProductSet && productSearchTerm) {
+                        setProductSearchTerm('')
+                        setIsInvalidProductSet(false)
+                      }
+                      setShowProductDropdown(false)
+                    }, 200)
+                  }}
                   showClearButton={true}
                   onClear={() => {
                     setProductSearchTerm('')
                     setFormData(prev => ({ ...prev, product_set_id: null }))
                     setShowProductDropdown(false)
+                    setIsInvalidProductSet(false)
                   }}
+                  error={isInvalidProductSet ? 'Please select a valid product set' : undefined}
                 />
                 {showProductDropdown && productSearchTerm && (
                   <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg">
@@ -554,9 +733,9 @@ export function MiniatureOverviewModal({
                   {selectedTypes.length > 0 && (
                     <div className="space-y-3">
                       <div className="border border-gray-700 rounded-md bg-gray-900/50">
-                        {selectedTypes.map(type => (
+                        {selectedTypes.map((type, index) => (
                           <div
-                            key={type.id}
+                            key={`${type.id}-${index}`}
                             className="flex items-center justify-between px-3 py-2 hover:bg-gray-700 cursor-pointer"
                             onClick={() => toggleProxyType(type.id)}
                           >
@@ -581,9 +760,9 @@ export function MiniatureOverviewModal({
                       </div>
                       {selectedCategories.length > 0 && (
                         <div className="flex flex-wrap gap-2">
-                          {selectedCategories.map(category => (
+                          {selectedCategories.map((category, index) => (
                             <div
-                              key={category}
+                              key={`${category}-${index}`}
                               className="px-2 py-1 text-xs rounded-full bg-orange-900/50 text-orange-200"
                             >
                               {category}
@@ -610,27 +789,52 @@ export function MiniatureOverviewModal({
         </UI.ModalBody>
 
         <UI.ModalFooter>
-          <div className="flex justify-end gap-2">
-            <UI.Button
-              variant="btnPrimary"
-              onClick={onClose}
-              type="button"
-            >
-              Cancel
-            </UI.Button>
-            <UI.Button
-              variant="btnSuccess"
-              type="submit"
-              disabled={isLoading}
-            >
-              {isLoading 
-                ? (isEditMode ? 'Saving...' : 'Adding...') 
-                : (isEditMode ? 'Save Changes' : 'Add Miniature')
-              }
-            </UI.Button>
+          <div className="flex justify-between w-full">
+            {isEditMode && onDelete && (
+              <UI.Button
+                variant="btnDanger"
+                type="button"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isLoading}
+              >
+                <div className="flex items-center gap-2">
+                  <FaTrash className="w-4 h-4" />
+                  Delete Miniature
+                </div>
+              </UI.Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <UI.Button
+                variant="btnPrimary"
+                onClick={onClose}
+                type="button"
+              >
+                Cancel
+              </UI.Button>
+              <UI.Button
+                variant="btnSuccess"
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading 
+                  ? (isEditMode ? 'Saving...' : 'Adding...') 
+                  : (isEditMode ? 'Save Changes' : 'Add Miniature')
+                }
+              </UI.Button>
+            </div>
           </div>
         </UI.ModalFooter>
       </form>
+
+      <UI.DeleteConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
+        title="Delete Miniature"
+        message={`Are you sure you want to delete "${mini?.name}"? This action cannot be undone.`}
+        icon={FaTrash}
+      />
     </UI.Modal>
   )
 } 
