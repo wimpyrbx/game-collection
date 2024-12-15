@@ -25,10 +25,9 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
 
   if (!isOpen) return null
 
-  // Create portal to mount modal directly to document body
   return createPortal(
     <div className="fixed inset-0 z-[9999] overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="min-h-screen px-4 flex items-center justify-center">
         {/* Backdrop */}
         <div 
           className="fixed inset-0 bg-black/50 transition-opacity"
@@ -36,8 +35,8 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
         />
         
         {/* Modal content */}
-        <div className="relative z-[9999] w-full max-w-2xl max-h-[90vh] flex flex-col">
-          <div className="bg-gray-900 rounded-lg border border-gray-800 shadow-xl flex flex-col max-h-full">
+        <div className="relative z-[9999] transform transition-all">
+          <div className="bg-gray-900 rounded-lg border border-gray-800 shadow-xl flex flex-col max-h-[90vh]">
             {children}
           </div>
         </div>

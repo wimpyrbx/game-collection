@@ -8,7 +8,7 @@ import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHead
 import { getMiniImagePath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 
-type ViewMode = 'table' | 'cards'
+type ViewMode = 'table' | 'cards' | 'banner'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -56,7 +56,17 @@ export default function MiniatureOverview() {
   // Add keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (loading) return
+      if (loading || isModalOpen) return
+
+      // Check if we're in an input field
+      const activeElement = document.activeElement
+      if (activeElement && (
+        activeElement.tagName === 'INPUT' ||
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.tagName === 'SELECT'
+      )) {
+        return
+      }
 
       if (e.key === 'ArrowLeft' && currentPage > 1) {
         setCurrentPage(prev => prev - 1)
@@ -67,7 +77,7 @@ export default function MiniatureOverview() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentPage, totalMinis, loading])
+  }, [currentPage, totalMinis, loading, isModalOpen])
 
   const getItemColumns = (mini: Mini) => {
     const types = mini.types?.map(t => {
@@ -159,14 +169,14 @@ export default function MiniatureOverview() {
           return (
             <div 
               key={mini.id} 
-              className="bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all hover:border-gray-600"
+              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]"
               onClick={() => handleEdit(mini)}
             >
-              <div className="relative aspect-square bg-gray-800">
+              <div className="relative aspect-square bg-gray-800 overflow-hidden">
                 <img
                   src={thumbPath}
                   alt={mini.name}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
                   onError={(e) => {
                     e.currentTarget.onerror = null
                     e.currentTarget.style.display = 'none'
@@ -184,6 +194,55 @@ export default function MiniatureOverview() {
                   <p className="truncate"><span className="text-gray-500">Set:</span> {productSet}</p>
                   <p className="truncate"><span className="text-gray-500">Base:</span> {baseSize}</p>
                   <p className="truncate"><span className="text-gray-500">Painted by:</span> {paintedBy}</p>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  const renderBannerView = () => {
+    return (
+      <div className="grid grid-cols-2 gap-6">
+        {minis.map((mini) => {
+          const thumbPath = getMiniImagePath(mini.id, 'thumb')
+          const productSet = mini.product_sets?.name || 'No set'
+          const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
+          const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
+          const quantity = mini.quantity || 0
+          const types = mini.types?.map(t => t.type.name).join(', ') || 'No type'
+
+          return (
+            <div 
+              key={mini.id} 
+              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 flex"
+              onClick={() => handleEdit(mini)}
+            >
+              <div className="relative w-1/3 bg-gray-800 overflow-hidden">
+                <img
+                  src={thumbPath}
+                  alt={mini.name}
+                  className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
+                  onError={(e) => {
+                    e.currentTarget.onerror = null
+                    e.currentTarget.style.display = 'none'
+                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                  }}
+                />
+                <FaDiceD20 className="absolute inset-0 m-auto w-12 h-12 text-gray-600 hidden" />
+                <div className="absolute top-2 right-2 bg-gray-900/80 px-2 py-1 rounded text-sm font-medium text-gray-100">
+                  QTY: {quantity}
+                </div>
+              </div>
+              <div className="flex-1 p-6">
+                <h3 className="font-bold text-xl text-gray-100 mb-4">{mini.name}</h3>
+                <div className="space-y-2 text-sm">
+                  <p><span className="text-gray-500">Types:</span> <span className="text-gray-300">{types}</span></p>
+                  <p><span className="text-gray-500">Set:</span> <span className="text-gray-300">{productSet}</span></p>
+                  <p><span className="text-gray-500">Base:</span> <span className="text-gray-300">{baseSize}</span></p>
+                  <p><span className="text-gray-500">Painted by:</span> <span className="text-gray-300">{paintedBy}</span></p>
                 </div>
               </div>
             </div>
@@ -256,6 +315,14 @@ export default function MiniatureOverview() {
                     >
                       <FaThLarge className="w-4 h-4" />
                     </button>
+                    <button
+                      className={`p-2 rounded focus:outline-none ${viewMode === 'banner' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                      onClick={() => setViewMode('banner')}
+                      title="Banner View"
+                      tabIndex={-1}
+                    >
+                      <FaExpand className="w-4 h-4" />
+                    </button>
                   </div>
                   <UI.Button 
                     variant="btnSuccess"
@@ -316,8 +383,10 @@ export default function MiniatureOverview() {
                       </tbody>
                     </table>
                   </div>
-                ) : (
+                ) : viewMode === 'cards' ? (
                   renderCardView()
+                ) : (
+                  renderBannerView()
                 )}
               </div>
             </UI.CardBody>

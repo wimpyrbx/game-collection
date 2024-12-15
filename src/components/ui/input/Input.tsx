@@ -20,9 +20,9 @@ export function Input({
   autoFocus
 }: InputProps) {
   return (
-    <div className="flex items-center gap-4">
+    <div>
       {label && (
-        <label className="text-sm font-medium w-32 text-gray-400">
+        <label className="block text-sm font-medium text-gray-400 mb-1">
           {label}
         </label>
       )}
@@ -33,7 +33,7 @@ export function Input({
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
-        className={`flex-1 px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
+        className={`w-full px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
       />
     </div>
   )

@@ -1,1 +1,1 @@
-export { default as MiniatureOverviewModal } from './MiniatureOverviewModal' 
+export { MiniatureOverviewModal } from './MiniatureOverviewModal' 

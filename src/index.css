@@ -75,6 +75,23 @@
     --tw-ring-offset-color: transparent !important;
     box-shadow: 0 0 0 1px var(--focus-color) !important;
   }
+
+  /* Placeholder styles */
+  ::placeholder {
+    color: rgba(156, 163, 175, 0.4) !important;
+  }
+
+  :-webkit-input-placeholder {
+    color: rgba(156, 163, 175, 0.4) !important;
+  }
+
+  :-ms-input-placeholder {
+    color: rgba(156, 163, 175, 0.4) !important;
+  }
+
+  ::-ms-input-placeholder {
+    color: rgba(156, 163, 175, 0.4) !important;
+  }
 }
 
 /* Custom component classes */

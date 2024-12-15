@@ -73,13 +73,7 @@ export function useMinis(
         `)
 
       if (searchTerm) {
-        query = query.or(`
-          name.ilike.%${searchTerm}%,
-          types.type.name.ilike.%${searchTerm}%,
-          product_sets.name.ilike.%${searchTerm}%,
-          product_sets.product_lines.name.ilike.%${searchTerm}%,
-          product_sets.product_lines.company.name.ilike.%${searchTerm}%
-        `)
+        query = query.ilike('name', `%${searchTerm}%`)
       }
 
       const { data, error } = await query
@@ -143,13 +137,7 @@ export function useMinis(
           `, { count: 'exact' })
 
         if (searchTerm) {
-          query = query.or(`
-            name.ilike.%${searchTerm}%,
-            types.type.name.ilike.%${searchTerm}%,
-            product_sets.name.ilike.%${searchTerm}%,
-            product_sets.product_lines.name.ilike.%${searchTerm}%,
-            product_sets.product_lines.company.name.ilike.%${searchTerm}%
-          `)
+          query = query.ilike('name', `%${searchTerm}%`)
         }
 
         const { data, error, count } = await query
