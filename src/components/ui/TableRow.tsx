@@ -1,4 +1,3 @@
-import { ReactNode } from 'react'
 import { FaEdit, FaTrash } from 'react-icons/fa'
 
 interface TableRowProps {

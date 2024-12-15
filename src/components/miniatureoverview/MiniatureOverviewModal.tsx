@@ -141,7 +141,7 @@ export function MiniatureOverviewModal({
         base_size_id: mini.base_size?.id || 0,
         product_set_id: mini.product_sets?.[0]?.id || null,
         types: mini.types?.map(t => ({
-          id: t.id,
+          id: t.type.id,
           proxy_type: t.proxy_type
         })) || []
       }
@@ -156,8 +156,8 @@ export function MiniatureOverviewModal({
       setSelectedTypes(types)
 
       // Set product search term if product set exists
-      if (mini.product_set) {
-        const productSetName = `${mini.product_set.product_line.company.name} → ${mini.product_set.product_line.name} → ${mini.product_set.name}`
+      if (mini.product_sets?.[0]) {
+        const productSetName = `${mini.product_sets[0].product_lines?.company?.name} → ${mini.product_sets[0].product_lines?.name} → ${mini.product_sets[0].name}`
         setProductSearchTerm(productSetName)
       }
 
@@ -231,7 +231,9 @@ export function MiniatureOverviewModal({
         product_set_id: formData.product_set_id || null,
         types: selectedTypes.map(t => ({
           id: t.id,
-          proxy_type: t.proxy_type
+          type_id: t.id,
+          proxy_type: t.proxy_type,
+          categories: []
         }))
       }
 
@@ -245,11 +247,19 @@ export function MiniatureOverviewModal({
       await onSave({
         ...miniatureData,
         types: selectedTypes.map(t => ({
-          type: { id: t.id, name: t.name, categories: [] },
+          mini_id: mini?.id || 0,
+          type_id: t.id,
           proxy_type: t.proxy_type,
-          id: t.id,
-          name: t.name,
-          categories: []
+          type: {
+            id: t.id,
+            name: t.name,
+            categories: [{
+              category: [{
+                id: 0,
+                name: ''
+              }]
+            }]
+          }
         }))
       })
 

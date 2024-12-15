@@ -2,6 +2,54 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Mini } from '../types/mini'
 
+interface SupabaseMini {
+  id: number
+  name: string
+  description: string | null
+  location: string
+  quantity: number
+  created_at: string
+  updated_at: string
+  painted_by_id: number
+  base_size_id: number
+  product_set_id: number | null
+  types?: Array<{
+    mini_id: number
+    type_id: number
+    proxy_type: boolean
+    type: {
+      id: number
+      name: string
+      categories: Array<{
+        category: Array<{
+          id: number
+          name: string
+        }>
+      }>
+    }
+  }>
+  painted_by: {
+    id: number
+    painted_by_name: string
+  }
+  base_size: {
+    id: number
+    base_size_name: string
+  }
+  product_sets?: Array<{
+    id: number
+    name: string
+    product_lines?: {
+      id: number
+      name: string
+      company?: {
+        id: number
+        name: string
+      }
+    }
+  }>
+}
+
 export function useMinis(
   page: number = 1,
   pageSize: number = 10,
@@ -12,6 +60,38 @@ export function useMinis(
   const [error, setError] = useState<string | null>(null)
   const [totalMinis, setTotalMinis] = useState(0)
   const [totalQuantity, setTotalQuantity] = useState(0)
+
+  const transformMini = (item: SupabaseMini): Mini => ({
+    id: item.id,
+    name: item.name,
+    description: item.description,
+    location: item.location,
+    quantity: item.quantity,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    painted_by_id: item.painted_by_id,
+    base_size_id: item.base_size_id,
+    product_set_id: item.product_set_id,
+    types: item.types?.map(t => ({
+      mini_id: item.id,
+      type_id: t.type.id,
+      proxy_type: t.proxy_type,
+      type: {
+        id: t.type.id,
+        name: t.type.name,
+        categories: t.type.categories.map(c => ({
+          category: c.category
+        }))
+      }
+    })) || [],
+    painted_by: item.painted_by,
+    base_size: item.base_size,
+    product_sets: item.product_sets?.map(ps => ({
+      id: ps.id,
+      name: ps.name,
+      product_lines: ps.product_lines
+    }))
+  })
 
   const getTotalQuantity = useCallback(async () => {
     try {
@@ -41,6 +121,9 @@ export function useMinis(
           location,
           created_at,
           updated_at,
+          painted_by_id,
+          base_size_id,
+          product_set_id,
           types:mini_to_types(
             mini_id,
             type_id,
@@ -88,25 +171,58 @@ export function useMinis(
 
       if (error) throw error
 
-      return data?.map(item => ({
-        id: item.id,
-        name: item.name,
-        description: item.description,
-        location: item.location,
-        quantity: item.quantity,
-        created_at: item.created_at,
-        updated_at: item.updated_at,
-        painted_by_id: item.painted_by?.[0]?.id || 0,
-        base_size_id: item.base_sizes?.[0]?.id || 0,
-        product_set_id: item.product_sets?.[0]?.id || null, 
-        types: item.types?.map(t => ({
-          type: t.type[0],
-          proxy_type: t.proxy_type
-        })) || [],
-        painted_by: item.painted_by?.[0],
-        base_size: item.base_sizes?.[0],
-        product_set: item.product_sets?.[0]
-      })) || null
+      const transformedData = data?.map(item => {
+        const typedItem = item as unknown as {
+          id: number
+          name: string
+          description: string | null
+          location: string
+          quantity: number
+          created_at: string
+          updated_at: string
+          painted_by_id: number
+          base_size_id: number
+          product_set_id: number | null
+          types: Array<{
+            mini_id: number
+            type_id: number
+            proxy_type: boolean
+            type: {
+              id: number
+              name: string
+              categories: Array<{
+                category: Array<{
+                  id: number
+                  name: string
+                }>
+              }>
+            }
+          }>
+          painted_by: {
+            id: number
+            painted_by_name: string
+          }
+          base_size: {
+            id: number
+            base_size_name: string
+          }
+          product_sets: Array<{
+            id: number
+            name: string
+            product_lines: {
+              id: number
+              name: string
+              company: {
+                id: number
+                name: string
+              }
+            }
+          }>
+        }
+        return transformMini(typedItem)
+      }) || []
+
+      return transformedData
     } catch (err) {
       console.error('Error loading minis:', err)
       return null
@@ -129,6 +245,9 @@ export function useMinis(
             location,
             created_at,
             updated_at,
+            painted_by_id,
+            base_size_id,
+            product_set_id,
             types:mini_to_types(
               mini_id,
               type_id,
@@ -176,10 +295,60 @@ export function useMinis(
 
         if (error) throw error
 
-        setMinis(data || [])
+        const transformedData = data?.map(item => {
+          const typedItem = item as unknown as {
+            id: number
+            name: string
+            description: string | null
+            location: string
+            quantity: number
+            created_at: string
+            updated_at: string
+            painted_by_id: number
+            base_size_id: number
+            product_set_id: number | null
+            types: Array<{
+              mini_id: number
+              type_id: number
+              proxy_type: boolean
+              type: {
+                id: number
+                name: string
+                categories: Array<{
+                  category: Array<{
+                    id: number
+                    name: string
+                  }>
+                }>
+              }
+            }>
+            painted_by: {
+              id: number
+              painted_by_name: string
+            }
+            base_size: {
+              id: number
+              base_size_name: string
+            }
+            product_sets: Array<{
+              id: number
+              name: string
+              product_lines: {
+                id: number
+                name: string
+                company: {
+                  id: number
+                  name: string
+                }
+              }
+            }>
+          }
+          return transformMini(typedItem)
+        }) || []
+
+        setMinis(transformedData)
         setTotalMinis(count || 0)
 
-        // Load total quantity
         await getTotalQuantity()
       } catch (err) {
         console.error('Error loading minis:', err)

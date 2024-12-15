@@ -85,13 +85,13 @@ export default function MiniatureOverview() {
 
   const getItemColumns = (mini: Mini) => {
     const types = mini.types?.map(t => {
-      const categories = t.type.categories?.map((c: { category: { name: any } }) => c.category.name).join(', ') || 'No categories'
+      const categories = t.type.categories.map(c => c.category[0]?.name).join(', ') || 'No categories'
       return `${t.type.name} (${categories})`
     }).join(' | ') || 'No type'
     
-    const company = mini.product_sets?.product_lines?.company?.name || 'No company'
-    const productLine = mini.product_sets?.product_lines?.name || 'No product line'
-    const productSet = mini.product_sets?.name || 'No set'
+    const company = mini.product_sets?.[0]?.product_lines?.company?.name || 'No company'
+    const productLine = mini.product_sets?.[0]?.product_lines?.name || 'No product line'
+    const productSet = mini.product_sets?.[0]?.name || 'No set'
     const location = mini.location || 'No location'
     const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
     const baseSize = mini.base_size?.base_size_name || 'Unknown size'
@@ -197,7 +197,7 @@ export default function MiniatureOverview() {
       <div className="grid grid-cols-5 gap-4">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
-          const productSet = mini.product_sets?.name || 'No set'
+          const productSet = mini.product_sets?.[0]?.name || 'No set'
           const baseSize = mini.base_size?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
@@ -244,7 +244,7 @@ export default function MiniatureOverview() {
       <div className="grid grid-cols-2 gap-6">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
-          const productSet = mini.product_sets?.name || 'No set'
+          const productSet = mini.product_sets?.[0]?.name || 'No set'
           const baseSize = mini.base_size?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0

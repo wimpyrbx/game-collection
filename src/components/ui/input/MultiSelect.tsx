@@ -1,21 +1,20 @@
 import React from 'react'
 
 interface Option {
-  value: number
+  value: string
   label: string
 }
 
 interface MultiSelectProps {
   label?: string
-  value: number[]
-  onChange: (selectedIds: number[]) => void
+  value: string[]
+  onChange: (value: string[]) => void
   options: Option[]
-  placeholder?: string
 }
 
-export function MultiSelect({ label, value, onChange, options, placeholder }: MultiSelectProps) {
+export function MultiSelect({ label, value, onChange, options }: MultiSelectProps) {
   const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedOptions = Array.from(e.target.selectedOptions).map(option => parseInt(option.value))
+    const selectedOptions = Array.from(e.target.selectedOptions).map(option => option.value)
     onChange(selectedOptions)
   }
 
@@ -24,7 +23,7 @@ export function MultiSelect({ label, value, onChange, options, placeholder }: Mu
       {label && <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>}
       <select
         multiple
-        value={value.map(String)}
+        value={value}
         onChange={handleChange}
         className="mt-1 block w-full rounded-md border-gray-700 bg-gray-800 text-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 min-h-[120px]"
       >

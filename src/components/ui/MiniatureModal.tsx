@@ -5,11 +5,10 @@ import type { Mini } from '../../types/mini'
 interface MiniatureModalProps {
   isOpen: boolean
   onClose: () => void
-  mini?: Mini // Optional for edit mode
-  onSave: (data: Partial<Mini>) => Promise<void>
+  mini?: Mini
 }
 
-export function MiniatureModal({ isOpen, onClose, mini, onSave }: MiniatureModalProps) {
+export function MiniatureModal({ isOpen, onClose, mini }: MiniatureModalProps) {
   const isEditMode = !!mini
 
   const handleSubmit = async (e: React.FormEvent) => {
