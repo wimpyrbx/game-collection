@@ -52,7 +52,11 @@ export default function ManageCategoriesModal({
   }, [])
 
   return (
-    <UI.Modal isOpen={isOpen} onClose={onClose}>
+    <UI.Modal 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      className="max-w-4xl"
+    >
       <form onSubmit={handleSubmit}>
         <UI.ModalHeader>
           <div className="flex items-center gap-3">
@@ -64,47 +68,49 @@ export default function ManageCategoriesModal({
         </UI.ModalHeader>
 
         <UI.ModalBody>
-          <UI.SearchInput
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search categories..."
-            className="w-full mb-4"
-          />
-
-          <div className="space-y-1">
-            {filteredCategories.map(category => {
-              const isSelected = selected.includes(category.id)
-              
-              return (
-                <label
-                  key={category.id}
-                  className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-700 ${
-                    isSelected ? 'bg-green-600/20' : ''
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isSelected}
-                    onChange={() => toggleCategory(category.id)}
-                    className="sr-only"
-                  />
-                  <div className="flex items-center gap-2 flex-1">
-                    <div className={`w-4 h-4 border rounded flex items-center justify-center ${
-                      isSelected
-                        ? 'bg-green-600 border-green-600'
-                        : 'border-gray-500'
-                    }`}>
-                      {isSelected && (
-                        <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
-                        </svg>
-                      )}
-                    </div>
-                    <span>{category.name}</span>
-                  </div>
-                </label>
-              )
-            })}
+          <div className="space-y-4">
+            <div className="space-y-4">
+              <UI.SearchInput
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search categories..."
+              />
+              <div className="h-[300px] overflow-y-auto scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-500 hover:scrollbar-thumb-gray-400">
+                {filteredCategories.map(category => {
+                  const isSelected = selected.includes(category.id)
+                  
+                  return (
+                    <label
+                      key={category.id}
+                      className={`flex items-center p-2 rounded cursor-pointer hover:bg-gray-700 ${
+                        isSelected ? 'bg-green-600/20' : ''
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleCategory(category.id)}
+                        className="sr-only"
+                      />
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className={`w-4 h-4 border rounded flex items-center justify-center ${
+                          isSelected
+                            ? 'bg-green-600 border-green-600'
+                            : 'border-gray-500'
+                        }`}>
+                          {isSelected && (
+                            <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" />
+                            </svg>
+                          )}
+                        </div>
+                        <span>{category.name}</span>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
           </div>
         </UI.ModalBody>
 

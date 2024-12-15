@@ -40,7 +40,7 @@ export function Layout() {
         className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
         style={{ backgroundImage: 'url(/images/login/login_background.webp)' }}
       >
-        <div className="absolute inset-0 bg-black/90" />
+        <div className="absolute inset-0 bg-black/80" />
       </div>
 
       {/* Top Navigation Bar */}
