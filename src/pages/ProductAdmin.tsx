@@ -221,7 +221,41 @@ export default function ProductAdmin() {
     }
   }, [state.selected.line, setPagination.currentPage, setSearch.searchTerm])
 
-  // Generic modal action handler
+  // Add these helper functions at the top level of the file, before the component
+  const canDeleteCompany = async (id: number) => {
+    const { data, error } = await supabase
+      .from('product_lines')
+      .select('id')
+      .eq('company_id', id)
+      .limit(1)
+    
+    if (error) throw error
+    return data.length === 0
+  }
+
+  const canDeleteProductLine = async (id: number) => {
+    const { data, error } = await supabase
+      .from('product_sets')
+      .select('id')
+      .eq('product_line_id', id)
+      .limit(1)
+    
+    if (error) throw error
+    return data.length === 0
+  }
+
+  const canDeleteProductSet = async (id: number) => {
+    const { data, error } = await supabase
+      .from('minis')
+      .select('id')
+      .eq('product_set_id', id)
+      .limit(1)
+    
+    if (error) throw error
+    return data.length === 0
+  }
+
+  // Replace the existing handleModalAction function with this updated version
   const handleModalAction = async (action: string, data?: any) => {
     try {
       let result
@@ -241,7 +275,13 @@ export default function ProductAdmin() {
           refresh('companies')
           break
 
-        case 'deleteCompany':
+        case 'deleteCompany': {
+          const canDelete = await canDeleteCompany(state.modal.data.id)
+          if (!canDelete) {
+            showError('Cannot delete company because it has product lines associated with it')
+            setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))
+            return
+          }
           result = await loading.withLoading(deleteCompany(state.modal.data.id))
           if (result.error) throw new Error(result.error)
           showSuccess('Company deleted successfully')
@@ -254,6 +294,7 @@ export default function ProductAdmin() {
           refresh('companies')
           loadOverallTotals()
           break
+        }
 
         case 'addLine':
           if (!state.selected.company) return
@@ -273,7 +314,13 @@ export default function ProductAdmin() {
           refresh('lines')
           break
 
-        case 'deleteLine':
+        case 'deleteLine': {
+          const canDelete = await canDeleteProductLine(state.modal.data.id)
+          if (!canDelete) {
+            showError('Cannot delete product line because it has product sets associated with it')
+            setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))
+            return
+          }
           result = await loading.withLoading(deleteProductLine(state.modal.data.id))
           if (result.error) throw new Error(result.error)
           showSuccess('Product line deleted successfully')
@@ -285,6 +332,7 @@ export default function ProductAdmin() {
           }
           refresh('lines')
           break
+        }
 
         case 'addSet':
           if (!state.selected.line) return
@@ -305,7 +353,13 @@ export default function ProductAdmin() {
           refresh('sets')
           break
 
-        case 'deleteSet':
+        case 'deleteSet': {
+          const canDelete = await canDeleteProductSet(state.modal.data.id)
+          if (!canDelete) {
+            showError('Cannot delete product set because it has miniatures associated with it')
+            setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))
+            return
+          }
           result = await loading.withLoading(deleteProductSet(state.modal.data.id))
           if (result.error) throw new Error(result.error)
           showSuccess('Product set deleted successfully')
@@ -318,10 +372,51 @@ export default function ProductAdmin() {
           refresh('sets')
           loadOverallTotals()
           break
+        }
       }
       setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))
     } catch (error: unknown) {
       showError(error instanceof Error ? error.message : String(error))
+    }
+  }
+
+  const handleDelete = async (type: 'company' | 'line' | 'set', item: any) => {
+    try {
+      let canDelete = false
+      
+      switch (type) {
+        case 'company':
+          canDelete = await canDeleteCompany(item.id)
+          if (!canDelete) {
+            showError('Cannot delete company because it has product lines associated with it')
+            return
+          }
+          break
+          
+        case 'line':
+          canDelete = await canDeleteProductLine(item.id)
+          if (!canDelete) {
+            showError('Cannot delete product line because it has product sets associated with it')
+            return
+          }
+          break
+          
+        case 'set':
+          canDelete = await canDeleteProductSet(item.id)
+          if (!canDelete) {
+            showError('Cannot delete product set because it has miniatures associated with it')
+            return
+          }
+          break
+      }
+
+      // If we get here, we can delete, so show the confirmation modal
+      setState(prev => ({
+        ...prev,
+        modal: { type: `delete${type.charAt(0).toUpperCase() + type.slice(1)}`, isOpen: true, data: item }
+      }))
+    } catch (error) {
+      showError('Error checking delete constraints')
     }
   }
 
@@ -373,10 +468,7 @@ export default function ProductAdmin() {
               ...prev,
               modal: { type: 'editCompany', isOpen: true, data: company }
             }))}
-            onDelete={(company) => setState(prev => ({
-              ...prev,
-              modal: { type: 'deleteCompany', isOpen: true, data: company }
-            }))}
+            onDelete={(company) => handleDelete('company', company)}
             loading={loading.isLoading}
             searchProps={{
               ...companySearch.searchProps,
@@ -412,10 +504,7 @@ export default function ProductAdmin() {
               ...prev,
               modal: { type: 'editLine', isOpen: true, data: line }
             }))}
-            onDelete={(line) => setState(prev => ({
-              ...prev,
-              modal: { type: 'deleteLine', isOpen: true, data: line }
-            }))}
+            onDelete={(line) => handleDelete('line', line)}
             loading={loading.isLoading}
             addButtonDisabled={!state.selected.company}
             headerSubText={`Selected company: ${state.selected.company?.name || 'None'}`}
@@ -458,10 +547,7 @@ export default function ProductAdmin() {
               ...prev,
               modal: { type: 'editSet', isOpen: true, data: set }
             }))}
-            onDelete={(set) => setState(prev => ({
-              ...prev,
-              modal: { type: 'deleteSet', isOpen: true, data: set }
-            }))}
+            onDelete={(set) => handleDelete('set', set)}
             loading={loading.isLoading}
             addButtonDisabled={!state.selected.line}
             headerSubText={`Selected line: ${state.selected.line?.name || 'None'}`}

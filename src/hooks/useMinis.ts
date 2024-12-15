@@ -11,6 +11,23 @@ export function useMinis(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [totalMinis, setTotalMinis] = useState(0)
+  const [totalQuantity, setTotalQuantity] = useState(0)
+
+  const getTotalQuantity = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('minis')
+        .select('quantity')
+        .returns<{ quantity: number }[]>()
+
+      if (error) throw error
+
+      const sum = data.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
+      setTotalQuantity(sum)
+    } catch (err) {
+      console.error('Error loading total quantity:', err)
+    }
+  }, [])
 
   const getPageMinis = useCallback(async (pageNum: number): Promise<Mini[] | null> => {
     try {
@@ -143,6 +160,9 @@ export function useMinis(
 
         setMinis(data || [])
         setTotalMinis(count || 0)
+
+        // Load total quantity
+        await getTotalQuantity()
       } catch (err) {
         console.error('Error loading minis:', err)
         setError(err instanceof Error ? err.message : 'An error occurred')
@@ -152,7 +172,7 @@ export function useMinis(
     }
 
     loadMinis()
-  }, [page, pageSize, searchTerm])
+  }, [page, pageSize, searchTerm, getTotalQuantity])
 
-  return { minis, loading, error, totalMinis, getPageMinis }
+  return { minis, loading, error, totalMinis, totalQuantity, getPageMinis }
 } 

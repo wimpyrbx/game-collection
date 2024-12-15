@@ -26,7 +26,7 @@ export default function MiniatureOverview() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
 
-  const { minis, loading, error, totalMinis, getPageMinis } = useMinis(
+  const { minis, loading, error, totalMinis, totalQuantity, getPageMinis } = useMinis(
     currentPage,
     itemsPerPage,
     miniSearch.searchTerm
@@ -208,12 +208,12 @@ export default function MiniatureOverview() {
         <PageHeaderBigNumber
             icon={FaDiceD6}
             number={totalMinis}
-            text="Total Miniatures"
+            text="Total Types"
           />
           <PageHeaderBigNumber
             icon={FaShareAltSquare}
-            number="1001"
-            text="Miniature Count"
+            number={totalQuantity}
+            text="Total Miniatures"
           />
       </PageHeader>
 

@@ -2,6 +2,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { PageTransition } from './PageTransition'
 import { AnimatePresence } from 'framer-motion'
+import { FaSignOutAlt, FaHome, FaDragon, FaTags, FaBoxes } from 'react-icons/fa'
 
 export function Layout() {
   const { user, signOut } = useAuth()
@@ -17,6 +18,21 @@ export function Layout() {
     }
   }
 
+  const menuItems = [
+    { path: '/', label: 'Home', icon: FaHome },
+    { path: '/miniature-overview', label: 'Miniatures', icon: FaDragon },
+    { path: '/type-category-admin', label: 'Categories', icon: FaTags },
+    { path: '/product-admin', label: 'Products', icon: FaBoxes },
+  ]
+
+  const getMenuItemClasses = (isActive: boolean) => `
+    flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium
+    transition-all duration-200 border
+    ${isActive 
+      ? 'bg-cyan-900 border-cyan-700 text-white shadow-lg' 
+      : 'text-gray-300 hover:text-white hover:bg-gray-900 border-transparent'}
+  `
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Background image with overlay - spans entire page */}
@@ -29,24 +45,23 @@ export function Layout() {
 
       {/* Top Navigation Bar */}
       <nav className="bg-gray-800/90 backdrop-blur-sm shadow-lg relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+        <div className="container mx-auto px-4">
+          <div className="flex justify-between h-20">
             {/* Left side - Navigation Links */}
-            <div className="flex">
-              <div className="flex space-x-4 items-center">
-                <Link to="/" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                  Home
-                </Link>
-                <Link to="/miniature-overview" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                  Miniatures
-                </Link>
-                <Link to="/type-category-admin" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                  Categories
-                </Link>
-                <Link to="/product-admin" className="text-gray-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium">
-                  Products
-                </Link>
-              </div>
+            <div className="flex items-center space-x-2">
+              {menuItems.map(({ path, label, icon: Icon }) => {
+                const isActive = location.pathname === path
+                return (
+                  <Link
+                    key={path}
+                    to={path}
+                    className={getMenuItemClasses(isActive)}
+                  >
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-gray-400'}`} />
+                    {label}
+                  </Link>
+                )
+              })}
             </div>
 
             {/* Right side - User Info & Sign Out */}
@@ -54,8 +69,9 @@ export function Layout() {
               <span className="text-gray-300 text-sm">{user?.email}</span>
               <button
                 onClick={handleSignOut}
-                className="text-gray-300 hover:text-white hover:bg-gray-700 px-3 py-2 rounded-md text-sm font-medium"
+                className="flex items-center gap-2 text-gray-300 hover:text-white bg-red-900/50 hover:bg-red-900 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 border border-transparent hover:border-gray-500"
               >
+                <FaSignOutAlt className="w-4 h-4" />
                 Sign Out
               </button>
             </div>
