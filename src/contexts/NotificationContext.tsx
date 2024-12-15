@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useCallback, useState } from 'react'
-import { Toast } from '../components/ui/Toast'
+import { Toast } from '../components/ui/feedback/Toast'
 
 export type NotificationType = 'error' | 'warning' | 'success'
 

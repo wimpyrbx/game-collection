@@ -24,7 +24,7 @@ export function CardIcon({ size = 'small', children, className = '' }: CardIconP
   )
 }
 
-export function CardHeader({ children, className = '' }: CardHeaderProps) {
+export default function CardHeader({ children, className = '' }: CardHeaderProps) {
   return (
     <div className={`p-4 border-b border-gray-700 ${className} bgCardHeader`}>
       <div className="flex justify-between items-start">

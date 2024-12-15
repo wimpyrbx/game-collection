@@ -1,4 +1,5 @@
-import * as UI from '.'
+import { Button } from '../Button'
+import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
 import { IconType } from 'react-icons'
 
 interface DeleteConfirmModalProps {
@@ -8,7 +9,6 @@ interface DeleteConfirmModalProps {
   isLoading?: boolean
   title: string
   message: string
-  itemName: string
   icon?: IconType
   iconColor?: string
 }
@@ -20,7 +20,6 @@ export function DeleteConfirmModal({
   isLoading,
   title,
   message,
-  itemName,
   icon: Icon,
   iconColor = 'text-red-500'
 }: DeleteConfirmModalProps) {
@@ -30,9 +29,9 @@ export function DeleteConfirmModal({
   }
 
   return (
-    <UI.Modal isOpen={isOpen} onClose={onClose}>
+    <Modal isOpen={isOpen} onClose={onClose}>
       <form onSubmit={handleSubmit}>
-        <UI.ModalHeader>
+        <ModalHeader>
           <div className="flex items-center gap-3">
             {Icon && (
               <div className={`text-xl ${iconColor}`}>
@@ -41,31 +40,30 @@ export function DeleteConfirmModal({
             )}
             <h2 className="text-xl font-semibold">{title}</h2>
           </div>
-        </UI.ModalHeader>
+        </ModalHeader>
 
-        <UI.ModalBody>
+        <ModalBody>
           <p className="text-gray-300">{message}</p>
-          <p className="mt-2 font-semibold text-gray-300"><strong>"{itemName}"</strong></p>
-        </UI.ModalBody>
+        </ModalBody>
 
-        <UI.ModalFooter>
+        <ModalFooter>
           <div className="flex justify-end gap-2">
-            <UI.Button
+            <Button
               variant="btnPrimary"
               onClick={onClose}
             >
               Cancel
-            </UI.Button>
-            <UI.Button
+            </Button>
+            <Button
               variant="btnDanger"
               type="submit"
               disabled={isLoading}
             >
               {isLoading ? 'Deleting...' : 'Delete'}
-            </UI.Button>
+            </Button>
           </div>
-        </UI.ModalFooter>
+        </ModalFooter>
       </form>
-    </UI.Modal>
+    </Modal>
   )
 } 

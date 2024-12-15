@@ -5,7 +5,7 @@ interface CardBodyProps {
   className?: string
 }
 
-export function CardBody({ children, className = '' }: CardBodyProps) {
+export default function CardBody({ children, className = '' }: CardBodyProps) {
   return (
     <div className={`p-4 ${className} bgCardBody`}>
       {children}

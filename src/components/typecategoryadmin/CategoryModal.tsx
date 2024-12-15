@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../ui';
-import { Input } from '../ui/Input';
+import { Input } from '../ui/input/Input';
 
 interface CategoryModalProps {
   isOpen: boolean
@@ -10,13 +10,13 @@ interface CategoryModalProps {
   isLoading: boolean
 }
 
-export const CategoryModal: React.FC<CategoryModalProps> = ({ 
+export default function CategoryModal({ 
   isOpen, 
   onClose, 
   onSubmit, 
   category = null,
   isLoading 
-}) => {
+}: CategoryModalProps) {
   const [name, setName] = useState(category?.name || '')
 
   useEffect(() => {

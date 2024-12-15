@@ -1,0 +1,5 @@
+export { default as AddTypeModal } from './AddTypeModal'
+export { default as EditTypeModal } from './EditTypeModal'
+export { default as ManageCategoriesModal } from './ManageCategoriesModal'
+export { default as CategoryModal } from './CategoryModal'
+export { default as DeleteCategoryModal } from './DeleteCategoryModal' 

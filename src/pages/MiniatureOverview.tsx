@@ -202,7 +202,7 @@ export default function MiniatureOverview() {
 
     <PageHeader bgColor="none">
         <PageHeaderTextGroup>
-          <PageHeaderText>Miniatures</PageHeaderText>
+          <PageHeaderText>Miniature Overview</PageHeaderText>
           <PageHeaderSubText>Manage your collection of miniatures</PageHeaderSubText>
         </PageHeaderTextGroup>
         <PageHeaderBigNumber

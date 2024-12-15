@@ -35,7 +35,7 @@ interface AdminTableSectionProps<T> {
   getItemName?: (item: T) => string
 }
 
-export function AdminTableSection<T extends { id: number }>({
+export default function AdminTableSection<T extends { id: number }>({
   title,
   icon: Icon,
   iconColor = 'text-blue-700',

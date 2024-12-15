@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
-import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
-import { FaBuilding, FaList, FaListAlt, FaBox, FaArchive } from 'react-icons/fa'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { FaBuilding, FaList, FaListAlt, FaArchive, FaExclamationTriangle } from 'react-icons/fa'
 
 import { useProductAdmin } from '../hooks/useProductAdmin'
 import { ProductLineModal, ProductSetModal, ProductCompanyModal } from '../components/productadmin'
@@ -383,6 +383,7 @@ export default function ProductAdmin() {
   const handleDelete = async (type: 'company' | 'line' | 'set', item: any) => {
     try {
       let canDelete = false
+      let modalType: typeof state.modal.type = null
       
       switch (type) {
         case 'company':
@@ -391,6 +392,7 @@ export default function ProductAdmin() {
             showError('Cannot delete company because it has product lines associated with it')
             return
           }
+          modalType = 'deleteCompany'
           break
           
         case 'line':
@@ -399,6 +401,7 @@ export default function ProductAdmin() {
             showError('Cannot delete product line because it has product sets associated with it')
             return
           }
+          modalType = 'deleteLine'
           break
           
         case 'set':
@@ -407,13 +410,14 @@ export default function ProductAdmin() {
             showError('Cannot delete product set because it has miniatures associated with it')
             return
           }
+          modalType = 'deleteSet'
           break
       }
 
       // If we get here, we can delete, so show the confirmation modal
       setState(prev => ({
         ...prev,
-        modal: { type: `delete${type.charAt(0).toUpperCase() + type.slice(1)}`, isOpen: true, data: item }
+        modal: { type: modalType, isOpen: true, data: item }
       }))
     } catch (error) {
       showError('Error checking delete constraints')
@@ -597,11 +601,12 @@ export default function ProductAdmin() {
 
         <UI.DeleteConfirmModal
           isOpen={state.modal.type?.startsWith('delete') || false}
+          icon={FaExclamationTriangle}
+          iconColor="text-red-500"
           onClose={() => setState(prev => ({ ...prev, modal: { type: null, isOpen: false } }))}
           onConfirm={() => handleModalAction(state.modal.type || '')}
-          title={`Delete ${state.modal.type?.replace('delete', '')}`}
-          message={`Are you sure you want to delete this ${state.modal.type?.replace('delete', '').toLowerCase()}?`}
-          itemName={state.modal.data?.name || ''}
+          title="Delete Confirmation"
+          message={`Are you sure you want to delete "${state.modal.data?.name}"? This action cannot be undone.`}
           isLoading={loading.isLoading}
         />
       </div>

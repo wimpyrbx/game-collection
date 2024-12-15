@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import * as UI from './ui'
+import * as UI from '../ui'
 import { FaListAlt } from 'react-icons/fa'
 
 interface Category {
@@ -71,7 +71,7 @@ export default function ManageCategoriesModal({
             className="w-full mb-4"
           />
 
-          <div className="max-h-[400px] overflow-y-auto">
+          <div className="space-y-1">
             {filteredCategories.map(category => {
               const isSelected = selected.includes(category.id)
               

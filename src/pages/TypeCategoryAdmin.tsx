@@ -7,12 +7,9 @@ import { FaArchive, FaSchlix, FaShareAltSquare, FaUsersCog, FaExclamationTriangl
 
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 import type { MiniType, MiniCategory } from '../lib/supabase'
-import AddTypeModal from '../components/AddTypeModal'
-import EditTypeModal from '../components/EditTypeModal'
-import ManageCategoriesModal from '../components/ManageCategoriesModal'
-import DeleteTypeConfirmationModal from '../components/DeleteTypeConfirmationModal'
-import { CategoryModal } from '../components/typecategoryadmin/CategoryModal'
-import { DeleteConfirmModal } from '../components/ui'
+import { AddTypeModal, EditTypeModal, ManageCategoriesModal, CategoryModal } from '../components/typecategoryadmin'
+import { DeleteConfirmModal } from '../components/ui/modal'
+import { supabase } from '../lib/supabase'
 
 export default function TypeCategoryAdmin() {
   // Essential state
@@ -20,6 +17,7 @@ export default function TypeCategoryAdmin() {
   const [showUnlinkedOnly, setShowUnlinkedOnly] = useState(false)
   const [totalCategories, setTotalCategories] = useState(0)
   const [categories, setCategories] = useState<MiniCategory[]>([])
+  const [allCategories, setAllCategories] = useState<MiniCategory[]>([])
   const [typesWithoutCategoriesCount, setTypesWithoutCategoriesCount] = useState(0)
 
   const {
@@ -326,6 +324,29 @@ export default function TypeCategoryAdmin() {
     setUnlinkCategory({ category: null, isOpen: false })
   }
 
+  // Add this new function
+  const loadAllCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('mini_categories')
+        .select('*')
+        .order('name')
+
+      if (error) throw error
+      if (data) setAllCategories(data)
+    } catch (error) {
+      console.error('Error loading all categories:', error)
+      showError('Failed to load categories')
+    }
+  }
+
+  // Add effect to load all categories when modal opens
+  useEffect(() => {
+    if (modalState.type === 'categories') {
+      loadAllCategories()
+    }
+  }, [modalState.type])
+
   return (
     <>
       <PageHeader bgColor="none">
@@ -364,8 +385,14 @@ export default function TypeCategoryAdmin() {
             selectedItem={selectedType}
             onSelect={handleTypeSelect}
             onAdd={() => setModalState({ type: 'add', isOpen: true })}
-            onEdit={(type) => setModalState({ type: 'edit', isOpen: true, data: type })}
-            onDelete={handleDeleteClick}
+            onEdit={(type) => {
+              handleTypeSelect(type)
+              setModalState({ type: 'edit', isOpen: true, data: type })
+            }}
+            onDelete={(type) => {
+              handleTypeSelect(type)
+              handleDeleteClick(type)
+            }}
             loading={loading.isLoading}
             headerSubText="Manage mini types"
             headerItalicText="* Click on a type to manage its categories"
@@ -434,16 +461,20 @@ export default function TypeCategoryAdmin() {
             items={categories}
             selectedItem={null}
             onAdd={() => setModalState({ type: 'addCategory', isOpen: true })}
-            onEdit={(category) => setModalState({ 
-              type: 'editCategory', 
-              isOpen: true, 
-              data: category 
-            })}
-            onDelete={(category) => setModalState({
-              type: 'deleteCategory',
-              isOpen: true,
-              data: category
-            })}
+            onEdit={(category) => {
+              setModalState({ 
+                type: 'editCategory', 
+                isOpen: true, 
+                data: category 
+              })
+            }}
+            onDelete={(category) => {
+              setModalState({
+                type: 'deleteCategory',
+                isOpen: true,
+                data: category
+              })
+            }}
             loading={loading.isLoading}
             headerSubText="Manage all categories"
             headerItalicText="* Add/Edit/Delete categories"
@@ -482,16 +513,20 @@ export default function TypeCategoryAdmin() {
         isOpen={modalState.type === 'categories' && !!selectedType}
         onClose={handleModalClose}
         onSubmit={(categoryIds) => handleModalAction('updateCategories', categoryIds)}
-        categories={categories}
+        categories={allCategories}
         selectedCategoryIds={selectedTypeCategories}
         isLoading={loading.isLoading}
       />
 
-      <DeleteTypeConfirmationModal
+      <UI.DeleteConfirmModal
         isOpen={modalState.type === 'delete'}
+        icon={FaExclamationTriangle}
+        iconColor="text-red-500"
         onClose={handleModalClose}
         onConfirm={() => handleModalAction('delete')}
-        typeName={modalState.data?.name || ''}
+        title="Delete Confirmation"
+        message={`Are you sure you want to delete "${modalState.data?.name}"? This action cannot be undone.`}
+        isLoading={loading.isLoading}
       />
 
       <CategoryModal
@@ -502,24 +537,26 @@ export default function TypeCategoryAdmin() {
         isLoading={loading.isLoading}
       />
 
-      <DeleteConfirmModal
+      <UI.DeleteConfirmModal
         isOpen={modalState.type === 'deleteCategory'}
+        icon={FaExclamationTriangle}
+        iconColor="text-red-500"
         onClose={handleModalClose}
         onConfirm={() => handleModalAction('deleteCategory')}
         title="Delete Category"
-        message={`Are you sure you want to delete the category "${modalState.data?.name}"?`}
+        message={`Are you sure you want to delete the category "${modalState.data?.name}"? This action cannot be undone.`}
         isLoading={loading.isLoading}
-        itemName={modalState.data?.name || ''}
       />
 
-      <DeleteConfirmModal
+      <UI.DeleteConfirmModal
         isOpen={unlinkCategory.isOpen}
+        icon={FaExclamationTriangle}
+        iconColor="text-red-500"
         onClose={() => setUnlinkCategory({ category: null, isOpen: false })}
         onConfirm={handleUnlinkConfirm}
         title="Unlink Category"
-        message={`Are you sure you want to unlink the category "${unlinkCategory.category?.name}" from type "${selectedType?.name}"?`}
+        message={`Are you sure you want to unlink the category "${unlinkCategory.category?.name}" from type "${selectedType?.name}"? This action cannot be undone.`}
         isLoading={loading.isLoading}
-        itemName={unlinkCategory.category?.name || ''}
       />
     </>
   )

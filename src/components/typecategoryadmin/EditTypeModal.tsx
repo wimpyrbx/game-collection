@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import * as UI from './ui'
+import * as UI from '../ui'
 import { FaArchive } from 'react-icons/fa'
 
 interface EditTypeModalProps {

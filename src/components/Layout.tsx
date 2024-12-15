@@ -1,6 +1,6 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { PageTransition } from './PageTransition'
+import { PageTransition } from './ui'
 import { AnimatePresence } from 'framer-motion'
 import { FaSignOutAlt, FaHome, FaDragon, FaTags, FaBoxes } from 'react-icons/fa'
 
