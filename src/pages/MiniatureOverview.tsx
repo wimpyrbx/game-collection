@@ -210,6 +210,11 @@ export default function MiniatureOverview() {
             number={totalMinis}
             text="Total Miniatures"
           />
+          <PageHeaderBigNumber
+            icon={FaShareAltSquare}
+            number="1001"
+            text="Miniature Count"
+          />
       </PageHeader>
 
       <div className="grid grid-cols-12 gap-4">

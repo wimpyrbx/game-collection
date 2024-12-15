@@ -39,7 +39,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   return (
     <NotificationContext.Provider value={{ addNotification, removeNotification, notifications }}>
       {children}
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2">
+      <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[9999] flex flex-col gap-2">
         {notifications.map(notification => (
           <Toast
             key={notification.id}

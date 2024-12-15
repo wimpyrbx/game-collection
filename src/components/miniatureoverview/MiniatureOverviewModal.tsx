@@ -1,5 +1,6 @@
-import React from 'react'
+import { useState, useEffect } from 'react'
 import * as UI from '../ui'
+import { FaDiceD6 } from 'react-icons/fa'
 import type { Mini } from '../../types/mini'
 
 interface MiniatureOverviewModalProps {
@@ -7,54 +8,83 @@ interface MiniatureOverviewModalProps {
   onClose: () => void
   mini?: Mini // Optional for edit mode
   onSave: (data: Partial<Mini>) => Promise<void>
+  isLoading?: boolean
 }
 
-export function MiniatureOverviewModal({ isOpen, onClose, mini, onSave }: MiniatureOverviewModalProps) {
+export function MiniatureOverviewModal({ 
+  isOpen, 
+  onClose, 
+  mini, 
+  onSave,
+  isLoading 
+}: MiniatureOverviewModalProps) {
+  const [name, setName] = useState('')
   const isEditMode = !!mini
+
+  useEffect(() => {
+    if (mini) {
+      setName(mini.name)
+    } else {
+      setName('')
+    }
+  }, [mini])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    // TODO: Implement form submission
+    if (!name.trim()) return
+    await onSave({ name: name.trim() })
+    if (!isEditMode) {
+      setName('')
+    }
   }
 
   return (
     <UI.Modal isOpen={isOpen} onClose={onClose}>
-      <div className="p-6">
-        <h2 className="text-xl font-semibold mb-4">
-          {isEditMode ? 'Edit Miniature' : 'Add New Miniature'}
-        </h2>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-4">
-            {/* Form fields will go here */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                Name
-              </label>
-              <UI.Input
-                type="text"
-                placeholder="Enter miniature name"
-                value={mini?.name}
-              />
+      <form onSubmit={handleSubmit}>
+        <UI.ModalHeader>
+          <div className="flex items-center gap-3">
+            <div className="text-xl text-blue-600">
+              <FaDiceD6 />
             </div>
+            <h2 className="text-xl font-semibold">
+              {isEditMode ? 'Edit Miniature' : 'Add New Miniature'}
+            </h2>
           </div>
+        </UI.ModalHeader>
 
-          <div className="flex justify-end gap-3 mt-6">
+        <UI.ModalBody>
+          <UI.Input
+            label="Name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Enter miniature name"
+            required
+            autoFocus
+          />
+        </UI.ModalBody>
+
+        <UI.ModalFooter>
+          <div className="flex justify-end gap-2">
             <UI.Button
-              type="button"
               variant="btnPrimary"
               onClick={onClose}
+              type="button"
             >
               Cancel
             </UI.Button>
             <UI.Button
-              type="submit"
               variant="btnSuccess"
+              type="submit"
+              disabled={isLoading}
             >
-              {isEditMode ? 'Save Changes' : 'Add Miniature'}
+              {isLoading 
+                ? (isEditMode ? 'Saving...' : 'Adding...') 
+                : (isEditMode ? 'Save Changes' : 'Add Miniature')
+              }
             </UI.Button>
           </div>
-        </form>
-      </div>
+        </UI.ModalFooter>
+      </form>
     </UI.Modal>
   )
 } 

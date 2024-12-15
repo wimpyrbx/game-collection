@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 
 interface ModalProps {
   isOpen: boolean
@@ -9,8 +10,9 @@ interface ModalProps {
 export function Modal({ isOpen, onClose, children }: ModalProps) {
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+  // Create portal to mount modal directly to document body
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] overflow-y-auto">
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Backdrop */}
         <div 
@@ -19,13 +21,14 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
         />
         
         {/* Modal content */}
-        <div className="relative z-50 w-full max-w-2xl">
+        <div className="relative z-[9999] w-full max-w-2xl">
           <div className="bg-gray-900 rounded-lg border border-gray-800 shadow-xl">
             {children}
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
