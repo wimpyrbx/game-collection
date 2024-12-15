@@ -32,10 +32,10 @@ interface SupabaseMini {
     id: number
     painted_by_name: string
   }
-  base_size: {
+  base_sizes: Array<{
     id: number
     base_size_name: string
-  }
+  }>
   product_sets?: Array<{
     id: number
     name: string
@@ -85,12 +85,19 @@ export function useMinis(
       }
     })) || [],
     painted_by: item.painted_by,
-    base_size: item.base_size,
-    product_sets: item.product_sets?.map(ps => ({
+    base_size: item.base_sizes[0] || null,
+    product_sets: Array.isArray(item.product_sets) ? item.product_sets.map(ps => ({
       id: ps.id,
       name: ps.name,
-      product_lines: ps.product_lines
-    }))
+      product_lines: ps.product_lines ? {
+        id: ps.product_lines.id,
+        name: ps.product_lines.name,
+        company: ps.product_lines.company ? {
+          id: ps.product_lines.company.id,
+          name: ps.product_lines.company.name
+        } : undefined
+      } : undefined
+    })) : []
   })
 
   const getTotalQuantity = useCallback(async () => {
@@ -147,13 +154,13 @@ export function useMinis(
             id, 
             base_size_name
           ),
-          product_sets(
+          product_sets!left(
             id,
             name,
-            product_lines(
+            product_lines!left(
               id,
               name,
-              company:product_companies(
+              company:product_companies!left(
                 id,
                 name
               )
@@ -202,10 +209,10 @@ export function useMinis(
             id: number
             painted_by_name: string
           }
-          base_size: {
+          base_sizes: Array<{
             id: number
             base_size_name: string
-          }
+          }>
           product_sets: Array<{
             id: number
             name: string
@@ -271,13 +278,13 @@ export function useMinis(
               id, 
               base_size_name
             ),
-            product_sets(
+            product_sets!left(
               id,
               name,
-              product_lines(
+              product_lines!left(
                 id,
                 name,
-                company:product_companies(
+                company:product_companies!left(
                   id,
                   name
                 )
@@ -294,6 +301,8 @@ export function useMinis(
           .order('name')
 
         if (error) throw error
+
+        // console.log('Raw data from Supabase:', JSON.stringify(data, null, 2))
 
         const transformedData = data?.map(item => {
           const typedItem = item as unknown as {
@@ -326,10 +335,10 @@ export function useMinis(
               id: number
               painted_by_name: string
             }
-            base_size: {
+            base_sizes: Array<{
               id: number
               base_size_name: string
-            }
+            }>
             product_sets: Array<{
               id: number
               name: string
