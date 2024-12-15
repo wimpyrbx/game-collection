@@ -4,31 +4,53 @@ import { Login } from './pages/Login'
 import { Layout } from './components/Layout'
 import { useAuth } from './contexts/AuthContext'
 import Home from './pages/Home'
-import Testing from './pages/Testing'
 import TypeCategoryAdmin from './pages/TypeCategoryAdmin'
 import ProductAdmin from './pages/ProductAdmin'
 import MiniatureOverview from './pages/MiniatureOverview'
+import { useState, useEffect } from 'react'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, session, loading } = useAuth()
   const location = useLocation()
 
-  console.log('ProtectedRoute state:', { user, loading, pathname: location.pathname })
+  const [showLoading, setShowLoading] = useState(false)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (loading) {
+        setShowLoading(true)
+      }
+    }, 500)
 
-  if (loading) {
+    if (!loading) {
+      setShowLoading(false)
+    }
+
+    return () => clearTimeout(timeout)
+  }, [loading])
+
+  if (loading && showLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
-        <div className="text-white text-xl">Loading...</div>
+        <div className="text-white text-xl flex items-center gap-3">
+          <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          Loading...
+        </div>
       </div>
     )
   }
 
-  if (!user) {
-    // Save the attempted URL
+  if (!loading && (!session || !user)) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  return <>{children}</>
+  if (!loading && session && user) {
+    return <>{children}</>
+  }
+
+  return null
 }
 
 export function AppRoutes() {
@@ -45,7 +67,6 @@ export function AppRoutes() {
           }
         >
           <Route index element={<Home />} />
-          <Route path="testing" element={<Testing />} />
           <Route path="type-category-admin" element={<TypeCategoryAdmin />} />
           <Route path="product-admin" element={<ProductAdmin />} />
           <Route path="miniature-overview" element={<MiniatureOverview />} />

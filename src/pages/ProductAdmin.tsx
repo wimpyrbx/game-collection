@@ -327,15 +327,10 @@ export default function ProductAdmin() {
 
   return (
     <>
-      <PageHeader bgColor="bg-cyan-900">
-            <PageHeaderIcon
-              icon={FaBuilding}
-              className="text-white"
-              bgClassName="bg-cyan-700"
-            />
+      <PageHeader bgColor="none">
             <PageHeaderTextGroup> 
-              <PageHeaderText>Product Management</PageHeaderText>
-              <PageHeaderSubText>Manage your product companies, lines and sets</PageHeaderSubText>
+              <PageHeaderText>Product Companies, Lines and Sets</PageHeaderText>
+              <PageHeaderSubText>Manage your collection of product companies, lines, and sets</PageHeaderSubText>
             </PageHeaderTextGroup>
               <PageHeaderBigNumber
                 icon={FaArchive}

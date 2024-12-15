@@ -328,14 +328,9 @@ export default function TypeCategoryAdmin() {
 
   return (
     <>
-      <PageHeader bgColor="bg-cyan-900">
-        <PageHeaderIcon
-          icon={FaUsersCog}
-          className="text-white"
-          bgClassName="bg-cyan-700"
-        />
+      <PageHeader bgColor="none">
         <PageHeaderTextGroup>
-          <PageHeaderText>Mini Types</PageHeaderText>
+          <PageHeaderText>Mini Types and Categories</PageHeaderText>
           <PageHeaderSubText>Manage your collection of mini types and their categories</PageHeaderSubText>
         </PageHeaderTextGroup>
           <PageHeaderBigNumber

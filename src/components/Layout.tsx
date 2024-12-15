@@ -1,9 +1,12 @@
-import { Outlet, Link, useNavigate } from 'react-router-dom'
+import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { PageTransition } from './PageTransition'
+import { AnimatePresence } from 'framer-motion'
 
 export function Layout() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleSignOut = async () => {
     try {
@@ -63,7 +66,11 @@ export function Layout() {
       {/* Main Content */}
       <main className="flex-1 container mx-auto px-4 py-6 relative z-0">
         <div className="bg-gray-900/50 backdrop-blur-sm rounded-lg shadow-xl p-6">
-          <Outlet />
+          <AnimatePresence mode="wait" initial={false}>
+            <PageTransition key={location.pathname}>
+              <Outlet />
+            </PageTransition>
+          </AnimatePresence>
         </div>
       </main>
     </div>

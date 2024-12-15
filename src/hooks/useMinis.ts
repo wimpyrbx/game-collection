@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Mini } from '../types/mini'
 
@@ -11,6 +11,72 @@ export function useMinis(
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [totalMinis, setTotalMinis] = useState(0)
+
+  const getPageMinis = useCallback(async (pageNum: number): Promise<Mini[] | null> => {
+    try {
+      let query = supabase
+        .from('minis')
+        .select(`
+          id,
+          name,
+          quantity,
+          location,
+          types:mini_to_types(
+            type:mini_types(
+              id,
+              name,
+              categories:type_to_categories(
+                category:mini_categories(
+                  id,
+                  name
+                )
+              )
+            )
+          ),
+          painted_by(
+            id, 
+            painted_by_name
+          ),
+          base_sizes(
+            id, 
+            base_size_name
+          ),
+          product_sets(
+            id,
+            name,
+            product_lines(
+              id,
+              name,
+              company:product_companies(
+                id,
+                name
+              )
+            )
+          )
+        `)
+
+      if (searchTerm) {
+        query = query.or(`
+          name.ilike.%${searchTerm}%,
+          types.type.name.ilike.%${searchTerm}%,
+          product_sets.name.ilike.%${searchTerm}%,
+          product_sets.product_lines.name.ilike.%${searchTerm}%,
+          product_sets.product_lines.company.name.ilike.%${searchTerm}%
+        `)
+      }
+
+      const { data, error } = await query
+        .range((pageNum - 1) * pageSize, pageNum * pageSize - 1)
+        .order('name')
+
+      if (error) throw error
+
+      return data
+    } catch (err) {
+      console.error('Error loading minis:', err)
+      return null
+    }
+  }, [pageSize, searchTerm])
 
   useEffect(() => {
     const loadMinis = async () => {
@@ -88,5 +154,5 @@ export function useMinis(
     loadMinis()
   }, [page, pageSize, searchTerm])
 
-  return { minis, loading, error, totalMinis }
+  return { minis, loading, error, totalMinis, getPageMinis }
 } 

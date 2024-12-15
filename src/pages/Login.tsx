@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { FaGoogle } from 'react-icons/fa'
 import { useAuth } from '../contexts/AuthContext'
 import { DndQuote } from '../components/ui/DndQuote'
@@ -9,28 +9,13 @@ export function Login() {
   const [error, setError] = useState<string | null>(null)
   const { signInWithGoogle, user } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
-
-  useEffect(() => {
-    // Check for OAuth callback error
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    const error = hashParams.get('error')
-    const errorDescription = hashParams.get('error_description')
-    
-    if (error) {
-      console.error('OAuth Error in Login:', error, errorDescription)
-      setError(errorDescription || 'Authentication failed')
-    }
-  }, [])
 
   useEffect(() => {
     if (user) {
-      // Redirect to the attempted URL or default to home
-      const from = (location.state as any)?.from?.pathname || '/'
-      console.log('User authenticated, redirecting to:', from)
-      navigate(from, { replace: true })
+      // Always redirect to home page after login
+      navigate('/', { replace: true })
     }
-  }, [user, navigate, location])
+  }, [user, navigate])
 
   const handleLogin = async () => {
     try {

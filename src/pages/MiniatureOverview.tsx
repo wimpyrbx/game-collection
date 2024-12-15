@@ -1,31 +1,57 @@
 import React, { useState, useEffect } from 'react'
-import { FaDragon, FaArchive, FaEgg, FaEllo, FaExpand, FaDog, FaHotdog, FaAlgolia, FaBullseye, FaCarCrash, FaChessKing, FaChessBishop, FaChessPawn, FaDiceD20, FaTable, FaTabletAlt, FaListUl, FaThList, FaRegListAlt, FaToolbox, FaStroopwafel, FaDiceD6, FaThLarge } from 'react-icons/fa'
+import { FaDragon, FaArchive, FaEgg, FaEllo, FaExpand, FaDog, FaHotdog, FaAlgolia, FaBullseye, FaCarCrash, FaChessKing, FaChessBishop, FaChessPawn, FaDiceD20, FaTable, FaTabletAlt, FaListUl, FaThList, FaRegListAlt, FaToolbox, FaStroopwafel, FaExclamationTriangle, FaDiceD6, FaThLarge, FaShareAltSquare } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminPagination, useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
 import type { Mini } from '../types/mini'
 import { PageHeader, PageHeaderIcon, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
-
-const getMiniImagePath = (id: number, type: 'thumb' | 'original' = 'original') => {
-  const idStr = id.toString()
-  const x = idStr[0]
-  const y = idStr.length > 1 ? idStr[1] : '0'
-  return `/public/images/miniatures/${type}/${x}/${y}/${id}.webp`
-}
+import { getMiniImagePath } from '../utils/imageUtils'
+import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 
 type ViewMode = 'table' | 'cards'
+
+// Preload images for a given array of minis
+const preloadImages = (minis: Mini[]) => {
+  minis.forEach(mini => {
+    const img = new Image()
+    img.src = getMiniImagePath(mini.id, 'thumb')
+  })
+}
 
 export default function MiniatureOverview() {
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const miniSearch = useAdminSearch({ searchFields: ['name'] })
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 10
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
 
-  const { minis, loading, error, totalMinis } = useMinis(
+  const { minis, loading, error, totalMinis, getPageMinis } = useMinis(
     currentPage,
     itemsPerPage,
     miniSearch.searchTerm
   )
+
+  // Preload images for adjacent pages
+  useEffect(() => {
+    if (!loading && totalMinis) {
+      const totalPages = Math.ceil(totalMinis / itemsPerPage)
+      
+      // Preload next page
+      if (currentPage < totalPages) {
+        getPageMinis(currentPage + 1).then(nextPageMinis => {
+          if (nextPageMinis) preloadImages(nextPageMinis)
+        })
+      }
+      
+      // Preload previous page
+      if (currentPage > 1) {
+        getPageMinis(currentPage - 1).then(prevPageMinis => {
+          if (prevPageMinis) preloadImages(prevPageMinis)
+        })
+      }
+    }
+  }, [currentPage, loading, totalMinis, getPageMinis])
 
   // Add keyboard navigation
   useEffect(() => {
@@ -57,7 +83,6 @@ export default function MiniatureOverview() {
     const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
     const quantity = mini.quantity || 0
 
-    const imagePath = getMiniImagePath(mini.id)
     const thumbPath = getMiniImagePath(mini.id, 'thumb')
 
     return [
@@ -66,6 +91,7 @@ export default function MiniatureOverview() {
           <img
             src={thumbPath}
             alt={mini.name}
+            loading="lazy"
             className="w-full h-full object-cover"
             onError={(e) => {
               e.currentTarget.onerror = null
@@ -101,13 +127,23 @@ export default function MiniatureOverview() {
   ]
 
   const handleAdd = () => {
-    // TODO: Implement add functionality
-    console.log('Add clicked')
+    setSelectedMini(undefined)
+    setIsModalOpen(true)
   }
 
   const handleEdit = (mini: Mini) => {
-    // TODO: Implement edit functionality
-    console.log('Edit clicked', mini)
+    setSelectedMini(mini)
+    setIsModalOpen(true)
+  }
+
+  const handleSave = async (data: Partial<Mini>) => {
+    try {
+      // TODO: Implement save functionality
+      setIsModalOpen(false)
+      setSelectedMini(undefined)
+    } catch (error) {
+      console.error('Error saving miniature:', error)
+    }
   }
 
   const renderCardView = () => {
@@ -163,6 +199,19 @@ export default function MiniatureOverview() {
 
   return (
     <>
+
+    <PageHeader bgColor="none">
+        <PageHeaderTextGroup>
+          <PageHeaderText>Miniatures</PageHeaderText>
+          <PageHeaderSubText>Manage your collection of miniatures</PageHeaderSubText>
+        </PageHeaderTextGroup>
+        <PageHeaderBigNumber
+            icon={FaDiceD6}
+            number={totalMinis}
+            text="Total Miniatures"
+          />
+      </PageHeader>
+
       <div className="grid grid-cols-12 gap-4">
         <div className="col-span-12">
           <UI.Card>
@@ -240,7 +289,6 @@ export default function MiniatureOverview() {
                               {header}
                             </th>
                           ))}
-                          <th className="px-6 py-2 bgTableHeader" />
                         </tr>
                       </thead>
                       <tbody className="bgCardBody divide-y divide-[#333333]">
@@ -258,19 +306,6 @@ export default function MiniatureOverview() {
                                 {column}
                               </td>
                             ))}
-                            <td className="px-6 py-2 text-right text-sm font-medium">
-                              <div className="flex justify-end gap-2">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    handleEdit(mini)
-                                  }}
-                                  className="text-blue-400 hover:text-blue-300"
-                                >
-                                  Edit
-                                </button>
-                              </div>
-                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -296,6 +331,16 @@ export default function MiniatureOverview() {
           )}
         </div>
       </div>
+
+      <MiniatureOverviewModal
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false)
+          setSelectedMini(undefined)
+        }}
+        mini={selectedMini}
+        onSave={handleSave}
+      />
     </>
   )
 } 
