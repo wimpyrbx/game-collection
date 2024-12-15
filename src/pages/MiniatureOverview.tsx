@@ -194,7 +194,7 @@ export default function MiniatureOverview() {
 
   const renderCardView = () => {
     return (
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-10  gap-4">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const productSet = mini.product_sets?.[0]?.name || 'No set'
@@ -241,7 +241,7 @@ export default function MiniatureOverview() {
 
   const renderBannerView = () => {
     return (
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-4 gap-6">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const productSet = mini.product_sets?.[0]?.name || 'No set'
