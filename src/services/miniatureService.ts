@@ -16,38 +16,93 @@ interface MiniatureData {
   types: MiniatureType[]
 }
 
-export async function createMiniature(data: MiniatureData) {
+async function getOrCreateTags(tags: Array<{ id: number, name: string }>) {
+  const allTags = []
+  
+  for (const tag of tags) {
+    if (tag.id > 0) {
+      // Existing tag, just add it to the array
+      allTags.push(tag)
+    } else {
+      // Check if tag with this name already exists
+      const { data: existingTag, error: findError } = await supabase
+        .from('tags')
+        .select('*')
+        .ilike('name', tag.name)
+        .single()
+
+      if (findError && findError.code !== 'PGRST116') { // PGRST116 is "not found" error
+        throw findError
+      }
+
+      if (existingTag) {
+        // Use existing tag
+        allTags.push(existingTag)
+      } else {
+        // Create new tag
+        const { data: newTag, error: createError } = await supabase
+          .from('tags')
+          .insert({ name: tag.name })
+          .select()
+          .single()
+
+        if (createError) throw createError
+        allTags.push(newTag)
+      }
+    }
+  }
+  
+  return allTags
+}
+
+export async function createMiniature(data: Partial<Mini>) {
   try {
-    // Insert the miniature
+    // First create the miniature without types to get its ID
+    const miniatureData = {
+      name: data.name,
+      description: data.description,
+      location: data.location,
+      quantity: data.quantity,
+      painted_by_id: data.painted_by_id,
+      base_size_id: data.base_size_id,
+      product_set_id: data.product_set_id
+    }
+
     const { data: newMini, error: miniError } = await supabase
       .from('minis')
-      .insert({
-        name: data.name,
-        description: data.description,
-        location: data.location,
-        quantity: data.quantity,
-        painted_by_id: data.painted_by_id,
-        base_size_id: data.base_size_id,
-        product_set_id: data.product_set_id
-      })
+      .insert(miniatureData)
       .select()
       .single()
 
     if (miniError) throw miniError
 
-    // Insert type relationships if any types are provided
+    // Then create the type relationships with the new mini ID
     if (data.types && data.types.length > 0) {
+      const typeRelations = data.types.map(t => ({
+        mini_id: newMini.id,
+        type_id: t.type_id,
+        proxy_type: t.proxy_type
+      }))
+
       const { error: typesError } = await supabase
         .from('mini_to_types')
-        .insert(
-          data.types.map(type => ({
-            mini_id: newMini.id,
-            type_id: type.id,
-            proxy_type: type.proxy_type
-          }))
-        )
+        .insert(typeRelations)
 
       if (typesError) throw typesError
+    }
+
+    // Handle tags if present
+    if (data.tags && data.tags.length > 0) {
+      const tagRelations = data.tags.map(t => ({
+        mini_id: newMini.id,
+        tag_id: t.id
+      }))
+
+      const { error: tagsError } = await supabase
+        .from('mini_to_tags')
+        .insert(tagRelations)
+
+      if (tagsError) throw tagsError
     }
 
     return newMini
@@ -57,46 +112,72 @@ export async function createMiniature(data: MiniatureData) {
   }
 }
 
-export async function updateMiniature(id: number, mini: Partial<Mini>) {
+export async function updateMiniature(miniId: number, data: Partial<Mini>) {
   try {
-    // Update the miniature
+    // First update the miniature basic data
+    const miniatureData = {
+      name: data.name,
+      description: data.description,
+      location: data.location,
+      quantity: data.quantity,
+      painted_by_id: data.painted_by_id,
+      base_size_id: data.base_size_id,
+      product_set_id: data.product_set_id
+    }
+
     const { error: miniError } = await supabase
       .from('minis')
-      .update({
-        name: mini.name,
-        description: mini.description,
-        location: mini.location,
-        quantity: mini.quantity,
-        painted_by_id: mini.painted_by_id,
-        base_size_id: mini.base_size_id,
-        product_set_id: mini.product_set_id
-      })
-      .eq('id', id)
+      .update(miniatureData)
+      .eq('id', miniId)
 
     if (miniError) throw miniError
 
-    // Update tags
+    // Then handle types - first delete existing relationships
+    const { error: deleteTypesError } = await supabase
+      .from('mini_to_types')
+      .delete()
+      .eq('mini_id', miniId)
+
+    if (deleteTypesError) throw deleteTypesError
+
+    // Then create new type relationships
+    if (data.types && data.types.length > 0) {
+      const typeRelations = data.types.map(t => ({
+        mini_id: miniId,
+        type_id: t.type_id,
+        proxy_type: t.proxy_type
+      }))
+
+      const { error: typesError } = await supabase
+        .from('mini_to_types')
+        .insert(typeRelations)
+
+      if (typesError) throw typesError
+    }
+
+    // Handle tags - first delete existing relationships
     const { error: deleteTagsError } = await supabase
       .from('mini_to_tags')
       .delete()
-      .eq('mini_id', id)
+      .eq('mini_id', miniId)
 
     if (deleteTagsError) throw deleteTagsError
 
-    if (mini.tags && mini.tags.length > 0) {
+    // Then create new tag relationships
+    if (data.tags && data.tags.length > 0) {
+      const tagRelations = data.tags.map(t => ({
+        mini_id: miniId,
+        tag_id: t.id
+      }))
+
       const { error: tagsError } = await supabase
         .from('mini_to_tags')
-        .insert(
-          mini.tags.map(tag => ({
-            mini_id: id,
-            tag_id: tag.id
-          }))
-        )
+        .insert(tagRelations)
 
       if (tagsError) throw tagsError
     }
 
-    return { id }
+    return { id: miniId, ...miniatureData }
   } catch (error) {
     console.error('Error updating miniature:', error)
     throw error
@@ -147,13 +228,25 @@ export const getMiniature = async (id: number) => {
         proxy_type
       ),
       tags:mini_to_tags(
-        tag:tag_id(*)
+        tag:tags(
+          id,
+          name
+        )
       )
     `)
     .eq('id', id)
     .single()
 
   if (error) throw error
+
+  // Transform the tags data structure to match what the component expects
+  if (data && data.tags) {
+    data.tags = data.tags.map((tagRel: any) => ({
+      id: tagRel.tag.id,
+      name: tagRel.tag.name
+    }))
+  }
+
   return data
 }
  

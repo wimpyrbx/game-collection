@@ -9,33 +9,33 @@ export interface Mini {
   painted_by_id: number
   base_size_id: number
   product_set_id: number | null
-  types?: {
+  types: Array<{
     mini_id: number
     type_id: number
-    proxy_type: any
+    proxy_type: boolean
     type: {
       id: number
       name: string
-      categories: {
+      categories: Array<{
         category: {
           id: number
           name: string
-        }[]
-      }[]
+        }
+      }>
     }
-  }[]
-  painted_by?: {
+  }>
+  painted_by: {
     id: number
     painted_by_name: string
   }
-  base_size?: {
+  base_sizes: {
     id: number
     base_size_name: string
   }
   product_sets?: {
     id: number
     name: string
-    product_lines?: {
+    product_line?: {
       id: number
       name: string
       company?: {
@@ -43,7 +43,11 @@ export interface Mini {
         name: string
       }
     }
-  }[]
+  }
+  tags?: Array<{
+    id: number
+    name: string
+  }>
 }
 
 export interface MiniType {

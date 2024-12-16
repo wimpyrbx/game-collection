@@ -134,6 +134,7 @@ export function MiniatureOverviewModal({
     return isValid
   }
 
+  // Load mini data when editing
   useEffect(() => {
     if (mini) {
       // Set form data
@@ -144,44 +145,90 @@ export function MiniatureOverviewModal({
         quantity: mini.quantity || 1,
         painted_by_id: mini.painted_by?.id || 0,
         base_size_id: mini.base_size?.id || 0,
-        product_set_id: mini.product_sets?.[0]?.id || null,
+        product_set_id: mini.product_sets?.id || mini.product_set_id || null,
         types: mini.types?.map(t => ({
           id: t.type.id,
           proxy_type: t.proxy_type
         })) || [],
-        tags: mini.tags?.map(t => ({ id: t.id })) || []
+        tags: mini.tags?.map(t => ({
+          id: t.id
+        })) || []
       }
+
       setFormData(formDataToSet)
 
-      // Set selected types with their names and categories
-      const types = mini.types?.map(t => ({
-        id: t.type.id,
-        name: t.type.name,
-        proxy_type: t.proxy_type
-      })) || []
-      setSelectedTypes(types)
-
-      // Set product search term if product set exists
-      if (mini.product_sets?.[0]) {
-        const productSetName = `${mini.product_sets[0].product_lines?.company?.name} → ${mini.product_sets[0].product_lines?.name} → ${mini.product_sets[0].name}`
-        setProductSearchTerm(productSetName)
-      }
-
-      // Set preview image if exists
-      if (mini.id) {
-        const previewPath = getMiniImagePath(mini.id, 'original')
-        setPreviewUrl(previewPath)
+      // Set selected types
+      if (mini.types) {
+        const typesToSet = mini.types.map(t => ({
+          id: t.type.id,
+          name: t.type.name,
+          proxy_type: t.proxy_type,
+          type: {
+            id: t.type.id,
+            name: t.type.name,
+            categories: t.type.categories || []
+          }
+        }))
+        setSelectedTypes(typesToSet)
       }
 
       // Set selected tags
-      const tags = mini.tags?.map(t => ({
-        id: t.id,
-        name: t.name
-      })) || []
-      setSelectedTags(tags)
+      if (mini.tags) {
+        setSelectedTags(mini.tags)
+      }
+
+      // Set preview URL if image exists
+      if (mini.image_path) {
+        const url = getMiniImagePath(mini.image_path)
+        setPreviewUrl(url)
+      }
+
+      // Set product set display
+      if (mini.product_set) {
+        const company = mini.product_set.product_lines?.product_companies?.name || ''
+        const line = mini.product_set.product_lines?.name || ''
+        const set = mini.product_set.name || ''
+        const displayValue = `${company} → ${line} → ${set}`
+        setProductSearchTerm(displayValue)
+        setShowProductDropdown(true)
+        
+        // Find and select the matching product set
+        for (const company of companies) {
+          const lines = getProductLinesByCompany(company.id)
+          for (const line of lines) {
+            const sets = getProductSetsByProductLine(line.id)
+            const matchingSet = sets.find(s => s.id === mini.product_set.id)
+            if (matchingSet) {
+              setFormData(prev => ({ ...prev, product_set_id: matchingSet.id }))
+              break
+            }
+          }
+        }
+      }
     }
   }, [mini])
 
+  // Add this effect to handle product set selection
+  useEffect(() => {
+    if (formData.product_set_id) {
+      // Find the product set in the available options
+      for (const company of companies) {
+        const lines = getProductLinesByCompany(company.id)
+        for (const line of lines) {
+          const sets = getProductSetsByProductLine(line.id)
+          const set = sets.find(s => s.id === formData.product_set_id)
+          if (set) {
+            const displayValue = `${company.name} → ${line.name} → ${set.name}`
+            setProductSearchTerm(displayValue)
+            setShowProductDropdown(false)
+            return
+          }
+        }
+      }
+    }
+  }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine])
+
+  // Add logging when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
       setFormData({
@@ -196,6 +243,8 @@ export function MiniatureOverviewModal({
         tags: []
       })
       setSelectedTypes([])
+      setSelectedTags([])
+      setPendingTags([])
       setPreviewUrl(null)
       setImage(null)
       setProductSearchTerm('')
@@ -208,10 +257,10 @@ export function MiniatureOverviewModal({
   useEffect(() => {
     if (!mini && isOpen) {
       const prepaintedId = paintedByOptions.find(p => 
-        p.painted_by_name.toLowerCase() === 'prepainted'
+        p.painted_by_name.toLowerCase() === 'Prepainted'.toLowerCase()
       )?.id || 0
       const mediumId = baseSizeOptions.find(b => 
-        b.base_size_name.toLowerCase() === 'medium'
+        b.base_size_name.toLowerCase() === 'Medium'.toLowerCase()
       )?.id || 0
 
       setFormData(prev => ({
@@ -225,7 +274,7 @@ export function MiniatureOverviewModal({
   // Add state for pending new tags
   const [pendingTags, setPendingTags] = useState<string[]>([])
 
-  // Modify the handleSubmit function to handle pending tags
+  // Modify handleSubmit to ensure tags are saved
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -243,13 +292,19 @@ export function MiniatureOverviewModal({
             .select()
             .single()
           
-          if (error) throw error
+          if (error) {
+            console.error('Error creating tag:', error)
+            throw error
+          }
           return data
         })
       )
 
-      // Add newly created tags to selected tags
-      const allTags = [...selectedTags, ...newTagIds]
+      // Combine existing selected tags with newly created tags
+      const allTags = [
+        ...selectedTags.filter(t => t.id > 0),
+        ...newTagIds
+      ]
 
       // Prepare the data
       const miniatureData = {
@@ -261,10 +316,13 @@ export function MiniatureOverviewModal({
         base_size_id: formData.base_size_id,
         product_set_id: formData.product_set_id || null,
         types: selectedTypes.map(t => ({
-          id: t.id,
           type_id: t.id,
           proxy_type: t.proxy_type,
-          categories: []
+          type: {
+            id: t.id,
+            name: t.name,
+            categories: miniTypes.find(mt => mt.id === t.id)?.categories || []
+          }
         })),
         tags: allTags.map(t => ({
           id: t.id
@@ -277,13 +335,8 @@ export function MiniatureOverviewModal({
         await createMiniature(miniatureData)
       }
 
-      // Clear pending tags after successful save
       setPendingTags([])
-
-      await onSave({
-        ...miniatureData,
-        tags: allTags
-      })
+      await onSave(miniatureData)
 
     } catch (error) {
       console.error('Error saving miniature:', error)
@@ -318,18 +371,42 @@ export function MiniatureOverviewModal({
 
   const handleTypeSelect = (typeId: number) => {
     const type = miniTypes.find(t => t.id === typeId)
+    
     if (type && !selectedTypes.some(t => t.id === type.id)) {
+      // Map the categories correctly from the type object
+      const mappedCategories = type.categories?.map(c => ({
+        id: c.id,
+        name: c.name
+      })) || []
+      
       const newType = {
         id: type.id,
         name: type.name,
-        categories: type.categories,
-        proxy_type: selectedTypes.some(t => !t.proxy_type) // If there's already a main type, this is a proxy
+        proxy_type: selectedTypes.some(t => !t.proxy_type), // If there's already a main type, this is a proxy
+        type: {
+          id: type.id,
+          name: type.name,
+          categories: mappedCategories
+        }
       }
       
-      setSelectedTypes([...selectedTypes, newType])
+      setSelectedTypes(prev => {
+        const updated = [...prev, newType]
+        return updated
+      })
+      
       setFormData(prev => ({
         ...prev,
-        types: [...prev.types, { id: type.id, proxy_type: newType.proxy_type }]
+        types: [...prev.types, { 
+          id: type.id,
+          type_id: type.id,
+          proxy_type: newType.proxy_type,
+          type: {
+            id: type.id,
+            name: type.name,
+            categories: type.categories || []
+          }
+        }]
       }))
     }
     setTypeSearchTerm('')
@@ -347,12 +424,24 @@ export function MiniatureOverviewModal({
       if (newTypes.length === 1) {
         newTypes[0].proxy_type = false
       }
+
+      // Also update formData.types to match
+      setFormData(prevForm => ({
+        ...prevForm,
+        types: newTypes.map(t => ({
+          id: t.id,
+          type_id: t.id,
+          proxy_type: t.proxy_type,
+          type: {
+            id: t.id,
+            name: t.name,
+            categories: miniTypes.find(mt => mt.id === t.id)?.categories || []
+          }
+        }))
+      }))
+
       return newTypes
     })
-    setFormData(prev => ({
-      ...prev,
-      types: prev.types.filter(t => t.id !== typeId)
-    }))
   }
 
   const toggleProxyType = (typeId: number) => {
@@ -366,25 +455,40 @@ export function MiniatureOverviewModal({
         return prev
       }
 
-      return prev.map(t => ({
+      const updated = prev.map(t => ({
         ...t,
         proxy_type: t.id === typeId ? !t.proxy_type : t.id !== typeId ? true : t.proxy_type
       }))
-    })
 
-    setFormData(prev => ({
-      ...prev,
-      types: selectedTypes.map(t => ({
-        id: t.id,
-        proxy_type: t.proxy_type
+      // Also update formData.types to match
+      setFormData(prevForm => ({
+        ...prevForm,
+        types: updated.map(t => ({
+          id: t.id,
+          type_id: t.id,
+          proxy_type: t.proxy_type,
+          type: {
+            id: t.id,
+            name: t.name,
+            categories: miniTypes.find(mt => mt.id === t.id)?.categories || []
+          }
+        }))
       }))
-    }))
+
+      return updated
+    })
   }
 
-  const filteredTypes = miniTypes.filter(type => 
-    type.name.toLowerCase().includes(typeSearchTerm.toLowerCase()) &&
-    !selectedTypes.some(st => st.id === type.id)
-  )
+  const filteredTypes = useMemo(() => {
+    const searchTerm = typeSearchTerm.toLowerCase().trim()
+    
+    return miniTypes.filter(type => {
+      const typeName = type.name.toLowerCase().trim()
+      const matches = typeName.includes(searchTerm)
+      const notSelected = !selectedTypes.some(st => st.id === type.id)
+      return matches && notSelected
+    })
+  }, [typeSearchTerm, miniTypes, selectedTypes])
 
   // Get unique categories from selected types
   const selectedCategories = useMemo(() => {
@@ -440,6 +544,15 @@ export function MiniatureOverviewModal({
   const selectedProductDisplay = useMemo(() => {
     if (!formData.product_set_id) return ''
 
+    // If we have the mini data with product set info, use that directly
+    if (mini?.product_set?.id === formData.product_set_id) {
+      const company = mini.product_set.product_lines?.product_companies?.name || ''
+      const line = mini.product_set.product_lines?.name || ''
+      const set = mini.product_set.name || ''
+      return `${company} → ${line} → ${set}`
+    }
+
+    // Otherwise search through available product sets
     for (const company of companies) {
       const lines = getProductLinesByCompany(company.id)
       for (const line of lines) {
@@ -451,7 +564,7 @@ export function MiniatureOverviewModal({
       }
     }
     return ''
-  }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine])
+  }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine, mini])
 
   // Add state for invalid product set
   const [isInvalidProductSet, setIsInvalidProductSet] = useState(false)
@@ -538,8 +651,8 @@ export function MiniatureOverviewModal({
   // Add state for tag input
   const [tagInput, setTagInput] = useState('')
 
-  // Modify tag input handler to store new tags as pending
-  const handleTagInput = async (tagName: string) => {
+  // Add this handler
+  const handleTagAdd = async (tagName: string) => {
     const trimmedTag = tagName.trim()
     if (!trimmedTag) return
 
@@ -554,14 +667,24 @@ export function MiniatureOverviewModal({
         setSelectedTags(prev => [...prev, existingTag])
       }
     } else {
-      // If tag is new, add to pending tags and create a temporary selected tag
-      if (!pendingTags.includes(trimmedTag)) {
-        setPendingTags(prev => [...prev, trimmedTag])
-        setSelectedTags(prev => [...prev, { 
-          id: -Date.now(), // Temporary negative ID
-          name: trimmedTag 
-        }])
-      }
+      // If tag is new, add to pending tags
+      setPendingTags(prev => {
+        // Only add if not already in pending tags
+        if (!prev.includes(trimmedTag)) {
+          return [...prev, trimmedTag]
+        }
+        return prev
+      })
+      
+      // Add to selected tags with temporary ID
+      const tempId = -Date.now()
+      setSelectedTags(prev => {
+        // Only add if not already in selected tags
+        if (!prev.some(t => t.name.toLowerCase() === trimmedTag.toLowerCase())) {
+          return [...prev, { id: tempId, name: trimmedTag }]
+        }
+        return prev
+      })
     }
   }
 
@@ -570,11 +693,11 @@ export function MiniatureOverviewModal({
     const resetState = () => {
       // Find default IDs
       const prepaintedId = paintedByOptions.find(p => 
-        p.painted_by_name.toLowerCase() === 'prepainted'
+        p.painted_by_name.toLowerCase() === 'Prepainted'.toLowerCase()
       )?.id || 0
       
       const mediumId = baseSizeOptions.find(b => 
-        b.base_size_name.toLowerCase() === 'medium'
+        b.base_size_name.toLowerCase() === 'Medium'.toLowerCase()
       )?.id || 0
 
       setFormData({
@@ -582,8 +705,8 @@ export function MiniatureOverviewModal({
         location: '',
         quantity: 1,
         description: '',
-        base_size_id: isOpen && !mini ? mediumId : 0,        // Only set default for new
-        painted_by_id: isOpen && !mini ? prepaintedId : 0,   // Only set default for new
+        base_size_id: isOpen && !mini ? mediumId : 0,
+        painted_by_id: isOpen && !mini ? prepaintedId : 0,
         product_set_id: null,
         types: [],
         tags: []
@@ -821,11 +944,12 @@ export function MiniatureOverviewModal({
                   }}
                   placeholder="Search for Company → Line → Set..."
                   onFocus={() => {
-                    if (formData.product_set_id) {
+                    setShowProductDropdown(true)
+                    // Only clear if user is typing new search
+                    if (productSearchTerm && !selectedProductDisplay) {
                       setProductSearchTerm('')
                       setFormData(prev => ({ ...prev, product_set_id: null }))
                     }
-                    setShowProductDropdown(true)
                   }}
                   onBlur={() => {
                     // On blur, if the input doesn't match any product and isn't empty, clear it
@@ -845,13 +969,15 @@ export function MiniatureOverviewModal({
                     setIsInvalidProductSet(false)
                   }}
                 />
-                {showProductDropdown && productSearchTerm && (
-                  <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg">
+                {showProductDropdown && (productSearchTerm || formData.product_set_id) && (
+                  <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                     {filteredProducts.map(product => (
                       <button
                         key={product.id}
                         type="button"
-                        className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
+                        className={`w-full text-left px-3 py-2 hover:bg-gray-700 text-sm ${
+                          formData.product_set_id === product.id ? 'bg-gray-700' : ''
+                        }`}
                         onClick={() => {
                           setFormData(prev => ({ ...prev, product_set_id: product.id }))
                           setProductSearchTerm('')
@@ -888,17 +1014,26 @@ export function MiniatureOverviewModal({
                         ref={typeSearchInputRef}
                       />
                       {showTypeDropdown && typeSearchTerm && (
-                        <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg">
+                        <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                           {filteredTypes.map(type => (
                             <button
                               key={type.id}
                               type="button"
                               className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
-                              onClick={() => handleTypeSelect(type.id)}
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleTypeSelect(type.id)
+                              }}
                             >
                               {type.name}
                             </button>
                           ))}
+                          {filteredTypes.length === 0 && (
+                            <div className="px-3 py-2 text-sm text-gray-500">
+                              No matches found
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -911,42 +1046,48 @@ export function MiniatureOverviewModal({
                       <div className="space-y-3">
                         <div className="border border-gray-700 rounded-md bg-gray-900/50">
                           {selectedTypes.map((type, index) => (
-                            <div
-                              key={`${type.id}-${index}`}
-                              className="flex items-center justify-between px-3 py-2 hover:bg-gray-700 cursor-pointer"
-                              onClick={() => toggleProxyType(type.id)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className={`w-2 h-2 rounded-full ${
-                                  !type.proxy_type ? 'bg-green-500' : 'bg-gray-500'
-                                }`} />
-                                <span className="text-sm">{type.name}</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleTypeRemove(type.id)
-                                }}
-                                className="text-red-400 hover:text-red-300"
+                            <div key={`${type.id}-${index}`} className="border-b border-gray-700 last:border-b-0">
+                              <div
+                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-700 cursor-pointer"
+                                onClick={() => toggleProxyType(type.id)}
                               >
-                                <FaTimesCircle className="w-4 h-4" />
-                              </button>
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2 h-2 rounded-full ${type.proxy_type ? 'bg-orange-500' : 'bg-green-500'}`} />
+                                  <span className="text-sm">{type.name}</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleTypeRemove(type.id)
+                                  }}
+                                  className="text-red-400 hover:text-red-300"
+                                >
+                                  <FaTimesCircle className="w-4 h-4" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                         </div>
-                        {selectedCategories.length > 0 && (
-                          <div className="flex flex-wrap gap-2">
-                            {selectedCategories.map((category, index) => (
+
+                        {/* Consolidated Categories List */}
+                        <div className="mt-4 border-t border-gray-700 pt-4">
+                          <div className="text-sm font-medium text-gray-400 mb-2">All Categories:</div>
+                          <div className="flex flex-wrap gap-1">
+                            {Array.from(new Set(
+                              selectedTypes.flatMap(type => 
+                                miniTypes.find(t => t.id === type.id)?.categories || []
+                              ).map(cat => cat.name)
+                            )).sort().map((categoryName, index) => (
                               <div
-                                key={`${category}-${index}`}
-                                className="px-2 py-1 text-xs rounded-full bg-orange-900/50 text-orange-200"
+                                key={index}
+                                className="px-2 py-0.5 text-xs rounded-full bg-orange-600/30 text-orange-200 border border-orange-900/50"
                               >
-                                {category}
+                                {categoryName}
                               </div>
                             ))}
                           </div>
-                        )}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -958,57 +1099,18 @@ export function MiniatureOverviewModal({
                     <h3 className="font-medium text-gray-200">Tags</h3>
                   </div>
                   <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40 relative">
-                  <TagInput
-  value={tagInput}
-  onChange={setTagInput}
-  onTagAdd={async (tagName) => {
-    try {
-      if (!tagName) return
-      
-      // Check if tag already exists
-      const existingTag = availableTags.find(t => 
-        t.name.toLowerCase() === tagName.toLowerCase()
-      )
-
-      let tagToAdd
-      if (existingTag) {
-        tagToAdd = existingTag
-      } else {
-        // Create new tag
-        const { data, error } = await supabase
-          .from('tags')
-          .insert({ name: tagName })
-          .select()
-          .single()
-        
-        if (error) {
-          showError(`Failed to create tag: ${error.message}`)
-          return
-        }
-        tagToAdd = data
-        setAvailableTags(prev => [...prev, data])
-      }
-
-      // Add to selected tags if not already selected
-      if (!selectedTags.some(t => t.id === tagToAdd.id)) {
-        setSelectedTags(prev => [...prev, tagToAdd])
-      }
-
-      // Clear input
-      setTagInput('')
-    } catch (error) {
-      console.error('Error adding tag:', error)
-      showError('Failed to add tag')
-    }
-  }}
-  placeholder="Add tags..."
-  availableTags={availableTags}
-  onTagSelect={(tag) => {
-    if (!selectedTags.some(t => t.id === tag.id)) {
-      setSelectedTags(prev => [...prev, tag])
-    }
-  }}
-/>
+                    <TagInput
+                      value={tagInput}
+                      onChange={setTagInput}
+                      onTagAdd={handleTagAdd}
+                      placeholder="Add tags..."
+                      availableTags={availableTags}
+                      onTagSelect={(tag) => {
+                        if (!selectedTags.some(t => t.id === tag.id)) {
+                          setSelectedTags(prev => [...prev, tag])
+                        }
+                      }}
+                    />
                     
                     {selectedTags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">

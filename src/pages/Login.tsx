@@ -21,7 +21,6 @@ export function Login() {
     try {
       setLoading(true)
       setError(null)
-      console.log('Initiating Google sign-in from Login component')
       await signInWithGoogle()
     } catch (err) {
       console.error('Login error:', err)

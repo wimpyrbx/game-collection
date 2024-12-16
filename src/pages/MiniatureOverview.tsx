@@ -8,7 +8,7 @@ import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, Pag
 import { getMiniImagePath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 import { useNotifications } from '../contexts/NotificationContext'
-import { deleteMiniature } from '../services/miniatureService'
+import { deleteMiniature, getMiniature } from '../services/miniatureService'
 
 type ViewMode = 'table' | 'cards' | 'banner'
 
@@ -85,13 +85,13 @@ export default function MiniatureOverview() {
 
   const getItemColumns = (mini: Mini) => {
     const types = mini.types?.map(t => {
-      const categories = t.type.categories.map(c => c.category[0]?.name).join(', ') || 'No categories'
-      return `${t.type.name} (${categories})`
+      const categories = t.type.categories?.map(c => c.name).join(', ') || 'No categories'
+      return `${t.type.name}${t.proxy_type ? ' (Proxy)' : ''} [${categories}]`
     }).join(' | ') || 'No type'
     
-    const company = mini.product_sets?.[0]?.product_lines?.company?.name || 'No company'
-    const productLine = mini.product_sets?.[0]?.product_lines?.name || 'No product line'
-    const productSet = mini.product_sets?.[0]?.name || 'No set'
+    const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
+    const productLine = mini.product_set?.product_lines?.name || 'No product line'
+    const productSet = mini.product_set?.name || 'No set'
     const location = mini.location || 'No location'
     const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
     const baseSize = mini.base_size?.base_size_name || 'Unknown size'
@@ -100,7 +100,7 @@ export default function MiniatureOverview() {
     const thumbPath = getMiniImagePath(mini.id, 'thumb')
 
     return [
-      <div key="image" className="flex items-center gap-4">
+      <div key="name" className="flex items-center gap-4">
         <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-800 flex items-center justify-center">
           <img
             src={thumbPath}
@@ -145,9 +145,18 @@ export default function MiniatureOverview() {
     setIsModalOpen(true)
   }
 
-  const handleEdit = (mini: Mini) => {
-    setSelectedMini(mini)
-    setIsModalOpen(true)
+  const handleEdit = async (mini: Mini) => {
+    try {
+      // Fetch complete mini data including tags
+      const completeData = await getMiniature(mini.id)
+      if (completeData) {
+        setSelectedMini(completeData)
+        setIsModalOpen(true)
+      }
+    } catch (error) {
+      console.error('Error fetching complete mini data:', error)
+      showError('Failed to load miniature data')
+    }
   }
 
   const handleSave = async () => {
@@ -155,16 +164,16 @@ export default function MiniatureOverview() {
       setIsModalOpen(false)
       setSelectedMini(undefined)
       
-      // Refresh the minis list
-      const updatedMinis = await getPageMinis(currentPage)
+      // Wait a bit to let the modal close animation finish
+      await new Promise(resolve => setTimeout(resolve, 100))
+
+      // Refresh the minis list for the current page
+      const updatedMinis = await getPageMinis(currentPage - 1) // Adjust for 0-based index
       if (updatedMinis) {
-        // Force a re-render by updating the state
         setMinis(updatedMinis)
-        // Update total quantity
         await getTotalQuantity()
       }
       
-      // Show success notification
       showSuccess(`Miniature ${selectedMini ? 'updated' : 'added'} successfully`)
     } catch (error) {
       console.error('Error saving miniature:', error)
@@ -197,7 +206,9 @@ export default function MiniatureOverview() {
       <div className="grid grid-cols-10  gap-4">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
-          const productSet = mini.product_sets?.[0]?.name || 'No set'
+          const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
+          const productLine = mini.product_set?.product_lines?.name || 'No product line'
+          const productSet = mini.product_set?.name || 'No set'
           const baseSize = mini.base_size?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
@@ -227,6 +238,8 @@ export default function MiniatureOverview() {
               <div className="p-4">
                 <h3 className="font-bold text-gray-100 mb-2 truncate">{mini.name}</h3>
                 <div className="space-y-1 text-sm text-gray-400">
+                  <p className="truncate"><span className="text-gray-500">Company:</span> {company}</p>
+                  <p className="truncate"><span className="text-gray-500">Line:</span> {productLine}</p>
                   <p className="truncate"><span className="text-gray-500">Set:</span> {productSet}</p>
                   <p className="truncate"><span className="text-gray-500">Base:</span> {baseSize}</p>
                   <p className="truncate"><span className="text-gray-500">Painted by:</span> {paintedBy}</p>
@@ -244,7 +257,9 @@ export default function MiniatureOverview() {
       <div className="grid grid-cols-4 gap-6">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
-          const productSet = mini.product_sets?.[0]?.name || 'No set'
+          const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
+          const productLine = mini.product_set?.product_lines?.name || 'No product line'
+          const productSet = mini.product_set?.name || 'No set'
           const baseSize = mini.base_size?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
@@ -276,6 +291,8 @@ export default function MiniatureOverview() {
                 <h3 className="font-bold text-xl text-gray-100 mb-4">{mini.name}</h3>
                 <div className="space-y-2 text-sm">
                   <p><span className="text-gray-500">Types:</span> <span className="text-gray-300">{types}</span></p>
+                  <p><span className="text-gray-500">Company:</span> <span className="text-gray-300">{company}</span></p>
+                  <p><span className="text-gray-500">Line:</span> <span className="text-gray-300">{productLine}</span></p>
                   <p><span className="text-gray-500">Set:</span> <span className="text-gray-300">{productSet}</span></p>
                   <p><span className="text-gray-500">Base:</span> <span className="text-gray-300">{baseSize}</span></p>
                   <p><span className="text-gray-500">Painted by:</span> <span className="text-gray-300">{paintedBy}</span></p>

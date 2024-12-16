@@ -28,13 +28,19 @@ interface ProductSet {
   product_line_id: number
 }
 
+interface Category {
+  id: number
+  name: string
+}
+
+interface TypeCategory {
+  category: Category
+}
+
 interface MiniType {
   id: number
   name: string
-  categories?: {
-    id: number
-    name: string
-  }[]
+  categories: Category[]
 }
 
 export function useMiniatureReferenceData() {
@@ -77,63 +83,69 @@ export function useMiniatureReferenceData() {
         setProductLines(productLinesData || [])
         setProductSets(productSetsData || [])
 
-        // Load all mini types with pagination
-        const allTypes: MiniType[] = []
-        let lastId = 0
-        let hasMore = true
+        // Load all mini types with their categories
+        const loadAllTypes = async () => {
+          const allTypes = []
+          let lastId = 0
+          let hasMore = true
 
-        while (hasMore) {
-          const { data: types, error: typesError } = await supabase
-            .from('mini_types')
-            .select(`
-              id,
-              name,
-              categories:type_to_categories(
-                category:mini_categories(
-                  id,
-                  name
+          while (hasMore) {
+            const { data: types, error: typesError } = await supabase
+              .from('mini_types')
+              .select(`
+                id,
+                name,
+                categories:type_to_categories(
+                  category:mini_categories(
+                    id,
+                    name
+                  )
                 )
-              )
-            `)
-            .order('id')
-            .gt('id', lastId)
-            .limit(1000)
+              `)
+              .order('id')
+              .gt('id', lastId)
+              .limit(1000)
+              .returns<Array<{
+                id: number;
+                name: string;
+                categories: Array<{
+                  category: {
+                    id: number;
+                    name: string;
+                  } | null;
+                }>;
+              }>>()
 
-          if (typesError) throw typesError
-          if (!types || types.length === 0) {
-            hasMore = false
-            break
+            if (typesError) {
+              throw typesError
+            }
+            if (!types || types.length === 0) {
+              hasMore = false
+              break
+            }
+
+            allTypes.push(...types)
+            lastId = types[types.length - 1].id
           }
 
-          const transformedTypes = types.map(type => ({
-            id: type.id,
-            name: type.name,
-            categories: type.categories
-              .filter(cat => 
-                cat !== null && 
-                typeof cat === 'object' &&
-                'category' in cat &&
-                Array.isArray(cat.category) &&
-                cat.category.length > 0
-              )
-              .flatMap(cat => cat.category)
-              .map(c => ({
-                id: c.id,
-                name: c.name
-              }))
-          }))
+          const transformedTypes: MiniType[] = allTypes.map(type => {
+            const transformed = {
+              id: type.id,
+              name: type.name,
+              categories: type.categories
+                .filter((cat): cat is TypeCategory => Boolean(cat?.category))
+                .map(cat => ({
+                  id: cat.category!.id,
+                  name: cat.category!.name
+                }))
+            }
+            return transformed
+          })
 
-          allTypes.push(...transformedTypes)
-          lastId = types[types.length - 1].id
-          
-          if (types.length < 1000) {
-            hasMore = false
-          }
+          setMiniTypes(transformedTypes)
         }
 
-        // Sort all types by name after collecting them all
-        allTypes.sort((a, b) => a.name.localeCompare(b.name))
-        setMiniTypes(allTypes)
+        await loadAllTypes()
       } catch (err) {
         console.error('Error loading reference data:', err)
         setError(err instanceof Error ? err.message : 'An error occurred')
@@ -151,8 +163,6 @@ export function useMiniatureReferenceData() {
     paintedByOptions,
     baseSizeOptions,
     companies,
-    productLines,
-    productSets,
     miniTypes,
     getProductLinesByCompany: (companyId: number) => 
       productLines.filter(pl => pl.company_id === companyId),
