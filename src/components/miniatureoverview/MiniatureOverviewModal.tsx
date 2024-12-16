@@ -108,7 +108,8 @@ export function MiniatureOverviewModal({
       isValid = false
     }
 
-    if (!formData.base_size_id) {
+    // Only validate base_size_id if it's 0 (not selected)
+    if (formData.base_size_id === 0) {
       errors.base_size_id = 'Base size is required'
       if (isValid) baseSizeSelectRef.current?.focus()
       isValid = false
@@ -474,8 +475,8 @@ export function MiniatureOverviewModal({
   }
 
   return (
-    <UI.Modal isOpen={isOpen} onClose={onClose}>
-      <form onSubmit={handleSubmit} className="min-w-[800px] max-w-[800px] flex flex-col max-h-[calc(100vh-8rem)]">
+    <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
+      <form onSubmit={handleSubmit} className="flex flex-col max-h-[calc(100vh-8rem)]">
         <UI.ModalHeader>
           <div className="flex items-center gap-3">
             <div className="text-xl text-blue-600">
@@ -487,10 +488,10 @@ export function MiniatureOverviewModal({
           </div>
         </UI.ModalHeader>
 
-        <UI.ModalBody className="flex-1 overflow-hidden">
-          <div className="grid grid-cols-[250px_1fr] gap-8 h-full">
+        <UI.ModalBody className="flex-1">
+          <div className="grid grid-cols-[250px_1fr] gap-6">
             {/* Left Column */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Image Drop Zone */}
               <div
                 className="w-full aspect-square border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors relative overflow-hidden bg-gray-900/50"
@@ -584,6 +585,7 @@ export function MiniatureOverviewModal({
                     validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
                   } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
                 >
+                  <option value="0">Select a base size</option>
                   {baseSizeOptions.map(size => (
                     <option key={size.id} value={size.id}>
                       {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1)}
@@ -628,7 +630,7 @@ export function MiniatureOverviewModal({
             </div>
 
             {/* Right Column */}
-            <div className="space-y-4 h-full flex flex-col">
+            <div className="space-y-3">
               {/* Name Input */}
               <Input
                 label="Name"
@@ -688,7 +690,6 @@ export function MiniatureOverviewModal({
                     setShowProductDropdown(false)
                     setIsInvalidProductSet(false)
                   }}
-                  error={isInvalidProductSet ? 'Please select a valid product set' : undefined}
                 />
                 {showProductDropdown && productSearchTerm && (
                   <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg">
@@ -715,7 +716,7 @@ export function MiniatureOverviewModal({
                 <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
                   <h3 className="font-medium text-gray-200">Types</h3>
                 </div>
-                <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-900 relative">
+                <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40 relative">
                   <div className="relative">
                     <UI.SearchInput
                       value={typeSearchTerm}

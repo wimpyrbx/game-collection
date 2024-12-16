@@ -220,7 +220,7 @@ export default function MiniatureOverview() {
                   }}
                 />
                 <FaDiceD20 className="absolute inset-0 m-auto w-12 h-12 text-gray-600 hidden" />
-                <div className="absolute top-2 right-2 bg-gray-900/80 px-2 py-1 rounded text-sm font-medium text-gray-100">
+                <div className="absolute top-1 right-1 bg-gray-900/60 px-2 py-1 rounded text-xs text-gray-100">
                   QTY: {quantity}
                 </div>
               </div>
@@ -268,7 +268,7 @@ export default function MiniatureOverview() {
                   }}
                 />
                 <FaDiceD20 className="absolute inset-0 m-auto w-12 h-12 text-gray-600 hidden" />
-                <div className="absolute top-2 right-2 bg-gray-900/80 px-2 py-1 rounded text-sm font-medium text-gray-100">
+                <div className="absolute top-1 right-1 bg-gray-900/60 px-2 py-1 rounded text-xs  text-gray-100">
                   QTY: {quantity}
                 </div>
               </div>

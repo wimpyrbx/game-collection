@@ -1,5 +1,5 @@
 import { Button } from '../Button'
-import { Modal, ModalHeader, ModalBody, ModalFooter } from './Modal'
+import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Modal'
 import { IconType } from 'react-icons'
 
 interface DeleteConfirmModalProps {

@@ -1,4 +1,5 @@
-import { ReactNode } from 'react'
+import { ReactNode, useEffect, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface ModalProps {
   children: ReactNode
@@ -8,14 +9,94 @@ export interface ModalProps {
 }
 
 export function Modal({ children, onClose, isOpen, className }: ModalProps) {
+  const modalRef = useRef<HTMLDivElement>(null)
+
+  const handleEscapeKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      onClose()
+    }
+  }, [onClose])
+
+  useEffect(() => {
+    // Always add the event listener to ensure it's available immediately when modal opens
+    window.addEventListener('keydown', handleEscapeKey, true)
+    return () => window.removeEventListener('keydown', handleEscapeKey, true)
+  }, [handleEscapeKey])
+
   if (!isOpen) return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose}></div>
-      <div className={`relative w-full ${className || 'max-w-2xl'} rounded-lg bg-gray-800 p-6 pt-1 pb-1 shadow-xl`}>
-        {children}
+  const modalRoot = document.getElementById('modal-root')
+  if (!modalRoot) return null
+
+  return createPortal(
+    <div 
+      ref={modalRef}
+      className="fixed inset-0 pointer-events-auto"
+      style={{ zIndex: 9999 }}
+      role="dialog"
+      aria-modal="true"
+    >
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-black/25 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal container */}
+      <div className="fixed inset-0 overflow-y-auto">
+        <div 
+          className="min-h-full flex items-center justify-center p-4"
+          onClick={onClose}
+        >
+          {/* Modal content */}
+          <div 
+            className={`relative bg-gray-900 rounded-lg border border-gray-800 shadow-xl ${className ? className : 'w-full max-w-2xl'}`}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {children}
+          </div>
+        </div>
       </div>
+    </div>,
+    modalRoot
+  )
+}
+
+interface ModalHeaderProps {
+  children: ReactNode
+  className?: string
+}
+
+export function ModalHeader({ children, className = '' }: ModalHeaderProps) {
+  return (
+    <div className={`p-4 bg-gray-800/50 border-b border-gray-700 rounded-t-lg ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+interface ModalBodyProps {
+  children: ReactNode
+  className?: string
+}
+
+export function ModalBody({ children, className = '' }: ModalBodyProps) {
+  return (
+    <div className={`p-4 bg-gray-900 overflow-y-auto ${className}`}>
+      {children}
+    </div>
+  )
+}
+
+interface ModalFooterProps {
+  children: ReactNode
+  className?: string
+}
+
+export function ModalFooter({ children, className = '' }: ModalFooterProps) {
+  return (
+    <div className={`p-4 bg-gray-800/50 border-t border-gray-700 rounded-b-lg ${className}`}>
+      {children}
     </div>
   )
 } 
