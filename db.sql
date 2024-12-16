@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS "minis" (
 	"painted_by_id"	INTEGER NOT NULL DEFAULT 1,
 	"base_size_id"	INTEGER NOT NULL DEFAULT 3,
 	"product_set_id"	INTEGER,
+    "in_use" TIMESTAMP WITH TIME ZONE DEFAULT NULL,
 	FOREIGN KEY("product_set_id") REFERENCES "product_sets"("id"),
 	FOREIGN KEY("painted_by_id") REFERENCES "painted_by"("id"),
 	FOREIGN KEY("base_size_id") REFERENCES "base_sizes"("id"),

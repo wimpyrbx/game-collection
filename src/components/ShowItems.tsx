@@ -40,10 +40,10 @@ const defaultItemStyle: ItemStyle = {
 };
 
 const sizeClasses: Record<ItemSize, string> = {
-  xs: 'px-1.5 py-0.5 text-xs',
-  sm: 'px-2 py-0.5 text-sm',
-  md: 'px-3 py-1 text-base',
-  lg: 'px-4 py-1.5 text-lg'
+  xs: 'px-2 py-0.5 text-xs leading-none',
+  sm: 'px-3 py-1 text-sm leading-none',
+  md: 'px-3 py-1.5 text-base leading-none',
+  lg: 'px-4 py-2 text-lg leading-none'
 };
 
 interface ToggleButtonProps {
@@ -138,11 +138,11 @@ export const ShowItems: React.FC<ShowItemsProps> = ({
     switch (displayType) {
       case 'pills':
         return (
-          <span className="inline-flex flex-wrap gap-1 items-center">
+          <span className="inline-flex flex-wrap gap-1.5 items-center">
             {visibleItems.map((item, index) => (
               <span
                 key={index}
-                className={`rounded-full ${sizeClasses[style.size || 'sm']} ${style.text} ${style.bg} ${style.border} ${style.hover} transition-all duration-200 transform`}
+                className={`inline-flex items-center rounded-full ${sizeClasses[style.size || 'sm']} ${style.text} ${style.bg} ${style.border} ${style.hover} transition-all duration-200 transform`}
               >
                 {item}
               </span>

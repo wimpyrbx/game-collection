@@ -40,9 +40,9 @@ export function Pagination({
     isCurrent = false,
     children 
   }: { 
-    page: number, 
-    isDisabled?: boolean, 
-    isCurrent?: boolean,
+    page: number
+    isDisabled?: boolean
+    isCurrent?: boolean
     children: React.ReactNode 
   }) => (
     <button

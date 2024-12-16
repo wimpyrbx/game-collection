@@ -249,4 +249,35 @@ export const getMiniature = async (id: number) => {
 
   return data
 }
+
+export async function updateMiniatureStatus(miniId: number, active: boolean) {
+  try {
+    const { error } = await supabase
+      .from('minis')
+      .update({ active })
+      .eq('id', miniId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating miniature status:', error);
+    throw error;
+  }
+}
+
+export async function updateMiniatureInUse(miniId: number, inUse: boolean) {
+  try {
+    const { error } = await supabase
+      .from('minis')
+      .update({ in_use: inUse ? new Date().toISOString() : null })
+      .eq('id', miniId)
+
+    if (error) throw error
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error updating miniature in_use status:', error)
+    throw error
+  }
+}
  

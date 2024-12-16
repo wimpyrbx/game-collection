@@ -9,6 +9,7 @@ export interface Mini {
   painted_by_id: number
   base_size_id: number
   product_set_id: number | null
+  in_use: string | null
   types: Array<{
     mini_id: number
     type_id: number

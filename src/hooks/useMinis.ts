@@ -13,6 +13,7 @@ interface SupabaseMini {
   painted_by_id: number
   base_size_id: number
   product_set_id: number | null
+  in_use: string | null
   types?: Array<{
     mini_id: number
     type_id: number
@@ -60,6 +61,13 @@ export function useMinis(
   const [error, setError] = useState<string | null>(null)
   const [totalMinis, setTotalMinis] = useState(0)
   const [totalQuantity, setTotalQuantity] = useState(0)
+  const [currentPage, setCurrentPage] = useState(page)
+
+  useEffect(() => {
+    if (page !== currentPage) {
+      setCurrentPage(page)
+    }
+  }, [page])
 
   const transformMini = (item: SupabaseMini): Mini => ({
     id: item.id,
@@ -72,6 +80,7 @@ export function useMinis(
     painted_by_id: item.painted_by_id,
     base_size_id: item.base_size_id,
     product_set_id: item.product_set_id,
+    in_use: item.in_use,
     types: item.types?.map(t => ({
       mini_id: item.id,
       type_id: t.type.id,
@@ -105,10 +114,10 @@ export function useMinis(
 
   const getPageMinis = async (pageNum: number): Promise<Mini[] | null> => {
     try {
-      const startRow = pageNum * pageSize
+      const startRow = (pageNum - 1) * pageSize
       const endRow = startRow + pageSize - 1
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('minis')
         .select(`
           *,
@@ -150,8 +159,16 @@ export function useMinis(
               id,
               name
             )
-          )
+          ),
+          in_use
         `)
+
+      // Apply search filter if search term exists
+      if (searchTerm) {
+        query = query.ilike('name', `%${searchTerm}%`)
+      }
+
+      const { data, error } = await query
         .range(startRow, endRow)
         .order('name')
 
@@ -205,6 +222,27 @@ export function useMinis(
         setLoading(true)
         setError(null)
 
+        // First get the total count with a proper count query
+        const { count, error: countError } = await supabase
+          .from('minis')
+          .select('*', { count: 'exact', head: true })
+          .ilike('name', searchTerm ? `%${searchTerm}%` : '%')
+
+        if (countError) throw countError
+        setTotalMinis(count || 0)
+
+        // Calculate valid page number
+        const maxPage = Math.max(1, Math.ceil((count || 0) / pageSize))
+        const validPage = Math.min(currentPage, maxPage)
+
+        // If requested page is beyond max, adjust current page
+        if (currentPage > maxPage) {
+          setCurrentPage(maxPage)
+          return
+        }
+
+        const startRow = (validPage - 1) * pageSize
+
         let query = supabase
           .from('minis')
           .select(`
@@ -218,6 +256,7 @@ export function useMinis(
             painted_by_id,
             base_size_id,
             product_set_id,
+            in_use,
             types:mini_to_types(
               mini_id,
               type_id,
@@ -253,14 +292,14 @@ export function useMinis(
                 )
               )
             )
-          `, { count: 'exact' })
+          `)
 
         if (searchTerm) {
           query = query.ilike('name', `%${searchTerm}%`)
         }
 
-        const { data, error, count } = await query
-          .range((page - 1) * pageSize, page * pageSize - 1)
+        const { data, error } = await query
+          .range(startRow, startRow + pageSize - 1)
           .order('name')
 
         if (error) throw error
@@ -268,8 +307,6 @@ export function useMinis(
         const transformedData = data?.map(item => transformMini(item as SupabaseMini)) || []
 
         setMinis(transformedData)
-        setTotalMinis(count || 0)
-
         await getTotalQuantity()
       } catch (err) {
         console.error('Error loading minis:', err)
@@ -280,7 +317,18 @@ export function useMinis(
     }
 
     loadMinis()
-  }, [page, pageSize, searchTerm, getTotalQuantity])
+  }, [currentPage, pageSize, searchTerm, getTotalQuantity])
 
-  return { minis, loading, error, totalMinis, totalQuantity, getPageMinis, setMinis, getTotalQuantity }
+  return { 
+    minis, 
+    loading, 
+    error, 
+    totalMinis, 
+    totalQuantity, 
+    getPageMinis, 
+    setMinis, 
+    getTotalQuantity,
+    currentPage,
+    setCurrentPage
+  }
 } 

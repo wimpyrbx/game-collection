@@ -9,7 +9,8 @@ import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, Pag
 import { getMiniImagePath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 import { useNotifications } from '../contexts/NotificationContext'
-import { deleteMiniature, getMiniature } from '../services/miniatureService'
+import { deleteMiniature, getMiniature, updateMiniatureInUse } from '../services/miniatureService'
+import { Switch } from '../components/ui'
 
 type ViewMode = 'table' | 'cards' | 'banner'
 
@@ -24,16 +25,22 @@ const preloadImages = (minis: Mini[]) => {
 export default function MiniatureOverview() {
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const miniSearch = useAdminSearch({ searchFields: ['name'] })
-  const [currentPage, setCurrentPage] = useState(1)
-  const itemsPerPage = 10
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
+  const itemsPerPage = 10
 
-  const { minis, loading, error, totalMinis, totalQuantity, getPageMinis, setMinis, getTotalQuantity } = useMinis(
+  const { 
+    minis, 
+    loading, 
+    error, 
+    totalMinis, 
+    totalQuantity, 
+    getPageMinis, 
+    setMinis, 
+    getTotalQuantity,
     currentPage,
-    itemsPerPage,
-    miniSearch.searchTerm
-  )
+    setCurrentPage 
+  } = useMinis(1, itemsPerPage, miniSearch.searchTerm)
 
   const { showSuccess, showError } = useNotifications()
 
@@ -58,7 +65,7 @@ export default function MiniatureOverview() {
     }
   }, [currentPage, loading, totalMinis, getPageMinis])
 
-  // Add keyboard navigation
+  // Update keyboard navigation to use currentPage from hook
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (loading || isModalOpen) return
@@ -82,7 +89,7 @@ export default function MiniatureOverview() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentPage, totalMinis, loading, isModalOpen])
+  }, [currentPage, totalMinis, loading, isModalOpen, setCurrentPage])
 
   const getItemColumns = (mini: Mini) => {
     const typeNames = mini.types?.map(t => t.type.name) || []
@@ -143,7 +150,31 @@ export default function MiniatureOverview() {
       location,
       paintedBy,
       baseSize,
-      quantity.toString()
+      quantity.toString(),
+      <div 
+        key="switch"
+        onClick={(e) => {
+          e.stopPropagation();
+        }}
+      >
+        <Switch
+          checked={!!mini.in_use}
+          onChange={async (checked) => {
+            try {
+              await updateMiniatureInUse(mini.id, checked);
+              // Refresh the current page with current search term
+              const updatedMinis = await getPageMinis(currentPage);
+              if (updatedMinis) {
+                setMinis(updatedMinis);
+              }
+            } catch (error) {
+              console.error('Error updating in_use status:', error);
+              showError('Failed to update status');
+            }
+          }}
+          className="ml-2"
+        />
+      </div>
     ]
   }
 
@@ -156,7 +187,8 @@ export default function MiniatureOverview() {
     'Location',
     'Painted By',
     'Base Size',
-    'Quantity'
+    'Quantity',
+    'Active'
   ]
 
   const handleAdd = () => {
@@ -180,25 +212,25 @@ export default function MiniatureOverview() {
 
   const handleSave = async () => {
     try {
-      setIsModalOpen(false)
-      setSelectedMini(undefined)
+      setIsModalOpen(false);
+      setSelectedMini(undefined);
       
       // Wait a bit to let the modal close animation finish
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Refresh the minis list for the current page
-      const updatedMinis = await getPageMinis(currentPage - 1) // Adjust for 0-based index
+      // Refresh the minis list for the current page with current search term
+      const updatedMinis = await getPageMinis(currentPage);
       if (updatedMinis) {
-        setMinis(updatedMinis)
-        await getTotalQuantity()
+        setMinis(updatedMinis);
+        await getTotalQuantity();
       }
       
-      showSuccess(`Miniature ${selectedMini ? 'updated' : 'added'} successfully`)
+      showSuccess(`Miniature ${selectedMini ? 'updated' : 'added'} successfully`);
     } catch (error) {
-      console.error('Error saving miniature:', error)
-      showError('Failed to save miniature')
+      console.error('Error saving miniature:', error);
+      showError('Failed to save miniature');
     }
-  }
+  };
 
   const handleDelete = async (miniId: number) => {
     try {
@@ -452,7 +484,10 @@ export default function MiniatureOverview() {
               <div className="mb-4">
                 <UI.SearchInput
                   value={miniSearch.searchTerm}
-                  onChange={(e) => miniSearch.handleSearch(e.target.value)}
+                  onChange={(e) => {
+                    miniSearch.handleSearch(e.target.value)
+                    setCurrentPage(1)
+                  }}
                   placeholder="Search miniatures..."
                   className="w-full"
                 />
@@ -480,7 +515,10 @@ export default function MiniatureOverview() {
                         {minis.map((mini) => (
                           <tr
                             key={mini.id}
-                            className="bgRow hover:bgRowHover transition-colors cursor-pointer"
+                            className={`
+                              ${mini.in_use ? 'bg-red-900/50' : 'bgRow'} 
+                              hover:bgRowHover transition-colors cursor-pointer
+                            `}
                             onClick={() => handleEdit(mini)}
                           >
                             {getItemColumns(mini).map((column, index) => (
@@ -511,7 +549,9 @@ export default function MiniatureOverview() {
                 currentPage={currentPage}
                 totalItems={totalMinis || 0}
                 itemsPerPage={itemsPerPage}
-                onPageChange={setCurrentPage}
+                onPageChange={(page) => {
+                  setCurrentPage(page)
+                }}
                 disabled={loading}
               />
             </div>
