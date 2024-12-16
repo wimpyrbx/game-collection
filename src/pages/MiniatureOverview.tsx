@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
-import { FaTable, FaExpand, FaDiceD6, FaThLarge, FaShareAltSquare, FaDiceD20 } from 'react-icons/fa'
+import { FaTable, FaExpand, FaDiceD6, FaThLarge, FaShareAltSquare, FaDiceD20, FaPlusSquare, FaMinusSquare, FaAngleDown, FaAngleUp, FaEye, FaEyeSlash } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
+import { ShowItems } from '../components/ShowItems'
 import type { Mini } from '../types/mini'
 import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
 import { getMiniImagePath } from '../utils/imageUtils'
@@ -84,10 +85,7 @@ export default function MiniatureOverview() {
   }, [currentPage, totalMinis, loading, isModalOpen])
 
   const getItemColumns = (mini: Mini) => {
-    const types = mini.types?.map(t => {
-      const categories = t.type.categories?.map(c => c.name).join(', ') || 'No categories'
-      return `${t.type.name}${t.proxy_type ? ' (Proxy)' : ''} [${categories}]`
-    }).join(' | ') || 'No type'
+    const typeNames = mini.types?.map(t => t.type.name) || []
     
     const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
     const productLine = mini.product_set?.product_lines?.name || 'No product line'
@@ -98,6 +96,13 @@ export default function MiniatureOverview() {
     const quantity = mini.quantity || 0
 
     const thumbPath = getMiniImagePath(mini.id, 'thumb')
+
+    // Example Toggle for ShowItems
+    const showItemsToggle = {
+      type: 'icon' as const,
+      more: <span className="text-gray-200 text-xs">(Show More)</span>,
+      less: <span className="text-gray-200 text-xs">(Show Less)</span>
+    };
 
     return [
       <div key="name" className="flex items-center gap-4">
@@ -117,7 +122,21 @@ export default function MiniatureOverview() {
         </div>
         <span>{mini.name}</span>
       </div>,
-      types,
+      <ShowItems 
+        key="types" 
+        items={typeNames} 
+        displayType="pills"
+        itemStyle={{
+          text: 'text-gray-200',
+          bg: 'bg-orange-900',
+          size: 'xs',
+          border: '',
+          hover: 'hover:bg-orange-800'
+        }}
+        maxVisible={2}
+        toggle={showItemsToggle}
+        emptyMessage="-"
+      />,
       company,
       productLine,
       productSet,
@@ -203,7 +222,7 @@ export default function MiniatureOverview() {
 
   const renderCardView = () => {
     return (
-      <div className="grid grid-cols-10  gap-4">
+      <div className="grid grid-cols-5 gap-4 h-[calc(90vh-20rem)]">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
@@ -254,7 +273,7 @@ export default function MiniatureOverview() {
 
   const renderBannerView = () => {
     return (
-      <div className="grid grid-cols-4 gap-6">
+      <div className="grid grid-cols-4 gap-6 h-[calc(90vh-20rem)]">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
@@ -263,7 +282,7 @@ export default function MiniatureOverview() {
           const baseSize = mini.base_size?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
-          const types = mini.types?.map(t => t.type.name).join(', ') || 'No type'
+          const typeNames = mini.types?.map(t => t.type.name) || []
 
           return (
             <div 
@@ -283,14 +302,55 @@ export default function MiniatureOverview() {
                   }}
                 />
                 <FaDiceD20 className="absolute inset-0 m-auto w-12 h-12 text-gray-600 hidden" />
-                <div className="absolute top-1 right-1 bg-gray-900/60 px-2 py-1 rounded text-xs  text-gray-100">
+                <div className="absolute top-1 right-1 bg-gray-900/60 px-2 py-1 rounded text-xs text-gray-100">
                   QTY: {quantity}
                 </div>
               </div>
               <div className="flex-1 p-6">
                 <h3 className="font-bold text-xl text-gray-100 mb-4">{mini.name}</h3>
                 <div className="space-y-2 text-sm">
-                  <p><span className="text-gray-500">Types:</span> <span className="text-gray-300">{types}</span></p>
+                  <p>
+                    <span className="text-gray-500">Types (eye - right):</span>{' '}
+                    <ShowItems 
+                      items={typeNames} 
+                      displayType="text" 
+                      textColor="text-gray-200"
+                      toggle={{
+                        type: 'icon',
+                        more: <FaEye className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />,
+                        less: <FaEyeSlash className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />
+                      }}
+                      togglePlacement="right"
+                    />
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Types (plus/minus - start):</span>{' '}
+                    <ShowItems 
+                      items={typeNames} 
+                      displayType="text" 
+                      textColor="text-gray-200"
+                      toggle={{
+                        type: 'icon',
+                        more: <FaPlusSquare className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />,
+                        less: <FaMinusSquare className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />
+                      }}
+                      togglePlacement="start"
+                    />
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Types (angle - top):</span>{' '}
+                    <ShowItems 
+                      items={typeNames} 
+                      displayType="text" 
+                      textColor="text-gray-200"
+                      toggle={{
+                        type: 'icon',
+                        more: <FaAngleDown className="w-4 h-4 inline opacity-75 hover:opacity-100 transition-transform duration-200" />,
+                        less: <FaAngleUp className="w-4 h-4 inline opacity-75 hover:opacity-100 transition-transform duration-200" />
+                      }}
+                      togglePlacement="top"
+                    />
+                  </p>
                   <p><span className="text-gray-500">Company:</span> <span className="text-gray-300">{company}</span></p>
                   <p><span className="text-gray-500">Line:</span> <span className="text-gray-300">{productLine}</span></p>
                   <p><span className="text-gray-500">Set:</span> <span className="text-gray-300">{productSet}</span></p>
