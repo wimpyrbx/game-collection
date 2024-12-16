@@ -2,6 +2,22 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Mini } from '../types/mini'
 
+interface SupabaseMiniType {
+  mini_id: number
+  type_id: number
+  proxy_type: boolean
+  type: {
+    id: number
+    name: string
+    categories: Array<{
+      category: {
+        id: number
+        name: string
+      }
+    }>
+  }
+}
+
 interface SupabaseMini {
   id: number
   name: string
@@ -14,36 +30,22 @@ interface SupabaseMini {
   base_size_id: number
   product_set_id: number | null
   in_use: string | null
-  types?: Array<{
-    mini_id: number
-    type_id: number
-    proxy_type: boolean
-    type: {
-      id: number
-      name: string
-      categories: Array<{
-        category: Array<{
-          id: number
-          name: string
-        }>
-      }>
-    }
-  }>
+  types: SupabaseMiniType[]
   painted_by: {
     id: number
     painted_by_name: string
   }
-  base_size: {
+  base_sizes: {
     id: number
     base_size_name: string
   }
-  product_set?: {
+  product_sets?: {
     id: number
     name: string
-    product_lines?: {
+    product_line?: {
       id: number
       name: string
-      product_companies?: {
+      company?: {
         id: number
         name: string
       }
@@ -81,19 +83,24 @@ export function useMinis(
     base_size_id: item.base_size_id,
     product_set_id: item.product_set_id,
     in_use: item.in_use,
-    types: item.types?.map(t => ({
-      mini_id: item.id,
-      type_id: t.type.id,
+    types: item.types?.map((t: SupabaseMiniType) => ({
+      mini_id: t.mini_id,
+      type_id: t.type_id,
       proxy_type: t.proxy_type,
       type: {
         id: t.type.id,
         name: t.type.name,
-        categories: t.type.categories?.map(c => c.category) || []
+        categories: t.type.categories.map(c => ({
+          category: {
+            id: c.category.id,
+            name: c.category.name
+          }
+        }))
       }
     })) || [],
     painted_by: item.painted_by,
-    base_size: item.base_size,
-    product_set: item.product_set
+    base_sizes: item.base_sizes,
+    product_sets: item.product_sets
   })
 
   const getTotalQuantity = useCallback(async () => {
@@ -117,7 +124,7 @@ export function useMinis(
       const startRow = (pageNum - 1) * pageSize
       const endRow = startRow + pageSize - 1
 
-      let query = supabase
+      const query = supabase
         .from('minis')
         .select(`
           *,
@@ -125,7 +132,7 @@ export function useMinis(
             id,
             painted_by_name
           ),
-          base_size:base_size_id(
+          base_sizes:base_size_id(
             id,
             base_size_name
           ),
@@ -142,7 +149,7 @@ export function useMinis(
             ),
             proxy_type
           ),
-          product_set:product_set_id(
+          product_sets:product_set_id(
             id,
             name,
             product_lines(
@@ -153,22 +160,15 @@ export function useMinis(
                 name
               )
             )
-          ),
-          tags:mini_to_tags(
-            tag:tags(
-              id,
-              name
-            )
-          ),
-          in_use
+          )
         `)
 
-      // Apply search filter if search term exists
       if (searchTerm) {
-        query = query.ilike('name', `%${searchTerm}%`)
+        query.ilike('name', `%${searchTerm}%`)
       }
 
       const { data, error } = await query
+        .returns<Array<SupabaseMini>>()
         .range(startRow, endRow)
         .order('name')
 
@@ -177,36 +177,8 @@ export function useMinis(
         return null
       }
 
-      // Transform the data structure
       if (data) {
-        return data.map(mini => ({
-          ...mini,
-          base_size: mini.base_size || (mini.base_size_id ? {
-            id: mini.base_size_id,
-            base_size_name: 'Loading...'
-          } : null),
-          product_set: mini.product_set || (mini.product_set_id ? {
-            id: mini.product_set_id,
-            name: 'Loading...',
-            product_lines: {
-              id: 0,
-              name: 'Loading...',
-              product_companies: {
-                id: 0,
-                name: 'Loading...'
-              }
-            }
-          } : null),
-          painted_by: mini.painted_by,
-          types: mini.types?.map(t => ({
-            ...t,
-            type: {
-              ...t.type,
-              categories: t.type.categories?.map(c => c.category)
-            }
-          })),
-          tags: mini.tags?.map(tagRel => tagRel.tag) || []
-        }))
+        return data.map((mini: SupabaseMini) => transformMini(mini))
       }
 
       return null
@@ -223,10 +195,15 @@ export function useMinis(
         setError(null)
 
         // First get the total count with a proper count query
-        const { count, error: countError } = await supabase
+        const countQuery = supabase
           .from('minis')
           .select('*', { count: 'exact', head: true })
-          .ilike('name', searchTerm ? `%${searchTerm}%` : '%')
+
+        if (searchTerm) {
+          countQuery.ilike('name', `%${searchTerm}%`)
+        }
+
+        const { count, error: countError } = await countQuery
 
         if (countError) throw countError
         setTotalMinis(count || 0)
@@ -243,7 +220,7 @@ export function useMinis(
 
         const startRow = (validPage - 1) * pageSize
 
-        let query = supabase
+        const query = supabase
           .from('minis')
           .select(`
             id,
@@ -276,11 +253,11 @@ export function useMinis(
               id, 
               painted_by_name
             ),
-            base_size:base_size_id(
+            base_sizes:base_size_id(
               id,
               base_size_name
             ),
-            product_set:product_set_id(
+            product_sets:product_set_id(
               id,
               name,
               product_lines(
@@ -295,16 +272,17 @@ export function useMinis(
           `)
 
         if (searchTerm) {
-          query = query.ilike('name', `%${searchTerm}%`)
+          query.ilike('name', `%${searchTerm}%`)
         }
 
         const { data, error } = await query
+          .returns<Array<SupabaseMini>>()
           .range(startRow, startRow + pageSize - 1)
           .order('name')
 
         if (error) throw error
 
-        const transformedData = data?.map(item => transformMini(item as SupabaseMini)) || []
+        const transformedData = data?.map((item: SupabaseMini) => transformMini(item)) || []
 
         setMinis(transformedData)
         await getTotalQuantity()

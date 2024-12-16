@@ -15,7 +15,7 @@ export function Layout() {
         {/* Background image with overlay - spans entire page */}
         <div 
           className="fixed inset-0 bg-cover bg-center bg-no-repeat -z-10"
-          style={{ backgroundImage: 'url(/images/login/login_background.webp)' }}
+          style={{ backgroundImage: 'url(/images/login/dnd1.png)' }}
         >
           <div className="absolute inset-0 bg-black/80" />
         </div>

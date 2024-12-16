@@ -1,17 +1,17 @@
-import React from 'react';
-
 interface SwitchProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
+  className?: string;
 }
 
-export function Switch({ checked, onChange }: SwitchProps) {
+export function Switch({ checked, onChange, className = '' }: SwitchProps) {
   return (
     <div
       onClick={() => onChange(!checked)}
       className={`
         relative inline-flex h-5 w-9 rounded-full border-2 border-transparent cursor-pointer
         ${checked ? 'bg-green-600' : 'bg-gray-700'}
+        ${className}
       `}
     >
       <span

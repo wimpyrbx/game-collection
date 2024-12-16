@@ -1,4 +1,4 @@
-import React, { KeyboardEvent, ChangeEvent, useState, useEffect } from 'react'
+import { KeyboardEvent, ChangeEvent, useState, useEffect } from 'react'
 
 interface Tag {
   id: number

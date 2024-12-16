@@ -1,61 +1,28 @@
 import { supabase } from '../lib/supabase'
 
 interface MiniatureType {
-  id: number
+  type_id: number
   proxy_type: boolean
+}
+
+interface MiniatureTag {
+  id: number
+  name: string
 }
 
 interface MiniatureData {
   name: string
-  description: string
+  description: string | null
   location: string
   quantity: number
   painted_by_id: number
   base_size_id: number
   product_set_id: number | null
-  types: MiniatureType[]
+  types?: MiniatureType[]
+  tags?: MiniatureTag[]
 }
 
-async function getOrCreateTags(tags: Array<{ id: number, name: string }>) {
-  const allTags = []
-  
-  for (const tag of tags) {
-    if (tag.id > 0) {
-      // Existing tag, just add it to the array
-      allTags.push(tag)
-    } else {
-      // Check if tag with this name already exists
-      const { data: existingTag, error: findError } = await supabase
-        .from('tags')
-        .select('*')
-        .ilike('name', tag.name)
-        .single()
-
-      if (findError && findError.code !== 'PGRST116') { // PGRST116 is "not found" error
-        throw findError
-      }
-
-      if (existingTag) {
-        // Use existing tag
-        allTags.push(existingTag)
-      } else {
-        // Create new tag
-        const { data: newTag, error: createError } = await supabase
-          .from('tags')
-          .insert({ name: tag.name })
-          .select()
-          .single()
-
-        if (createError) throw createError
-        allTags.push(newTag)
-      }
-    }
-  }
-  
-  return allTags
-}
-
-export async function createMiniature(data: Partial<Mini>) {
+export async function createMiniature(data: Partial<MiniatureData>) {
   try {
     // First create the miniature without types to get its ID
     const miniatureData = {
@@ -78,7 +45,7 @@ export async function createMiniature(data: Partial<Mini>) {
 
     // Then create the type relationships with the new mini ID
     if (data.types && data.types.length > 0) {
-      const typeRelations = data.types.map(t => ({
+      const typeRelations = data.types.map((t: MiniatureType) => ({
         mini_id: newMini.id,
         type_id: t.type_id,
         proxy_type: t.proxy_type
@@ -93,7 +60,7 @@ export async function createMiniature(data: Partial<Mini>) {
 
     // Handle tags if present
     if (data.tags && data.tags.length > 0) {
-      const tagRelations = data.tags.map(t => ({
+      const tagRelations = data.tags.map((t: MiniatureTag) => ({
         mini_id: newMini.id,
         tag_id: t.id
       }))
@@ -112,7 +79,7 @@ export async function createMiniature(data: Partial<Mini>) {
   }
 }
 
-export async function updateMiniature(miniId: number, data: Partial<Mini>) {
+export async function updateMiniature(miniId: number, data: Partial<MiniatureData>) {
   try {
     // First update the miniature basic data
     const miniatureData = {
@@ -142,7 +109,7 @@ export async function updateMiniature(miniId: number, data: Partial<Mini>) {
 
     // Then create new type relationships
     if (data.types && data.types.length > 0) {
-      const typeRelations = data.types.map(t => ({
+      const typeRelations = data.types.map((t: MiniatureType) => ({
         mini_id: miniId,
         type_id: t.type_id,
         proxy_type: t.proxy_type
@@ -165,7 +132,7 @@ export async function updateMiniature(miniId: number, data: Partial<Mini>) {
 
     // Then create new tag relationships
     if (data.tags && data.tags.length > 0) {
-      const tagRelations = data.tags.map(t => ({
+      const tagRelations = data.tags.map((t: MiniatureTag) => ({
         mini_id: miniId,
         tag_id: t.id
       }))
@@ -248,21 +215,6 @@ export const getMiniature = async (id: number) => {
   }
 
   return data
-}
-
-export async function updateMiniatureStatus(miniId: number, active: boolean) {
-  try {
-    const { error } = await supabase
-      .from('minis')
-      .update({ active })
-      .eq('id', miniId);
-
-    if (error) throw error;
-    return { success: true };
-  } catch (error) {
-    console.error('Error updating miniature status:', error);
-    throw error;
-  }
 }
 
 export async function updateMiniatureInUse(miniId: number, inUse: boolean) {

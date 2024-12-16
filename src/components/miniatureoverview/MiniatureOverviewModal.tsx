@@ -144,7 +144,7 @@ export function MiniatureOverviewModal({
         location: mini.location || '',
         quantity: mini.quantity || 1,
         painted_by_id: mini.painted_by?.id || 0,
-        base_size_id: mini.base_size?.id || 0,
+        base_size_id: mini.base_sizes?.id || 0,
         product_set_id: mini.product_sets?.id || mini.product_set_id || null,
         types: mini.types?.map(t => ({
           id: t.type.id,
@@ -179,15 +179,15 @@ export function MiniatureOverviewModal({
 
       // Set preview URL if image exists
       if (mini.image_path) {
-        const url = getMiniImagePath(mini.image_path)
+        const url = getMiniImagePath(mini.id)
         setPreviewUrl(url)
       }
 
       // Set product set display
-      if (mini.product_set) {
-        const company = mini.product_set.product_lines?.product_companies?.name || ''
-        const line = mini.product_set.product_lines?.name || ''
-        const set = mini.product_set.name || ''
+      if (mini.product_sets) {
+        const company = mini.product_sets.product_line?.company?.name || ''
+        const line = mini.product_sets.product_line?.name || ''
+        const set = mini.product_sets.name || ''
         const displayValue = `${company} → ${line} → ${set}`
         setProductSearchTerm(displayValue)
         setShowProductDropdown(true)
@@ -197,7 +197,7 @@ export function MiniatureOverviewModal({
           const lines = getProductLinesByCompany(company.id)
           for (const line of lines) {
             const sets = getProductSetsByProductLine(line.id)
-            const matchingSet = sets.find(s => s.id === mini.product_set.id)
+            const matchingSet = sets.find(s => s.id === mini.product_sets?.id)
             if (matchingSet) {
               setFormData(prev => ({ ...prev, product_set_id: matchingSet.id }))
               break
@@ -316,16 +316,23 @@ export function MiniatureOverviewModal({
         base_size_id: formData.base_size_id,
         product_set_id: formData.product_set_id || null,
         types: selectedTypes.map(t => ({
+          mini_id: mini?.id || 0,
           type_id: t.id,
           proxy_type: t.proxy_type,
           type: {
             id: t.id,
             name: t.name,
-            categories: miniTypes.find(mt => mt.id === t.id)?.categories || []
+            categories: miniTypes.find(mt => mt.id === t.id)?.categories?.map(cat => ({
+              category: {
+                id: cat.id,
+                name: cat.name
+              }
+            })) || []
           }
         })),
         tags: allTags.map(t => ({
-          id: t.id
+          id: t.id,
+          name: t.name
         }))
       }
 
@@ -419,10 +426,19 @@ export function MiniatureOverviewModal({
 
   const handleTypeRemove = (typeId: number) => {
     setSelectedTypes(prev => {
+      // Check if we're removing the non-proxy type
+      const isRemovingMainType = prev.find(t => t.id === typeId)?.proxy_type === false
+      
       const newTypes = prev.filter(t => t.id !== typeId)
-      // If only one type remains, make it the main type
-      if (newTypes.length === 1) {
+      
+      // If we removed the main type and there are other types remaining,
+      // set the first remaining type as the main type
+      if (isRemovingMainType && newTypes.length > 0) {
         newTypes[0].proxy_type = false
+        // Set all other types as proxies
+        for (let i = 1; i < newTypes.length; i++) {
+          newTypes[i].proxy_type = true
+        }
       }
 
       // Also update formData.types to match
@@ -490,20 +506,6 @@ export function MiniatureOverviewModal({
     })
   }, [typeSearchTerm, miniTypes, selectedTypes])
 
-  // Get unique categories from selected types
-  const selectedCategories = useMemo(() => {
-    const categories = new Set<string>()
-    selectedTypes.forEach(type => {
-      const typeData = miniTypes.find(t => t.id === type.id)
-      if (typeData?.categories) {
-        typeData.categories.forEach(cat => {
-          categories.add(cat.name)
-        })
-      }
-    })
-    return Array.from(categories).sort()
-  }, [selectedTypes, miniTypes])
-
   // Get filtered product sets based on search
   const filteredProducts = useMemo(() => {
     if (!productSearchTerm) return []
@@ -545,10 +547,10 @@ export function MiniatureOverviewModal({
     if (!formData.product_set_id) return ''
 
     // If we have the mini data with product set info, use that directly
-    if (mini?.product_set?.id === formData.product_set_id) {
-      const company = mini.product_set.product_lines?.product_companies?.name || ''
-      const line = mini.product_set.product_lines?.name || ''
-      const set = mini.product_set.name || ''
+    if (mini?.product_sets?.id === formData.product_set_id) {
+      const company = mini.product_sets.product_line?.company?.name || ''
+      const line = mini.product_sets.product_line?.name || ''
+      const set = mini.product_sets.name || ''
       return `${company} → ${line} → ${set}`
     }
 
@@ -592,8 +594,7 @@ export function MiniatureOverviewModal({
 
   // Add new state for tags
   const [selectedTags, setSelectedTags] = useState<{ id: number, name: string }[]>([])
-  const [tagSearchTerm, setTagSearchTerm] = useState('')
-  const [showTagDropdown, setShowTagDropdown] = useState(false)
+  const [tagInput, setTagInput] = useState('')
 
   // Add state for available tags
   const [availableTags, setAvailableTags] = useState<{ id: number; name: string }[]>([])
@@ -616,40 +617,6 @@ export function MiniatureOverviewModal({
     
     fetchTags()
   }, [])
-
-  // Update tag handlers
-  const handleTagSelect = (tagId: number) => {
-    const tag = availableTags.find(t => t.id === tagId)
-    if (tag && !selectedTags.some(t => t.id === tag.id)) {
-      setSelectedTags([...selectedTags, { id: tag.id, name: tag.name }])
-      setFormData(prev => ({
-        ...prev,
-        tags: [...prev.tags || [], { id: tag.id }]
-      }))
-    }
-    setTagSearchTerm('')
-    setShowTagDropdown(false)
-  }
-
-  const handleTagRemove = (tagId: number) => {
-    setSelectedTags(prev => prev.filter(t => t.id !== tagId))
-    setFormData(prev => ({
-      ...prev,
-      tags: (prev.tags || []).filter(t => t.id !== tagId)
-    }))
-  }
-
-  // Update filtered tags to use availableTags instead of miniTypes
-  const filteredTags = availableTags.filter(tag => 
-    tag.name.toLowerCase().includes(tagSearchTerm.toLowerCase()) &&
-    !selectedTags.some(st => st.id === tag.id)
-  )
-
-  // Add ref for tag search input
-  const tagSearchInputRef = useRef<HTMLInputElement>(null)
-
-  // Add state for tag input
-  const [tagInput, setTagInput] = useState('')
 
   // Add this handler
   const handleTagAdd = async (tagName: string) => {
@@ -688,6 +655,14 @@ export function MiniatureOverviewModal({
     }
   }
 
+  const handleTagRemove = (tagId: number) => {
+    setSelectedTags(prev => prev.filter(t => t.id !== tagId))
+    setFormData(prev => ({
+      ...prev,
+      tags: (prev.tags || []).filter(t => t.id !== tagId)
+    }))
+  }
+
   // Update reset state to clear pending tags
   useEffect(() => {
     const resetState = () => {
@@ -717,11 +692,9 @@ export function MiniatureOverviewModal({
       setSelectedTags([])
       setTypeSearchTerm('')
       setProductSearchTerm('')
-      setTagSearchTerm('')
       setValidationErrors({})
       setShowTypeDropdown(false)
       setShowProductDropdown(false)
-      setShowTagDropdown(false)
       setPendingTags([])
     }
 
@@ -1108,6 +1081,10 @@ export function MiniatureOverviewModal({
                       onTagSelect={(tag) => {
                         if (!selectedTags.some(t => t.id === tag.id)) {
                           setSelectedTags(prev => [...prev, tag])
+                          setFormData(prev => ({
+                            ...prev,
+                            tags: [...prev.tags || [], { id: tag.id }]
+                          }))
                         }
                       }}
                     />

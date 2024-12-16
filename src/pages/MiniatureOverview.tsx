@@ -94,12 +94,12 @@ export default function MiniatureOverview() {
   const getItemColumns = (mini: Mini) => {
     const typeNames = mini.types?.map(t => t.type.name) || []
     
-    const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
-    const productLine = mini.product_set?.product_lines?.name || 'No product line'
-    const productSet = mini.product_set?.name || 'No set'
+    const company = mini.product_sets?.product_line?.company?.name || 'No company'
+    const productLine = mini.product_sets?.product_line?.name || 'No product line'
+    const productSet = mini.product_sets?.name || 'No set'
     const location = mini.location || 'No location'
     const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
-    const baseSize = mini.base_size?.base_size_name || 'Unknown size'
+    const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
     const quantity = mini.quantity || 0
 
     const thumbPath = getMiniImagePath(mini.id, 'thumb')
@@ -257,10 +257,10 @@ export default function MiniatureOverview() {
       <div className="grid grid-cols-5 gap-4 h-[calc(90vh-20rem)]">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
-          const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
-          const productLine = mini.product_set?.product_lines?.name || 'No product line'
-          const productSet = mini.product_set?.name || 'No set'
-          const baseSize = mini.base_size?.base_size_name || 'Unknown size'
+          const company = mini.product_sets?.product_line?.company?.name || 'No company'
+          const productLine = mini.product_sets?.product_line?.name || 'No product line'
+          const productSet = mini.product_sets?.name || 'No set'
+          const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
 
@@ -308,10 +308,10 @@ export default function MiniatureOverview() {
       <div className="grid grid-cols-4 gap-6 h-[calc(90vh-20rem)]">
         {minis.map((mini) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
-          const company = mini.product_set?.product_lines?.product_companies?.name || 'No company'
-          const productLine = mini.product_set?.product_lines?.name || 'No product line'
-          const productSet = mini.product_set?.name || 'No set'
-          const baseSize = mini.base_size?.base_size_name || 'Unknown size'
+          const company = mini.product_sets?.product_line?.company?.name || 'No company'
+          const productLine = mini.product_sets?.product_line?.name || 'No product line'
+          const productSet = mini.product_sets?.name || 'No set'
+          const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
           const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
           const quantity = mini.quantity || 0
           const typeNames = mini.types?.map(t => t.type.name) || []
