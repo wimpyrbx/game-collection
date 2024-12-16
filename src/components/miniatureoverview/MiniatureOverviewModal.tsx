@@ -7,6 +7,9 @@ import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData
 import { getMiniImagePath } from '../../utils/imageUtils'
 import { createMiniature, updateMiniature } from '../../services/miniatureService'
 import { useNotifications } from '../../contexts/NotificationContext'
+import { supabase } from '../../lib/supabase'
+import { TagInput } from '../ui/input/TagInput'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface MiniatureOverviewModalProps {
   isOpen: boolean
@@ -48,7 +51,8 @@ export function MiniatureOverviewModal({
     painted_by_id: 0,
     base_size_id: 0,
     product_set_id: null as number | null,
-    types: [] as { id: number, proxy_type: boolean }[]
+    types: [] as { id: number, proxy_type: boolean }[],
+    tags: [] as { id: number }[]
   })
 
   // State for selected types table
@@ -144,7 +148,8 @@ export function MiniatureOverviewModal({
         types: mini.types?.map(t => ({
           id: t.type.id,
           proxy_type: t.proxy_type
-        })) || []
+        })) || [],
+        tags: mini.tags?.map(t => ({ id: t.id })) || []
       }
       setFormData(formDataToSet)
 
@@ -167,6 +172,13 @@ export function MiniatureOverviewModal({
         const previewPath = getMiniImagePath(mini.id, 'original')
         setPreviewUrl(previewPath)
       }
+
+      // Set selected tags
+      const tags = mini.tags?.map(t => ({
+        id: t.id,
+        name: t.name
+      })) || []
+      setSelectedTags(tags)
     }
   }, [mini])
 
@@ -180,7 +192,8 @@ export function MiniatureOverviewModal({
         painted_by_id: 0,
         base_size_id: 0,
         product_set_id: null,
-        types: []
+        types: [],
+        tags: []
       })
       setSelectedTypes([])
       setPreviewUrl(null)
@@ -209,18 +222,35 @@ export function MiniatureOverviewModal({
     }
   }, [paintedByOptions, baseSizeOptions, mini, isOpen])
 
+  // Add state for pending new tags
+  const [pendingTags, setPendingTags] = useState<string[]>([])
+
+  // Modify the handleSubmit function to handle pending tags
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // Clear previous validation errors
-    setValidationErrors({})
-
-    // Validate form
     if (!validateForm()) {
       return
     }
 
     try {
+      // Create any pending tags first
+      const newTagIds = await Promise.all(
+        pendingTags.map(async (tagName) => {
+          const { data, error } = await supabase
+            .from('tags')
+            .insert({ name: tagName })
+            .select()
+            .single()
+          
+          if (error) throw error
+          return data
+        })
+      )
+
+      // Add newly created tags to selected tags
+      const allTags = [...selectedTags, ...newTagIds]
+
       // Prepare the data
       const miniatureData = {
         name: formData.name.trim(),
@@ -235,6 +265,9 @@ export function MiniatureOverviewModal({
           type_id: t.id,
           proxy_type: t.proxy_type,
           categories: []
+        })),
+        tags: allTags.map(t => ({
+          id: t.id
         }))
       }
 
@@ -244,24 +277,12 @@ export function MiniatureOverviewModal({
         await createMiniature(miniatureData)
       }
 
-      // Call the parent's onSave callback
+      // Clear pending tags after successful save
+      setPendingTags([])
+
       await onSave({
         ...miniatureData,
-        types: selectedTypes.map(t => ({
-          mini_id: mini?.id || 0,
-          type_id: t.id,
-          proxy_type: t.proxy_type,
-          type: {
-            id: t.id,
-            name: t.name,
-            categories: [{
-              category: [{
-                id: 0,
-                name: ''
-              }]
-            }]
-          }
-        }))
+        tags: allTags
       })
 
     } catch (error) {
@@ -456,6 +477,140 @@ export function MiniatureOverviewModal({
     }
   }
 
+  // Add new state for tags
+  const [selectedTags, setSelectedTags] = useState<{ id: number, name: string }[]>([])
+  const [tagSearchTerm, setTagSearchTerm] = useState('')
+  const [showTagDropdown, setShowTagDropdown] = useState(false)
+
+  // Add state for available tags
+  const [availableTags, setAvailableTags] = useState<{ id: number; name: string }[]>([])
+
+  // Add useEffect to fetch tags
+  useEffect(() => {
+    const fetchTags = async () => {
+      const { data: tags, error } = await supabase
+        .from('tags')
+        .select('*')
+        .order('name')
+      
+      if (error) {
+        console.error('Error fetching tags:', error)
+        return
+      }
+      
+      setAvailableTags(tags || [])
+    }
+    
+    fetchTags()
+  }, [])
+
+  // Update tag handlers
+  const handleTagSelect = (tagId: number) => {
+    const tag = availableTags.find(t => t.id === tagId)
+    if (tag && !selectedTags.some(t => t.id === tag.id)) {
+      setSelectedTags([...selectedTags, { id: tag.id, name: tag.name }])
+      setFormData(prev => ({
+        ...prev,
+        tags: [...prev.tags || [], { id: tag.id }]
+      }))
+    }
+    setTagSearchTerm('')
+    setShowTagDropdown(false)
+  }
+
+  const handleTagRemove = (tagId: number) => {
+    setSelectedTags(prev => prev.filter(t => t.id !== tagId))
+    setFormData(prev => ({
+      ...prev,
+      tags: (prev.tags || []).filter(t => t.id !== tagId)
+    }))
+  }
+
+  // Update filtered tags to use availableTags instead of miniTypes
+  const filteredTags = availableTags.filter(tag => 
+    tag.name.toLowerCase().includes(tagSearchTerm.toLowerCase()) &&
+    !selectedTags.some(st => st.id === tag.id)
+  )
+
+  // Add ref for tag search input
+  const tagSearchInputRef = useRef<HTMLInputElement>(null)
+
+  // Add state for tag input
+  const [tagInput, setTagInput] = useState('')
+
+  // Modify tag input handler to store new tags as pending
+  const handleTagInput = async (tagName: string) => {
+    const trimmedTag = tagName.trim()
+    if (!trimmedTag) return
+
+    // Check if tag already exists
+    const existingTag = availableTags.find(t => 
+      t.name.toLowerCase() === trimmedTag.toLowerCase()
+    )
+
+    if (existingTag) {
+      // If tag exists, add it to selected tags
+      if (!selectedTags.some(t => t.id === existingTag.id)) {
+        setSelectedTags(prev => [...prev, existingTag])
+      }
+    } else {
+      // If tag is new, add to pending tags and create a temporary selected tag
+      if (!pendingTags.includes(trimmedTag)) {
+        setPendingTags(prev => [...prev, trimmedTag])
+        setSelectedTags(prev => [...prev, { 
+          id: -Date.now(), // Temporary negative ID
+          name: trimmedTag 
+        }])
+      }
+    }
+  }
+
+  // Update reset state to clear pending tags
+  useEffect(() => {
+    const resetState = () => {
+      // Find default IDs
+      const prepaintedId = paintedByOptions.find(p => 
+        p.painted_by_name.toLowerCase() === 'prepainted'
+      )?.id || 0
+      
+      const mediumId = baseSizeOptions.find(b => 
+        b.base_size_name.toLowerCase() === 'medium'
+      )?.id || 0
+
+      setFormData({
+        name: '',
+        location: '',
+        quantity: 1,
+        description: '',
+        base_size_id: isOpen && !mini ? mediumId : 0,        // Only set default for new
+        painted_by_id: isOpen && !mini ? prepaintedId : 0,   // Only set default for new
+        product_set_id: null,
+        types: [],
+        tags: []
+      })
+      setImage(null)
+      setPreviewUrl(null)
+      setSelectedTypes([])
+      setSelectedTags([])
+      setTypeSearchTerm('')
+      setProductSearchTerm('')
+      setTagSearchTerm('')
+      setValidationErrors({})
+      setShowTypeDropdown(false)
+      setShowProductDropdown(false)
+      setShowTagDropdown(false)
+      setPendingTags([])
+    }
+
+    if (isOpen && !mini) {
+      resetState()
+    }
+
+    if (!isOpen) {
+      resetState()
+    }
+  }, [isOpen, mini, baseSizeOptions, paintedByOptions])
+
   if (loadingRef) {
     return (
       <UI.Modal isOpen={isOpen} onClose={onClose}>
@@ -585,7 +740,6 @@ export function MiniatureOverviewModal({
                     validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
                   } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
                 >
-                  <option value="0">Select a base size</option>
                   {baseSizeOptions.map(size => (
                     <option key={size.id} value={size.id}>
                       {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1)}
@@ -711,88 +865,182 @@ export function MiniatureOverviewModal({
                 )}
               </div>
 
-              {/* Types Card */}
-              <div className="border border-gray-700 rounded-lg overflow-hidden h-[300px] flex flex-col">
-                <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
-                  <h3 className="font-medium text-gray-200">Types</h3>
-                </div>
-                <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40 relative">
-                  <div className="relative">
-                    <UI.SearchInput
-                      value={typeSearchTerm}
-                      onChange={(e) => {
-                        setTypeSearchTerm(e.target.value)
-                        setShowTypeDropdown(true)
-                      }}
-                      placeholder="Search types..."
-                      onFocus={() => {
-                        setTypeSearchTerm('')
-                        setShowTypeDropdown(true)
-                      }}
-                      ref={typeSearchInputRef}
-                    />
-                    {showTypeDropdown && typeSearchTerm && (
-                      <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg">
-                        {filteredTypes.map(type => (
-                          <button
-                            key={type.id}
-                            type="button"
-                            className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
-                            onClick={() => handleTypeSelect(type.id)}
-                          >
-                            {type.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
+              {/* Types and Tags Section */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Types Card */}
+                <div className="border border-gray-700 rounded-lg overflow-hidden h-[300px] flex flex-col">
+                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
+                    <h3 className="font-medium text-gray-200">Types</h3>
                   </div>
-                  {selectedTypes.length === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '45px' }}>
-                      <div className="text-3xl font-bold text-gray-800/70">No Types Assigned</div>
-                    </div>
-                  )}
-                  {selectedTypes.length > 0 && (
-                    <div className="space-y-3">
-                      <div className="border border-gray-700 rounded-md bg-gray-900/50">
-                        {selectedTypes.map((type, index) => (
-                          <div
-                            key={`${type.id}-${index}`}
-                            className="flex items-center justify-between px-3 py-2 hover:bg-gray-700 cursor-pointer"
-                            onClick={() => toggleProxyType(type.id)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full ${
-                                !type.proxy_type ? 'bg-green-500' : 'bg-gray-500'
-                              }`} />
-                              <span className="text-sm">{type.name}</span>
-                            </div>
+                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40 relative">
+                    <div className="relative">
+                      <UI.SearchInput
+                        value={typeSearchTerm}
+                        onChange={(e) => {
+                          setTypeSearchTerm(e.target.value)
+                          setShowTypeDropdown(true)
+                        }}
+                        placeholder="Search types..."
+                        onFocus={() => {
+                          setTypeSearchTerm('')
+                          setShowTypeDropdown(true)
+                        }}
+                        ref={typeSearchInputRef}
+                      />
+                      {showTypeDropdown && typeSearchTerm && (
+                        <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg">
+                          {filteredTypes.map(type => (
                             <button
+                              key={type.id}
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleTypeRemove(type.id)
-                              }}
-                              className="text-red-400 hover:text-red-300"
+                              className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
+                              onClick={() => handleTypeSelect(type.id)}
                             >
-                              <FaTimesCircle className="w-4 h-4" />
+                              {type.name}
                             </button>
-                          </div>
-                        ))}
-                      </div>
-                      {selectedCategories.length > 0 && (
-                        <div className="flex flex-wrap gap-2">
-                          {selectedCategories.map((category, index) => (
-                            <div
-                              key={`${category}-${index}`}
-                              className="px-2 py-1 text-xs rounded-full bg-orange-900/50 text-orange-200"
-                            >
-                              {category}
-                            </div>
                           ))}
                         </div>
                       )}
                     </div>
-                  )}
+                    {selectedTypes.length === 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '45px' }}>
+                        <div className="text-3xl font-bold text-gray-800/70">No Types Assigned</div>
+                      </div>
+                    )}
+                    {selectedTypes.length > 0 && (
+                      <div className="space-y-3">
+                        <div className="border border-gray-700 rounded-md bg-gray-900/50">
+                          {selectedTypes.map((type, index) => (
+                            <div
+                              key={`${type.id}-${index}`}
+                              className="flex items-center justify-between px-3 py-2 hover:bg-gray-700 cursor-pointer"
+                              onClick={() => toggleProxyType(type.id)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${
+                                  !type.proxy_type ? 'bg-green-500' : 'bg-gray-500'
+                                }`} />
+                                <span className="text-sm">{type.name}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleTypeRemove(type.id)
+                                }}
+                                className="text-red-400 hover:text-red-300"
+                              >
+                                <FaTimesCircle className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        {selectedCategories.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {selectedCategories.map((category, index) => (
+                              <div
+                                key={`${category}-${index}`}
+                                className="px-2 py-1 text-xs rounded-full bg-orange-900/50 text-orange-200"
+                              >
+                                {category}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Tags Card */}
+                <div className="border border-gray-700 rounded-lg overflow-hidden h-[300px] flex flex-col">
+                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
+                    <h3 className="font-medium text-gray-200">Tags</h3>
+                  </div>
+                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40 relative">
+                  <TagInput
+  value={tagInput}
+  onChange={setTagInput}
+  onTagAdd={async (tagName) => {
+    try {
+      if (!tagName) return
+      
+      // Check if tag already exists
+      const existingTag = availableTags.find(t => 
+        t.name.toLowerCase() === tagName.toLowerCase()
+      )
+
+      let tagToAdd
+      if (existingTag) {
+        tagToAdd = existingTag
+      } else {
+        // Create new tag
+        const { data, error } = await supabase
+          .from('tags')
+          .insert({ name: tagName })
+          .select()
+          .single()
+        
+        if (error) {
+          showError(`Failed to create tag: ${error.message}`)
+          return
+        }
+        tagToAdd = data
+        setAvailableTags(prev => [...prev, data])
+      }
+
+      // Add to selected tags if not already selected
+      if (!selectedTags.some(t => t.id === tagToAdd.id)) {
+        setSelectedTags(prev => [...prev, tagToAdd])
+      }
+
+      // Clear input
+      setTagInput('')
+    } catch (error) {
+      console.error('Error adding tag:', error)
+      showError('Failed to add tag')
+    }
+  }}
+  placeholder="Add tags..."
+  availableTags={availableTags}
+  onTagSelect={(tag) => {
+    if (!selectedTags.some(t => t.id === tag.id)) {
+      setSelectedTags(prev => [...prev, tag])
+    }
+  }}
+/>
+                    
+                    {selectedTags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        <AnimatePresence>
+                          {selectedTags.map((tag) => (
+                            <motion.div
+                              key={tag.id}
+                              initial={{ opacity: 0, scale: 0.3 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.3 }}
+                              transition={{ 
+                                type: "spring",
+                                stiffness: 500,
+                                damping: 15,
+                                mass: 1
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 text-sm rounded-full bg-gray-700"
+                            >
+                              <span>{tag.name}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleTagRemove(tag.id)}
+                                className="text-gray-400 hover:text-red-400 transition-colors"
+                              >
+                                <FaTimesCircle className="w-3 h-3" />
+                              </button>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

@@ -57,48 +57,46 @@ export async function createMiniature(data: MiniatureData) {
   }
 }
 
-export async function updateMiniature(miniId: number, data: MiniatureData) {
+export async function updateMiniature(id: number, mini: Partial<Mini>) {
   try {
     // Update the miniature
     const { error: miniError } = await supabase
       .from('minis')
       .update({
-        name: data.name,
-        description: data.description,
-        location: data.location,
-        quantity: data.quantity,
-        painted_by_id: data.painted_by_id,
-        base_size_id: data.base_size_id,
-        product_set_id: data.product_set_id
+        name: mini.name,
+        description: mini.description,
+        location: mini.location,
+        quantity: mini.quantity,
+        painted_by_id: mini.painted_by_id,
+        base_size_id: mini.base_size_id,
+        product_set_id: mini.product_set_id
       })
-      .eq('id', miniId)
+      .eq('id', id)
 
     if (miniError) throw miniError
 
-    // Delete existing type relationships
-    const { error: deleteError } = await supabase
-      .from('mini_to_types')
+    // Update tags
+    const { error: deleteTagsError } = await supabase
+      .from('mini_to_tags')
       .delete()
-      .eq('mini_id', miniId)
+      .eq('mini_id', id)
 
-    if (deleteError) throw deleteError
+    if (deleteTagsError) throw deleteTagsError
 
-    // Insert new type relationships if any types are provided
-    if (data.types && data.types.length > 0) {
-      const { error: typesError } = await supabase
-        .from('mini_to_types')
+    if (mini.tags && mini.tags.length > 0) {
+      const { error: tagsError } = await supabase
+        .from('mini_to_tags')
         .insert(
-          data.types.map(type => ({
-            mini_id: miniId,
-            type_id: type.id,
-            proxy_type: type.proxy_type
+          mini.tags.map(tag => ({
+            mini_id: id,
+            tag_id: tag.id
           }))
         )
 
-      if (typesError) throw typesError
+      if (tagsError) throw tagsError
     }
 
-    return { id: miniId }
+    return { id }
   } catch (error) {
     console.error('Error updating miniature:', error)
     throw error
@@ -134,4 +132,28 @@ export async function deleteMiniature(miniId: number) {
     console.error('Error deleting miniature:', error)
     throw error
   }
-} 
+}
+
+export const getMiniature = async (id: number) => {
+  const { data, error } = await supabase
+    .from('minis')
+    .select(`
+      *,
+      painted_by:painted_by_id(*),
+      base_size:base_size_id(*),
+      product_sets(*),
+      types:mini_to_types(
+        type:type_id(*),
+        proxy_type
+      ),
+      tags:mini_to_tags(
+        tag:tag_id(*)
+      )
+    `)
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+ 
