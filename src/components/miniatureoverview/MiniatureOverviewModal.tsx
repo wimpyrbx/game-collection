@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaImage, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaExclamationCircle } from 'react-icons/fa'
+import { FaDiceD6, FaImage, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaExclamationCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath } from '../../utils/imageUtils'
@@ -18,6 +18,10 @@ interface MiniatureOverviewModalProps {
   onSave: (data: Partial<Mini>) => Promise<void>
   onDelete?: (miniId: number) => Promise<void>
   isLoading?: boolean
+  onPrevious?: () => void
+  onNext?: () => void
+  hasPrevious?: boolean
+  hasNext?: boolean
 }
 
 interface SelectedType {
@@ -41,7 +45,11 @@ export function MiniatureOverviewModal({
   mini, 
   onSave,
   onDelete,
-  isLoading 
+  isLoading,
+  onPrevious,
+  onNext,
+  hasPrevious = true,
+  hasNext = true
 }: MiniatureOverviewModalProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -714,6 +722,25 @@ export function MiniatureOverviewModal({
     }
   }, [isOpen])
 
+  // Reset form data when mini changes
+  useEffect(() => {
+    if (mini) {
+      setFormData({
+        ...mini,
+        types: mini.types || [],
+        tags: mini.tags || [],
+        description: mini.description || '',
+      })
+      // Reset image state
+      setShowImage(false)
+      setTimeout(() => {
+        setShowImage(true)
+        // Focus name input after a short delay to ensure modal is ready
+        nameInputRef.current?.focus()
+      }, 50)
+    }
+  }, [mini?.id])
+
   if (loadingRef) {
     return (
       <UI.Modal isOpen={isOpen} onClose={onClose}>
@@ -734,6 +761,29 @@ export function MiniatureOverviewModal({
 
   return (
     <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
+      {/* Add navigation buttons */}
+      {onPrevious && (
+        <button
+          onClick={onPrevious}
+          disabled={!hasPrevious}
+          className="absolute left-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Previous miniature"
+        >
+          <FaChevronLeft className="w-8 h-8" />
+        </button>
+      )}
+      
+      {onNext && (
+        <button
+          onClick={onNext}
+          disabled={!hasNext}
+          className="absolute right-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Next miniature"
+        >
+          <FaChevronRight className="w-8 h-8" />
+        </button>
+      )}
+
       <form onSubmit={handleSubmit} className="flex flex-col max-h-[calc(100vh-8rem)]">
         <UI.ModalHeader>
           <div className="flex items-center justify-between w-full">
@@ -789,57 +839,30 @@ export function MiniatureOverviewModal({
                 onDragOver={(e) => e.preventDefault()}
                 onClick={handleImageClick}
               >
-                {previewUrl ? (
-                  <div className="relative w-full h-full group">
-                    <AnimatePresence mode="wait">
-                      {showImage && (
-                        <motion.img
-                          key={`mini-image-${isOpen}`}
-                          initial={{ scale: 1, opacity: 0 }}
-                          animate={{ 
-                            scale: 1.1,
-                            opacity: 1 
-                          }}
-                          whileInView={{
-                            scale: 1,
-                            transition: {
-                              type: "spring",
-                              bounce: 0.4,
-                              duration: 0.8
-                            }
-                          }}
-                          transition={{ 
-                            scale: {
-                              duration: 0.2,
-                              ease: "easeOut"
-                            },
-                            opacity: {
-                              duration: 0.2
-                            }
-                          }}
-                          src={previewUrl}
-                          alt="Preview"
-                          className="w-full h-full object-contain"
-                          onError={(e) => {
-                            e.currentTarget.onerror = null
-                            e.currentTarget.style.display = 'none'
-                            e.currentTarget.parentElement?.querySelector('.placeholder-icon')?.classList.remove('hidden')
-                          }}
-                        />
-                      )}
-                    </AnimatePresence>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center hidden placeholder-icon">
-                      <FaDiceD20 className="w-20 h-20 text-gray-700/50" />
-                      <span className="text-sm text-center px-4 text-gray-700/50 mt-2">Drop image here or click to select</span>
-                    </div>
-                    <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <FaImage className="w-8 h-8 text-white" />
-                    </div>
-                  </div>
-                ) : (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-700/50">
-                    <FaDiceD20 className="w-20 h-20" />
-                    <span className="text-sm text-center px-4 mt-2">Drop image here or click to select</span>
+                <AnimatePresence mode="wait">
+                  {showImage && mini?.id && (
+                    <motion.img
+                      key={`mini-image-${mini.id}`}
+                      src={getMiniImagePath(mini.id, 'full')}
+                      alt={mini.name}
+                      className="w-full h-full object-contain"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.15 }}
+                      onError={(e) => {
+                        e.currentTarget.onerror = null
+                        setShowImage(false)
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
+                
+                {/* Only show placeholder content if no image */}
+                {!showImage && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+                    <FaDiceD20 className="w-12 h-12 mb-2" />
+                    <span className="text-sm">Drop image here or click to select</span>
                   </div>
                 )}
               </div>
@@ -923,7 +946,6 @@ export function MiniatureOverviewModal({
                   }}
                   placeholder="Name"
                   required
-                  autoFocus
                   ref={nameInputRef}
                   error={validationErrors.name}
                 />
@@ -1073,7 +1095,6 @@ export function MiniatureOverviewModal({
                                   key={categoryName}
                                   initial={{ opacity: 0, scale: 0.3 }}
                                   animate={{ opacity: 1, scale: 1 }}
-                                  exit={{ opacity: 0, scale: 0.3 }}
                                   transition={{ 
                                     type: "spring",
                                     stiffness: 500,
@@ -1124,7 +1145,6 @@ export function MiniatureOverviewModal({
                               key={tag.id}
                               initial={{ opacity: 0, scale: 0.3 }}
                               animate={{ opacity: 1, scale: 1 }}
-                              exit={{ opacity: 0, scale: 0.3 }}
                               transition={{ 
                                 type: "spring",
                                 stiffness: 500,

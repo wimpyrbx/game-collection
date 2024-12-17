@@ -27,6 +27,7 @@ export default function MiniatureOverview() {
   const miniSearch = useAdminSearch({ searchFields: ['name'] })
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
+  const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
   const itemsPerPage = 10
 
   const { 
@@ -68,8 +69,6 @@ export default function MiniatureOverview() {
   // Update keyboard navigation to use currentPage from hook
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (loading || isModalOpen) return
-
       // Check if we're in an input field
       const activeElement = document.activeElement
       if (activeElement && (
@@ -80,10 +79,20 @@ export default function MiniatureOverview() {
         return
       }
 
-      if (e.key === 'ArrowLeft' && currentPage > 1) {
-        setCurrentPage(prev => prev - 1)
-      } else if (e.key === 'ArrowRight' && currentPage < Math.ceil((totalMinis || 0) / itemsPerPage)) {
-        setCurrentPage(prev => prev + 1)
+      if (isModalOpen) {
+        // Handle modal navigation
+        if (e.key === 'ArrowLeft' && selectedMiniIndex > 0) {
+          setSelectedMiniIndex(prev => prev - 1)
+        } else if (e.key === 'ArrowRight' && selectedMiniIndex < minis.length - 1) {
+          setSelectedMiniIndex(prev => prev + 1)
+        }
+      } else {
+        // Handle page navigation
+        if (e.key === 'ArrowLeft' && currentPage > 1) {
+          setCurrentPage(prev => prev - 1)
+        } else if (e.key === 'ArrowRight' && currentPage < Math.ceil((totalMinis || 0) / itemsPerPage)) {
+          setCurrentPage(prev => prev + 1)
+        }
       }
     }
 
@@ -224,17 +233,67 @@ export default function MiniatureOverview() {
     setIsModalOpen(true)
   }
 
-  const handleEdit = async (mini: Mini) => {
+  const handleEdit = async (mini: Mini, index: number) => {
+    await loadMiniature(mini, index)
+  }
+
+  const loadMiniature = async (mini: Mini, index: number) => {
     try {
-      // Fetch complete mini data including tags
+      setIsModalOpen(false)
+      await new Promise(resolve => setTimeout(resolve, 50))
+
+      // Calculate page number based on index
+      const newPage = Math.floor(index / itemsPerPage) + 1
+      if (newPage !== currentPage) {
+        setCurrentPage(newPage)
+      }
+
       const completeData = await getMiniature(mini.id)
       if (completeData) {
         setSelectedMini(completeData)
+        setSelectedMiniIndex(index)
         setIsModalOpen(true)
       }
     } catch (error) {
       console.error('Error fetching complete mini data:', error)
       showError('Failed to load miniature data')
+    }
+  }
+
+  const handlePrevious = async () => {
+    // Get the global index in the full list
+    const globalIndex = selectedMiniIndex - 1
+    if (globalIndex >= 0) {
+      // If we need to load the previous page
+      if (globalIndex < (currentPage - 1) * itemsPerPage) {
+        const prevPageMinis = await getPageMinis(currentPage - 1)
+        if (prevPageMinis && prevPageMinis.length > 0) {
+          const lastMiniOnPrevPage = prevPageMinis[prevPageMinis.length - 1]
+          await loadMiniature(lastMiniOnPrevPage, globalIndex)
+        }
+      } else {
+        // Same page navigation
+        const prevMini = minis[globalIndex % itemsPerPage]
+        await loadMiniature(prevMini, globalIndex)
+      }
+    }
+  }
+
+  const handleNext = async () => {
+    const globalIndex = selectedMiniIndex + 1
+    if (globalIndex < totalMinis) {
+      // If we need to load the next page
+      if (globalIndex >= currentPage * itemsPerPage) {
+        const nextPageMinis = await getPageMinis(currentPage + 1)
+        if (nextPageMinis && nextPageMinis.length > 0) {
+          const firstMiniOnNextPage = nextPageMinis[0]
+          await loadMiniature(firstMiniOnNextPage, globalIndex)
+        }
+      } else {
+        // Same page navigation
+        const nextMini = minis[globalIndex % itemsPerPage]
+        await loadMiniature(nextMini, globalIndex)
+      }
     }
   }
 
@@ -283,7 +342,7 @@ export default function MiniatureOverview() {
   const renderCardView = () => {
     return (
       <div className="grid grid-cols-5 gap-4 h-[calc(90vh-20rem)]">
-        {minis.map((mini) => {
+        {minis.map((mini, index) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const company = mini.product_sets?.product_line?.company?.name || 'No company'
           const productLine = mini.product_sets?.product_line?.name || 'No product line'
@@ -296,7 +355,7 @@ export default function MiniatureOverview() {
             <div 
               key={mini.id} 
               className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] hover:rotate-1"
-              onClick={() => handleEdit(mini)}
+              onClick={() => handleEdit(mini, index)}
             >
               <div className="relative aspect-square bg-gray-800 overflow-hidden">
                 <img
@@ -334,7 +393,7 @@ export default function MiniatureOverview() {
   const renderBannerView = () => {
     return (
       <div className="grid grid-cols-4 gap-6 h-[calc(90vh-20rem)]">
-        {minis.map((mini) => {
+        {minis.map((mini, index) => {
           const thumbPath = getMiniImagePath(mini.id, 'thumb')
           const company = mini.product_sets?.product_line?.company?.name || 'No company'
           const productLine = mini.product_sets?.product_line?.name || 'No product line'
@@ -348,7 +407,7 @@ export default function MiniatureOverview() {
             <div 
               key={mini.id} 
               className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:rotate-1 hover:-translate-y-1 flex"
-              onClick={() => handleEdit(mini)}
+              onClick={() => handleEdit(mini, index)}
             >
               <div className="relative w-1/3 bg-gray-800 overflow-hidden">
                 <img
@@ -542,14 +601,14 @@ export default function MiniatureOverview() {
                         </tr>
                       </thead>
                       <tbody className="bgCardBody divide-y divide-[#333333]">
-                        {minis.map((mini) => (
+                        {minis.map((mini, index) => (
                           <tr
                             key={mini.id}
                             className={`
                               ${mini.in_use ? 'bg-red-900/50' : 'bgRow'} 
                               hover:bgRowHover transition-colors cursor-pointer
                             `}
-                            onClick={() => handleEdit(mini)}
+                            onClick={() => handleEdit(mini, index)}
                           >
                             {getItemColumns(mini).map((column, index) => (
                               <td
@@ -593,11 +652,15 @@ export default function MiniatureOverview() {
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false)
-          setSelectedMini(undefined)
+          setSelectedMiniIndex(-1)
         }}
         mini={selectedMini}
         onSave={handleSave}
         onDelete={handleDelete}
+        onPrevious={handlePrevious}
+        onNext={handleNext}
+        hasPrevious={selectedMiniIndex > 0}
+        hasNext={selectedMiniIndex < (totalMinis || 0) - 1}
       />
     </>
   )
