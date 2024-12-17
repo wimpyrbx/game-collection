@@ -34,7 +34,7 @@ export const SearchInput = forwardRef<HTMLInputElement, SearchInputProps>(({
         onFocus={onFocus}
         onBlur={onBlur}
         placeholder={placeholder}
-        className={`w-full px-3 py-2 bg-gray-800 rounded border ${error ? 'border-red-500' : 'border-gray-700'} focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
+        className={`h-10 w-full px-3 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
         ref={ref}
       />
       {showClearButton && value && (

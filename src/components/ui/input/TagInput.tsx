@@ -12,6 +12,7 @@ interface TagInputProps {
   placeholder?: string
   availableTags: Tag[]
   onTagSelect?: (tag: Tag) => void
+  className?: string
 }
 
 export function TagInput({
@@ -20,7 +21,8 @@ export function TagInput({
   onTagAdd,
   placeholder,
   availableTags,
-  onTagSelect
+  onTagSelect,
+  className = ""
 }: TagInputProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [filteredTags, setFilteredTags] = useState<Tag[]>([])
@@ -98,14 +100,14 @@ export function TagInput({
   }
 
   return (
-    <div className="relative">
+    <div className={`relative w-full ${className}`}>
       <input
         type="text"
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        className="w-full px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none text-gray-200 text-sm"
+        className="h-10 w-full px-3 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
       />
       {showDropdown && filteredTags.length > 0 && (
         <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">

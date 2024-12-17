@@ -781,11 +781,10 @@ export function MiniatureOverviewModal({
 
         <UI.ModalBody className="flex-1">
           <div className="grid grid-cols-[250px_1fr] gap-6">
-            {/* Left Column */}
+            {/* Left Column - Image and remaining form fields */}
             <div className="space-y-3">
               {/* Image Drop Zone */}
-              <div
-                className="w-full aspect-square border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors relative overflow-hidden bg-gray-900/50"
+              <div className="w-full aspect-square border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors relative overflow-hidden bg-gray-900/50"
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
                 onClick={handleImageClick}
@@ -845,133 +844,110 @@ export function MiniatureOverviewModal({
                 )}
               </div>
 
-              {/* Location and Quantity */}
-              <div className="grid grid-cols-[1fr_80px] gap-4">
-                <Input
-                  label="Location"
-                  value={formData.location}
-                  onChange={(e) => {
-                    setFormData(prev => ({ ...prev, location: e.target.value }))
-                    if (validationErrors.location) {
-                      setValidationErrors(prev => ({ ...prev, location: undefined }))
-                    }
-                  }}
-                  placeholder="Enter storage location"
-                  required
-                  ref={locationInputRef}
-                  error={validationErrors.location}
-                />
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-1">Qty</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={formData.quantity}
-                    onChange={(e) => {
-                      setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))
-                      if (validationErrors.quantity) {
-                        setValidationErrors(prev => ({ ...prev, quantity: undefined }))
-                      }
-                    }}
-                    placeholder="Qty"
-                    required
-                    ref={quantityInputRef}
-                    className={`w-full px-3 py-2 bg-gray-800 rounded border ${
-                      validationErrors.quantity ? 'border-red-500' : 'border-gray-700'
-                    } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
-                  />
-                  {validationErrors.quantity && (
-                    <div className="text-sm text-red-500 mt-1">{validationErrors.quantity}</div>
-                  )}
-                </div>
-              </div>
+              {/* Location */}
+              <Input
+                value={formData.location}
+                onChange={(e) => {
+                  setFormData(prev => ({ ...prev, location: e.target.value }))
+                  if (validationErrors.location) {
+                    setValidationErrors(prev => ({ ...prev, location: undefined }))
+                  }
+                }}
+                placeholder="Location"
+                required
+                ref={locationInputRef}
+                error={validationErrors.location}
+              />
 
               {/* Base Size */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Base Size</label>
-                <select
-                  value={formData.base_size_id}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value)
-                    setFormData(prev => ({ ...prev, base_size_id: value }))
-                    if (validationErrors.base_size_id) {
-                      setValidationErrors(prev => ({ ...prev, base_size_id: undefined }))
-                    }
-                  }}
-                  required
-                  ref={baseSizeSelectRef}
-                  className={`w-full px-3 py-2 bg-gray-800 rounded border ${
-                    validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
-                  } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
-                >
-                  <option value={0} disabled>Select base size</option>
-                  {baseSizeOptions
-                    .sort((a, b) => a.id - b.id)
-                    .map(size => (
-                      <option key={size.id} value={size.id}>
-                        {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
-                      </option>
-                    ))}
-                </select>
-                {validationErrors.base_size_id && (
-                  <div className="text-sm text-red-500 mt-1">{validationErrors.base_size_id}</div>
-                )}
-              </div>
+              <select
+                value={formData.base_size_id}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value)
+                  setFormData(prev => ({ ...prev, base_size_id: value }))
+                  if (validationErrors.base_size_id) {
+                    setValidationErrors(prev => ({ ...prev, base_size_id: undefined }))
+                  }
+                }}
+                required
+                ref={baseSizeSelectRef}
+                className={`h-10 w-full px-3 bg-gray-800 rounded border ${
+                  validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
+                } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
+              >
+                <option value={0} disabled>Base Size</option>
+                {baseSizeOptions.map(size => (
+                  <option key={size.id} value={size.id}>
+                    {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
+                  </option>
+                ))}
+              </select>
 
               {/* Painted By Boxes */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">Painted By</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {paintedByOptions.slice(0, 3).map(painter => (
-                    <button
-                      key={painter.id}
-                      type="button"
-                      className={`p-3 rounded border capitalize ${
-                        formData.painted_by_id === painter.id
-                          ? 'border-green-600 bg-green-600/20'
-                          : validationErrors.painted_by_id 
-                            ? 'border-red-500'
-                            : 'border-gray-600 hover:border-gray-500'
-                      } transition-colors text-sm`}
-                      onClick={() => {
-                        setFormData(prev => ({ ...prev, painted_by_id: painter.id }))
-                        if (validationErrors.painted_by_id) {
-                          setValidationErrors(prev => ({ ...prev, painted_by_id: undefined }))
-                        }
-                      }}
-                    >
-                      {painter.painted_by_name.toLowerCase()}
-                    </button>
-                  ))}
-                </div>
-                {validationErrors.painted_by_id && (
-                  <div className="text-sm text-red-500 mt-1">{validationErrors.painted_by_id}</div>
-                )}
+              <div className="grid grid-cols-3 gap-2">
+                {paintedByOptions.slice(0, 3).map(painter => (
+                  <button
+                    key={painter.id}
+                    type="button"
+                    className={`p-3 rounded border capitalize ${
+                      formData.painted_by_id === painter.id
+                        ? 'border-green-600 bg-green-600/20'
+                        : validationErrors.painted_by_id 
+                          ? 'border-red-500'
+                          : 'border-gray-600 hover:border-gray-500'
+                    } transition-colors text-sm`}
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, painted_by_id: painter.id }))
+                      if (validationErrors.painted_by_id) {
+                        setValidationErrors(prev => ({ ...prev, painted_by_id: undefined }))
+                      }
+                    }}
+                  >
+                    {painter.painted_by_name.toLowerCase()}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* Right Column */}
+            {/* Right Column - Types, Tags, and moved fields */}
             <div className="space-y-3">
-              {/* Name Input */}
-              <Input
-                label="Name"
-                value={formData.name}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, name: e.target.value }))
-                  if (validationErrors.name) {
-                    setValidationErrors(prev => ({ ...prev, name: undefined }))
-                  }
-                }}
-                placeholder="Enter miniature name"
-                required
-                autoFocus
-                ref={nameInputRef}
-                error={validationErrors.name}
-              />
+              {/* Name and Quantity */}
+              <div className="grid grid-cols-[1fr_60px] gap-2 items-center">
+                <Input
+                  value={formData.name}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, name: e.target.value }))
+                    if (validationErrors.name) {
+                      setValidationErrors(prev => ({ ...prev, name: undefined }))
+                    }
+                  }}
+                  placeholder="Name"
+                  required
+                  autoFocus
+                  ref={nameInputRef}
+                  error={validationErrors.name}
+                />
+                <input
+                  type="number"
+                  min={1}
+                  value={formData.quantity}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }))
+                    if (validationErrors.quantity) {
+                      setValidationErrors(prev => ({ ...prev, quantity: undefined }))
+                    }
+                  }}
+                  placeholder="Qty"
+                  required
+                  ref={quantityInputRef}
+                  className={`h-10 w-full px-3 bg-gray-800 rounded border ${
+                    validationErrors.quantity ? 'border-red-500' : 'border-gray-700'
+                  } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
+                />
+              </div>
 
-              {/* Product Set Selection */}
+              {/* Product Set */}
               <div className="relative">
-                <label className="block text-sm font-medium text-gray-300 mb-1">Product Set</label>
                 <UI.SearchInput
                   value={selectedProductDisplay || productSearchTerm}
                   onChange={(e) => {
@@ -985,30 +961,7 @@ export function MiniatureOverviewModal({
                       `${p.company} → ${p.line} → ${p.set}`.toLowerCase().includes(newValue.toLowerCase())
                     ))
                   }}
-                  placeholder="Search for Company → Line → Set..."
-                  onFocus={() => {
-                    setShowProductDropdown(true)
-                    if (productSearchTerm && !selectedProductDisplay) {
-                      setProductSearchTerm('')
-                      setFormData(prev => ({ ...prev, product_set_id: null }))
-                    }
-                  }}
-                  onBlur={() => {
-                    setTimeout(() => {
-                      if (isInvalidProductSet && productSearchTerm) {
-                        setProductSearchTerm('')
-                        setIsInvalidProductSet(false)
-                      }
-                      setShowProductDropdown(false)
-                    }, 200)
-                  }}
-                  showClearButton={true}
-                  onClear={() => {
-                    setProductSearchTerm('')
-                    setFormData(prev => ({ ...prev, product_set_id: null }))
-                    setShowProductDropdown(false)
-                    setIsInvalidProductSet(false)
-                  }}
+                  placeholder="Product Set"
                 />
                 {showProductDropdown && (productSearchTerm || formData.product_set_id) && (
                   <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
@@ -1032,7 +985,7 @@ export function MiniatureOverviewModal({
                 )}
               </div>
 
-              {/* Types and Tags Section */}
+              {/* Types and Tags grid */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Types Card */}
                 <div className="border border-gray-700 rounded-lg overflow-hidden h-[300px] flex flex-col">
@@ -1048,11 +1001,6 @@ export function MiniatureOverviewModal({
                           setShowTypeDropdown(true)
                         }}
                         placeholder="Search types..."
-                        onFocus={() => {
-                          setTypeSearchTerm('')
-                          setShowTypeDropdown(true)
-                        }}
-                        ref={typeSearchInputRef}
                       />
                       {showTypeDropdown && typeSearchTerm && (
                         <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
@@ -1201,7 +1149,7 @@ export function MiniatureOverviewModal({
                   </div>
                 </div>
               </div>
-
+              
               {/* Description */}
               <UI.TextArea
                 label="Description"

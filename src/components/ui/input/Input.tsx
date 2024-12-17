@@ -7,6 +7,7 @@ interface InputProps {
   className?: string
   required?: boolean
   autoFocus?: boolean
+  error?: string
 }
 
 export function Input({
@@ -17,7 +18,8 @@ export function Input({
   type = "text",
   className = "",
   required,
-  autoFocus
+  autoFocus,
+  error
 }: InputProps) {
   return (
     <div>
@@ -33,7 +35,7 @@ export function Input({
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
-        className={`w-full px-3 py-2 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
+        className={`h-10 w-full px-3 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none ${className}`}
       />
     </div>
   )
