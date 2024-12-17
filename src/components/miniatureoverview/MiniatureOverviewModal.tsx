@@ -10,6 +10,7 @@ import { useNotifications } from '../../contexts/NotificationContext'
 import { supabase } from '../../lib/supabase'
 import { TagInput } from '../ui/input/TagInput'
 import { motion, AnimatePresence } from 'framer-motion'
+import { ShowItems } from '../ShowItems'
 
 interface MiniatureOverviewModalProps {
   isOpen: boolean
@@ -38,6 +39,16 @@ interface ValidationErrors {
   painted_by_id?: string
   quantity?: string
 }
+
+// Add this utility function at the top of the file
+const checkImageExists = async (url: string): Promise<boolean> => {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch {
+    return false;
+  }
+};
 
 export function MiniatureOverviewModal({ 
   isOpen, 
@@ -153,7 +164,7 @@ export function MiniatureOverviewModal({
 
       // Always try to set preview URL if we have a mini ID
       const url = getMiniImagePath(mini.id, 'original')
-      //console.log('Setting preview URL:', url)
+      // console.log('Image URL:', url) // Debugging: Log the image URL
       setPreviewUrl(url)
 
       // Set form data
@@ -710,36 +721,68 @@ export function MiniatureOverviewModal({
   }, [isOpen, mini, baseSizeOptions, paintedByOptions])
 
   const [showImage, setShowImage] = useState(false)
-  
-  // Reset and trigger image animation when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setShowImage(false)
-      // Small delay to ensure component remounts
-      setTimeout(() => {
-        setShowImage(true)
-      }, 50)
-    }
-  }, [isOpen])
+  const [isImageLoading, setIsImageLoading] = useState(false)
+  const [imageError, setImageError] = useState<string | null>(null)
 
-  // Reset form data when mini changes
+  // Update the image initialization effect
   useEffect(() => {
-    if (mini) {
-      setFormData({
-        ...mini,
-        types: mini.types || [],
-        tags: mini.tags || [],
-        description: mini.description || '',
-      })
-      // Reset image state
-      setShowImage(false)
-      setTimeout(() => {
-        setShowImage(true)
-        // Focus name input after a short delay to ensure modal is ready
-        nameInputRef.current?.focus()
-      }, 50)
+    let mounted = true;
+
+    const initializeImage = (miniId: number) => {
+      if (!mounted) return;
+      
+      setIsImageLoading(true);
+      setImageError(null);
+      setShowImage(false);
+      
+      // Create new image object
+      const img = new Image();
+      
+      img.onload = () => {
+        if (!mounted) return;
+        setIsImageLoading(false);
+        // Add small delay before showing image for smooth animation
+        requestAnimationFrame(() => {
+          if (mounted) setShowImage(true);
+        });
+      };
+      
+      img.onerror = () => {
+        if (!mounted) return;
+        setIsImageLoading(false);
+        setImageError('Image not available');
+        setShowImage(false);
+      };
+      
+      // Set source last
+      img.src = getMiniImagePath(miniId, 'full');
+    };
+
+    if (isOpen && mini?.id) {
+      // Reset states when modal opens
+      setShowImage(false);
+      
+      // Small delay to ensure modal transition is complete
+      const timer = setTimeout(() => {
+        if (mounted) {
+          initializeImage(mini.id);
+        }
+      }, 100);
+
+      return () => {
+        mounted = false;
+        clearTimeout(timer);
+      };
+    } else {
+      setShowImage(false);
+      setIsImageLoading(false);
+      setImageError(null);
     }
-  }, [mini?.id])
+
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, mini?.id]);
 
   if (loadingRef) {
     return (
@@ -766,10 +809,10 @@ export function MiniatureOverviewModal({
         <button
           onClick={onPrevious}
           disabled={!hasPrevious}
-          className="absolute left-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="absolute left-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-800 rounded-full shadow-lg"
           title="Previous miniature"
         >
-          <FaChevronLeft className="w-8 h-8" />
+          <FaChevronLeft className="w-10 h-10 text-white" />
         </button>
       )}
       
@@ -777,10 +820,10 @@ export function MiniatureOverviewModal({
         <button
           onClick={onNext}
           disabled={!hasNext}
-          className="absolute right-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="absolute right-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-800 rounded-full shadow-lg"
           title="Next miniature"
         >
-          <FaChevronRight className="w-8 h-8" />
+          <FaChevronRight className="w-10 h-10 text-white" />
         </button>
       )}
 
@@ -811,7 +854,7 @@ export function MiniatureOverviewModal({
               )}
               {isEditMode && mini?.in_use && (
                 <div className="flex items-center gap-1 px-1 py-1 bg-red-500/30 border border-red-500/20 rounded text-red-500 text-xs">
-                  <FaExclamationTriangle className="text-yellow-500 w-8 h-8" />
+                  <FaExclamationTriangle className="text-yellow-500 w-7 h-7 ml-1 mr-2" />
                   <span className="text-gray-300">In Use:<br></br>
                   <span className="text-xs text-gray-400">
                     {new Date(mini.in_use).toLocaleString('de-DE', {
@@ -834,37 +877,74 @@ export function MiniatureOverviewModal({
             {/* Left Column - Image and remaining form fields */}
             <div className="space-y-3">
               {/* Image Drop Zone */}
-              <div className="w-full aspect-square border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors relative overflow-hidden bg-gray-900/50"
+              <div 
+                className="w-full aspect-square border border-gray-800 rounded-lg cursor-pointer hover:border-gray-700 transition-colors relative overflow-hidden bg-gray-900/50"
                 onDrop={handleDrop}
                 onDragOver={(e) => e.preventDefault()}
                 onClick={handleImageClick}
               >
                 <AnimatePresence mode="wait">
-                  {showImage && mini?.id && (
-                    <motion.img
+                  {showImage && mini?.id && !imageError ? (
+                    <motion.div
                       key={`mini-image-${mini.id}`}
-                      src={getMiniImagePath(mini.id, 'full')}
-                      alt={mini.name}
-                      className="w-full h-full object-contain"
+                      className="absolute inset-0 flex items-center justify-center"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 25,
+                        duration: 0.3
+                      }}
+                    >
+                      <img
+                        src={getMiniImagePath(mini.id, 'full')}
+                        alt={mini.name}
+                        className="w-full h-full object-contain"
+                      />
+                    </motion.div>
+                  ) : previewUrl ? (
+                    <motion.div
+                      key="preview-image"
+                      className="absolute inset-0 flex items-center justify-center"
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 25,
+                        duration: 0.3
+                      }}
+                    >
+                      <img
+                        src={previewUrl}
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                        onError={() => setPreviewUrl(null)}
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="placeholder"
+                      className="absolute inset-0 flex flex-col items-center justify-center text-gray-500"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      transition={{ duration: 0.15 }}
-                      onError={(e) => {
-                        e.currentTarget.onerror = null
-                        setShowImage(false)
-                      }}
-                    />
+                      transition={{ duration: 0.2 }}
+                    >
+                      {isImageLoading ? (
+                        <UI.LoadingSpinner size="sm" />
+                      ) : (
+                        <>
+                          <FaDiceD20 className="w-12 h-12 mb-2" />
+                          <span className="text-sm">Drop image here or click to select</span>
+                        </>
+                      )}
+                    </motion.div>
                   )}
                 </AnimatePresence>
-                
-                {/* Only show placeholder content if no image */}
-                {!showImage && (
-                  <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
-                    <FaDiceD20 className="w-12 h-12 mb-2" />
-                    <span className="text-sm">Drop image here or click to select</span>
-                  </div>
-                )}
               </div>
 
               {/* Location */}
@@ -1084,30 +1164,21 @@ export function MiniatureOverviewModal({
                         {/* Consolidated Categories List */}
                         <div className="mt-1">
                           <div className="text-sm font-medium text-gray-400 mb-2">All Categories:</div>
-                          <div className="flex flex-wrap gap-1">
-                            <AnimatePresence>
-                              {Array.from(new Set(
-                                selectedTypes.flatMap(type => 
-                                  miniTypes.find(t => t.id === type.id)?.categories || []
-                                ).map(cat => cat.name)
-                              )).sort().map((categoryName, index) => (
-                                <motion.div
-                                  key={categoryName}
-                                  initial={{ opacity: 0, scale: 0.3 }}
-                                  animate={{ opacity: 1, scale: 1 }}
-                                  transition={{ 
-                                    type: "spring",
-                                    stiffness: 500,
-                                    damping: 15,
-                                    mass: 1
-                                  }}
-                                  className="px-2 py-0.5 text-xs rounded-full bg-orange-600/30 text-orange-200 border border-orange-900/50"
-                                >
-                                  {categoryName}
-                                </motion.div>
-                              ))}
-                            </AnimatePresence>
-                          </div>
+                          <ShowItems
+                            items={Array.from(new Set(
+                              selectedTypes.flatMap(type => 
+                                miniTypes.find(t => t.id === type.id)?.categories || []
+                              ).map(cat => cat.name)
+                            )).sort()}
+                            displayType="pills"
+                            scaleAnimation={true}
+                            shadowEnabled={true}
+                            itemStyle={{
+                              bg: 'bg-yellow-800',
+                              size: 'xs',
+                              hover: 'hover:bg-yellow-700'
+                            }}
+                          />
                         </div>
                       </div>
                     )}
@@ -1151,7 +1222,7 @@ export function MiniatureOverviewModal({
                                 damping: 15,
                                 mass: 1
                               }}
-                              className="flex items-center gap-1 px-2 py-1 text-sm rounded-full bg-gray-700"
+                              className="flex items-center gap-1 px-2 py-1 pb-1.5 text-xs rounded-full bg-gray-700"
                             >
                               <span>{tag.name}</span>
                               <button

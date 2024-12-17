@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export type TogglePlacement = 'start' | 'end' | 'right' | 'top';
 
@@ -22,6 +23,8 @@ interface ShowItemsProps {
   textColor?: string;
   emptyMessage?: string;
   maxPerRow?: number;
+  shadowEnabled?: boolean;
+  scaleAnimation?: boolean;
 }
 
 export function ShowItems({
@@ -39,7 +42,9 @@ export function ShowItems({
   },
   textColor,
   emptyMessage = 'No items',
-  maxPerRow = 3
+  maxPerRow = 3,
+  shadowEnabled = false,
+  scaleAnimation = false
 }: ShowItemsProps) {
   const [showAll, setShowAll] = useState(false);
   const visibleItems = showAll ? items : items.slice(0, maxVisible);
@@ -56,7 +61,7 @@ export function ShowItems({
 
   const getPillPadding = () => {
     switch (itemStyle.size) {
-      case 'xs': return 'px-3 py-1';
+      case 'xs': return 'px-3 py-1 pb-1.5';
       case 'sm': return 'px-4 py-1.5';
       case 'md': return 'px-5 py-2';
       default: return 'px-4 py-1.5';
@@ -81,6 +86,18 @@ export function ShowItems({
     );
   };
 
+  const pillClasses = `
+    inline-block whitespace-nowrap rounded-full cursor-default
+    ${shadowEnabled ? 'shadow-sm shadow-gray-900' : ''}
+    ${getPillPadding()}
+    ${getTextSize()}
+    ${itemStyle.text}
+    ${itemStyle.bg}
+    ${itemStyle.border}
+    ${itemStyle.hover}
+    transition-colors duration-200
+  `;
+
   const renderItems = () => {
     if (items.length === 0) {
       return <span className="text-gray-500 italic">{emptyMessage}</span>;
@@ -88,30 +105,45 @@ export function ShowItems({
 
     if (displayType === 'pills') {
       return (
-        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${maxPerRow}, minmax(0, 1fr))` }}>
-          {visibleItems.map((item, index) => (
-            <span
-              key={index}
-              className={`
-                inline-flex items-center justify-center rounded-full shadow-sm shadow-gray-900
-                ${getPillPadding()}
-                ${getTextSize()}
-                ${itemStyle.text}
-                ${itemStyle.bg}
-                ${itemStyle.border}
-                ${itemStyle.hover}
-                transition-colors duration-200
-              `}
-            >
-              {item}
-            </span>
-          ))}
+        <div className="flex flex-wrap gap-1">
+          <AnimatePresence>
+            {visibleItems.map((item, index) => (
+              scaleAnimation ? (
+                <motion.span
+                  key={index}
+                  initial={{ opacity: 0, scale: 0.3 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ 
+                    type: "spring",
+                    stiffness: 500,
+                    damping: 15,
+                    mass: 1,
+                    delay: index * 0.1 
+                  }}
+                  className={pillClasses}
+                >
+                  {item}
+                </motion.span>
+              ) : (
+                <span
+                  key={index}
+                  className={pillClasses}
+                >
+                  {item}
+                </span>
+              )
+            ))}
+          </AnimatePresence>
         </div>
       );
     }
 
     return (
-      <span className={`${getTextSize()} ${textColor || itemStyle.text}`}>
+      <span className={`
+        ${getTextSize()} 
+        ${textColor || itemStyle.text}
+        ${shadowEnabled ? 'drop-shadow-sm' : ''}
+      `}>
         {visibleItems.join(', ')}
       </span>
     );
