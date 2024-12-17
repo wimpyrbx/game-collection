@@ -25,6 +25,7 @@ interface ShowItemsProps {
   maxPerRow?: number;
   shadowEnabled?: boolean;
   scaleAnimation?: boolean;
+  render?: (item: string) => React.ReactNode;
 }
 
 export function ShowItems({
@@ -44,7 +45,8 @@ export function ShowItems({
   emptyMessage = 'No items',
   maxPerRow = 3,
   shadowEnabled = false,
-  scaleAnimation = false
+  scaleAnimation = false,
+  render
 }: ShowItemsProps) {
   const [showAll, setShowAll] = useState(false);
   const visibleItems = showAll ? items : items.slice(0, maxVisible);
@@ -107,9 +109,11 @@ export function ShowItems({
       return (
         <div className="flex flex-wrap gap-1">
           <AnimatePresence>
-            {visibleItems.map((item, index) => (
-              scaleAnimation ? (
-                <motion.span
+            {visibleItems.map((item, index) => {
+              const content = render ? render(item) : item;
+              
+              return scaleAnimation ? (
+                <motion.div
                   key={index}
                   initial={{ opacity: 0, scale: 0.3 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -120,19 +124,23 @@ export function ShowItems({
                     mass: 1,
                     delay: index * 0.1 
                   }}
-                  className={pillClasses}
                 >
-                  {item}
-                </motion.span>
+                  {render ? content : (
+                    <span className={pillClasses}>
+                      {content}
+                    </span>
+                  )}
+                </motion.div>
               ) : (
-                <span
-                  key={index}
-                  className={pillClasses}
-                >
-                  {item}
-                </span>
+                <div key={index}>
+                  {render ? content : (
+                    <span className={pillClasses}>
+                      {content}
+                    </span>
+                  )}
+                </div>
               )
-            ))}
+            })}
           </AnimatePresence>
         </div>
       );

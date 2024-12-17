@@ -15,7 +15,8 @@ import { ShowItems } from '../ShowItems'
 interface MiniatureOverviewModalProps {
   isOpen: boolean
   onClose: () => void
-  mini?: Mini
+  miniId?: number
+  miniData?: Mini
   onSave: (data: Partial<Mini>) => Promise<void>
   onDelete?: (miniId: number) => Promise<void>
   isLoading?: boolean
@@ -53,7 +54,8 @@ const checkImageExists = async (url: string): Promise<boolean> => {
 export function MiniatureOverviewModal({ 
   isOpen, 
   onClose, 
-  mini, 
+  miniId, 
+  miniData,
   onSave,
   onDelete,
   isLoading,
@@ -98,7 +100,7 @@ export function MiniatureOverviewModal({
     getProductSetsByProductLine
   } = useMiniatureReferenceData()
 
-  const isEditMode = !!mini
+  const isEditMode = !!miniData
 
   // Add ref for type search input
   const typeSearchInputRef = useRef<HTMLInputElement>(null)
@@ -155,32 +157,32 @@ export function MiniatureOverviewModal({
 
   // Load mini data when editing
   useEffect(() => {
-    if (mini) {
+    if (miniData) {
       // console.log('Loading mini data:', {
-      //   id: mini.id,
-      //   name: mini.name,
-      //   image_path: mini.image_path
+      //   id: miniData.id,
+      //   name: miniData.name,
+      //   image_path: miniData.image_path
       // })
 
       // Always try to set preview URL if we have a mini ID
-      const url = getMiniImagePath(mini.id, 'original')
+      const url = getMiniImagePath(miniData.id, 'original')
       // console.log('Image URL:', url) // Debugging: Log the image URL
       setPreviewUrl(url)
 
       // Set form data
       const formDataToSet = {
-        name: mini.name,
-        description: mini.description || '',
-        location: mini.location || '',
-        quantity: mini.quantity || 1,
-        painted_by_id: mini.painted_by?.id || 0,
-        base_size_id: mini.base_size_id || 0,
-        product_set_id: mini.product_sets?.id || null,
-        types: mini.types?.map(t => ({
+        name: miniData.name,
+        description: miniData.description || '',
+        location: miniData.location || '',
+        quantity: miniData.quantity || 1,
+        painted_by_id: miniData.painted_by?.id || 0,
+        base_size_id: miniData.base_size_id || 0,
+        product_set_id: miniData.product_sets?.id || null,
+        types: miniData.types?.map(t => ({
           id: t.type.id,
           proxy_type: t.proxy_type
         })) || [],
-        tags: mini.tags?.map(t => ({
+        tags: miniData.tags?.map(t => ({
           id: t.id
         })) || []
       }
@@ -188,8 +190,8 @@ export function MiniatureOverviewModal({
       setFormData(formDataToSet)
 
       // Set selected types
-      if (mini.types) {
-        const typesToSet = mini.types.map(t => ({
+      if (miniData.types) {
+        const typesToSet = miniData.types.map(t => ({
           id: t.type.id,
           name: t.type.name,
           proxy_type: t.proxy_type,
@@ -203,24 +205,24 @@ export function MiniatureOverviewModal({
       }
 
       // Set selected tags
-      if (mini.tags) {
-        setSelectedTags(mini.tags)
+      if (miniData.tags) {
+        setSelectedTags(miniData.tags)
       }
 
       // Set product set display
-      if (mini.product_sets) {
-        const company = mini.product_sets.product_line?.company?.name || ''
-        const line = mini.product_sets.product_line?.name || ''
-        const set = mini.product_sets.name || ''
+      if (miniData.product_sets) {
+        const company = miniData.product_sets.product_line?.company?.name || ''
+        const line = miniData.product_sets.product_line?.name || ''
+        const set = miniData.product_sets.name || ''
         const displayValue = `${company} → ${line} → ${set}`
         setProductSearchTerm(displayValue)
         setShowProductDropdown(false)
         
         // Find and select the matching product set
-        setFormData(prev => ({ ...prev, product_set_id: mini.product_sets.id }))
+        setFormData(prev => ({ ...prev, product_set_id: miniData.product_sets.id }))
       }
     }
-  }, [mini])
+  }, [miniData])
 
   // Add this effect to handle product set selection
   useEffect(() => {
@@ -265,16 +267,16 @@ export function MiniatureOverviewModal({
       setTypeSearchTerm('')
       setShowProductDropdown(false)
       setShowTypeDropdown(false)
-    } else if (mini) {
+    } else if (miniData) {
       // When modal opens with a mini, set the preview URL
-      const url = getMiniImagePath(mini.id, 'original')
+      const url = getMiniImagePath(miniData.id, 'original')
       // console.log('Setting preview URL:', url)
       setPreviewUrl(url)
     }
-  }, [isOpen, mini])
+  }, [isOpen, miniData])
 
   useEffect(() => {
-    if (!mini && isOpen) {
+    if (!miniData && isOpen) {
       const prepaintedId = paintedByOptions.find(p => 
         p.painted_by_name.toLowerCase() === 'Prepainted'.toLowerCase()
       )?.id || 0
@@ -288,7 +290,7 @@ export function MiniatureOverviewModal({
         base_size_id: mediumId
       }))
     }
-  }, [paintedByOptions, baseSizeOptions, mini, isOpen])
+  }, [paintedByOptions, baseSizeOptions, miniData, isOpen])
 
   // Add state for pending new tags
   const [pendingTags, setPendingTags] = useState<string[]>([])
@@ -335,7 +337,7 @@ export function MiniatureOverviewModal({
         base_size_id: formData.base_size_id,
         product_set_id: formData.product_set_id,
         types: selectedTypes.map(t => ({
-          mini_id: mini?.id || 0,
+          mini_id: miniData?.id || 0,
           type_id: t.id,
           proxy_type: t.proxy_type,
           type: {
@@ -357,8 +359,8 @@ export function MiniatureOverviewModal({
 
       // console.log('Submitting miniature data:', miniatureData)
 
-      if (isEditMode && mini?.id) {
-        await updateMiniature(mini.id, miniatureData)
+      if (isEditMode && miniData?.id) {
+        await updateMiniature(miniData.id, miniatureData)
       } else {
         await createMiniature(miniatureData)
       }
@@ -588,11 +590,11 @@ export function MiniatureOverviewModal({
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = async () => {
-    if (!mini?.id || !onDelete) return
+    if (!miniData?.id || !onDelete) return
     
     try {
       setIsDeleting(true)
-      await onDelete(mini.id)
+      await onDelete(miniData.id)
       setShowDeleteConfirm(false)
       onClose()
     } catch (error) {
@@ -693,8 +695,8 @@ export function MiniatureOverviewModal({
         location: '',
         quantity: 1,
         description: '',
-        base_size_id: isOpen && !mini ? mediumId : 0,
-        painted_by_id: isOpen && !mini ? prepaintedId : 0,
+        base_size_id: isOpen && !miniData ? mediumId : 0,
+        painted_by_id: isOpen && !miniData ? prepaintedId : 0,
         product_set_id: null,
         types: [],
         tags: []
@@ -711,14 +713,14 @@ export function MiniatureOverviewModal({
       setPendingTags([])
     }
 
-    if (isOpen && !mini) {
+    if (isOpen && !miniData) {
       resetState()
     }
 
     if (!isOpen) {
       resetState()
     }
-  }, [isOpen, mini, baseSizeOptions, paintedByOptions])
+  }, [isOpen, miniData, baseSizeOptions, paintedByOptions])
 
   const [showImage, setShowImage] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(false)
@@ -758,14 +760,14 @@ export function MiniatureOverviewModal({
       img.src = getMiniImagePath(miniId, 'full');
     };
 
-    if (isOpen && mini?.id) {
+    if (isOpen && miniData?.id) {
       // Reset states when modal opens
       setShowImage(false);
       
       // Small delay to ensure modal transition is complete
       const timer = setTimeout(() => {
         if (mounted) {
-          initializeImage(mini.id);
+          initializeImage(miniData.id);
         }
       }, 100);
 
@@ -782,7 +784,22 @@ export function MiniatureOverviewModal({
     return () => {
       mounted = false;
     };
-  }, [isOpen, mini?.id]);
+  }, [isOpen, miniData?.id]);
+
+  useEffect(() => {
+    if (isOpen && !miniData) {
+      console.error('Modal opened but no mini data available');
+      onClose();
+    }
+  }, [isOpen, miniData, onClose]);
+
+  if (isOpen && !miniData) {
+    return (
+      <UI.Modal isOpen={isOpen} onClose={onClose}>
+        <UI.LoadingSpinner message="Loading miniature data..." />
+      </UI.Modal>
+    );
+  }
 
   if (loadingRef) {
     return (
@@ -839,11 +856,11 @@ export function MiniatureOverviewModal({
               </h2>
             </div>
             <div className="flex items-center gap-4">
-              {isEditMode && mini?.created_at && (
+              {isEditMode && miniData?.created_at && (
                 <div className="italic text-right text-sm text-gray-400">
-                  ID: <span className="text-gray-300">{mini.id}</span>
+                  ID: <span className="text-gray-300">{miniData.id}</span>
                   <br />
-                  Added: <span className="text-gray-300">{new Date(mini.created_at).toLocaleString('de-DE', {
+                  Added: <span className="text-gray-300">{new Date(miniData.created_at).toLocaleString('de-DE', {
                     day: '2-digit',
                     month: '2-digit',
                     year: 'numeric',
@@ -852,12 +869,12 @@ export function MiniatureOverviewModal({
                   }).replace(',', '')}</span>
                 </div>
               )}
-              {isEditMode && mini?.in_use && (
+              {isEditMode && miniData?.in_use && (
                 <div className="flex items-center gap-1 px-1 py-1 bg-red-500/30 border border-red-500/20 rounded text-red-500 text-xs">
                   <FaExclamationTriangle className="text-yellow-500 w-7 h-7 ml-1 mr-2" />
                   <span className="text-gray-300">In Use:<br></br>
                   <span className="text-xs text-gray-400">
-                    {new Date(mini.in_use).toLocaleString('de-DE', {
+                    {new Date(miniData.in_use).toLocaleString('de-DE', {
                       day: '2-digit',
                       month: '2-digit',
                       year: 'numeric',
@@ -884,9 +901,9 @@ export function MiniatureOverviewModal({
                 onClick={handleImageClick}
               >
                 <AnimatePresence mode="wait">
-                  {showImage && mini?.id && !imageError ? (
+                  {showImage && miniData?.id && !imageError ? (
                     <motion.div
-                      key={`mini-image-${mini.id}`}
+                      key={`mini-image-${miniData.id}`}
                       className="absolute inset-0 flex items-center justify-center"
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
@@ -899,8 +916,8 @@ export function MiniatureOverviewModal({
                       }}
                     >
                       <img
-                        src={getMiniImagePath(mini.id, 'full')}
-                        alt={mini.name}
+                        src={getMiniImagePath(miniData.id, 'full')}
+                        alt={miniData.name}
                         className="w-full h-full object-contain"
                       />
                     </motion.div>
@@ -1161,7 +1178,7 @@ export function MiniatureOverviewModal({
                           ))}
                         </div>
 
-                        {/* Consolidated Categories List */}
+                        {/* Categories */}
                         <div className="mt-1">
                           <div className="text-sm font-medium text-gray-400 mb-2">All Categories:</div>
                           <ShowItems
@@ -1169,14 +1186,17 @@ export function MiniatureOverviewModal({
                               selectedTypes.flatMap(type => 
                                 miniTypes.find(t => t.id === type.id)?.categories || []
                               ).map(cat => cat.name)
-                            )).sort()}
+                            )).sort((a, b) => a.localeCompare(b))}
                             displayType="pills"
+                            maxVisible={999}
                             scaleAnimation={true}
                             shadowEnabled={true}
                             itemStyle={{
-                              bg: 'bg-yellow-800',
+                              text: 'text-orange-200',
+                              bg: 'bg-orange-600/30',
                               size: 'xs',
-                              hover: 'hover:bg-yellow-700'
+                              border: 'border border-orange-900/50',
+                              hover: ''
                             }}
                           />
                         </div>
@@ -1211,29 +1231,25 @@ export function MiniatureOverviewModal({
                     {selectedTags.length > 0 && (
                       <div className="flex flex-wrap gap-2 mt-2">
                         <AnimatePresence>
-                          {selectedTags.map((tag) => (
-                            <motion.div
-                              key={tag.id}
-                              initial={{ opacity: 0, scale: 0.3 }}
-                              animate={{ opacity: 1, scale: 1 }}
-                              transition={{ 
-                                type: "spring",
-                                stiffness: 500,
-                                damping: 15,
-                                mass: 1
-                              }}
-                              className="flex items-center gap-1 px-2 py-1 pb-1.5 text-xs rounded-full bg-gray-700"
-                            >
-                              <span>{tag.name}</span>
-                              <button
-                                type="button"
-                                onClick={() => handleTagRemove(tag.id)}
-                                className="text-gray-400 hover:text-red-400 transition-colors"
-                              >
-                                <FaTimesCircle className="w-3 h-3" />
-                              </button>
-                            </motion.div>
-                          ))}
+                          <ShowItems
+                            items={selectedTags.map(tag => tag.name).sort((a, b) => a.localeCompare(b))}
+                            displayType="pills"
+                            scaleAnimation={true}
+                            shadowEnabled={true}
+                            maxVisible={999}
+                            render={(tagName) => (
+                              <div className="flex items-center gap-1 px-2 py-1 pb-1.5 text-xs rounded-full bg-gray-700 cursor-default">
+                                <span>{tagName}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTagRemove(selectedTags.find(t => t.name === tagName)?.id || 0)}
+                                  className="text-gray-400 hover:text-red-400 transition-colors"
+                                >
+                                  <FaTimesCircle className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          />
                         </AnimatePresence>
                       </div>
                     )}
@@ -1298,7 +1314,7 @@ export function MiniatureOverviewModal({
         onConfirm={handleDelete}
         isLoading={isDeleting}
         title="Delete Miniature"
-        message={`Are you sure you want to delete "${mini?.name}"? This action cannot be undone.`}
+        message={`Are you sure you want to delete "${miniData?.name}"? This action cannot be undone.`}
         icon={FaTrash}
       />
     </UI.Modal>

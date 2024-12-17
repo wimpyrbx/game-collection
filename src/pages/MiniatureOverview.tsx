@@ -239,15 +239,6 @@ export default function MiniatureOverview() {
 
   const loadMiniature = async (mini: Mini, index: number) => {
     try {
-      setIsModalOpen(false)
-      await new Promise(resolve => setTimeout(resolve, 50))
-
-      // Calculate page number based on index
-      const newPage = Math.floor(index / itemsPerPage) + 1
-      if (newPage !== currentPage) {
-        setCurrentPage(newPage)
-      }
-
       const completeData = await getMiniature(mini.id)
       if (completeData) {
         setSelectedMini(completeData)
@@ -650,17 +641,16 @@ export default function MiniatureOverview() {
 
       <MiniatureOverviewModal
         isOpen={isModalOpen}
-        onClose={() => {
-          setIsModalOpen(false)
-          setSelectedMiniIndex(-1)
-        }}
-        mini={selectedMini}
+        onClose={() => setIsModalOpen(false)}
+        miniId={selectedMini?.id}
+        miniData={selectedMini}
         onSave={handleSave}
         onDelete={handleDelete}
         onPrevious={handlePrevious}
         onNext={handleNext}
         hasPrevious={selectedMiniIndex > 0}
-        hasNext={selectedMiniIndex < (totalMinis || 0) - 1}
+        hasNext={selectedMiniIndex < totalMinis - 1}
+        isLoading={loading}
       />
     </>
   )
