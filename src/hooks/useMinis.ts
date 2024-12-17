@@ -51,6 +51,12 @@ interface SupabaseMini {
       }
     }
   }
+  tags?: {
+    tag: {
+      id: number
+      name: string
+    }
+  }[]
 }
 
 export function useMinis(
@@ -100,7 +106,13 @@ export function useMinis(
     })) || [],
     painted_by: item.painted_by,
     base_sizes: item.base_sizes,
-    product_sets: item.product_sets
+    product_sets: item.product_sets,
+    tags: item.tags?.map(t => ({
+      tag: {
+        id: t.tag.id,
+        name: t.tag.name
+      }
+    })) || []
   })
 
   const getTotalQuantity = useCallback(async () => {
@@ -152,13 +164,19 @@ export function useMinis(
           product_sets:product_set_id(
             id,
             name,
-            product_lines(
+            product_line:product_line_id(
               id,
               name,
-              product_companies(
+              company:company_id(
                 id,
                 name
               )
+            )
+          ),
+          tags:mini_to_tags(
+            tag:tags(
+              id,
+              name
             )
           )
         `)
@@ -260,13 +278,19 @@ export function useMinis(
             product_sets:product_set_id(
               id,
               name,
-              product_lines(
+              product_line:product_line_id(
                 id,
                 name,
-                product_companies(
+                company:company_id(
                   id,
                   name
                 )
+              )
+            ),
+            tags:mini_to_tags(
+              tag:tags(
+                id,
+                name
               )
             )
           `)

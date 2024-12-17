@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaImage, FaTimesCircle, FaDiceD20, FaTrash } from 'react-icons/fa'
+import { FaDiceD6, FaImage, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaExclamationCircle } from 'react-icons/fa'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath } from '../../utils/imageUtils'
@@ -137,6 +137,17 @@ export function MiniatureOverviewModal({
   // Load mini data when editing
   useEffect(() => {
     if (mini) {
+      // console.log('Loading mini data:', {
+      //   id: mini.id,
+      //   name: mini.name,
+      //   image_path: mini.image_path
+      // })
+
+      // Always try to set preview URL if we have a mini ID
+      const url = getMiniImagePath(mini.id, 'original')
+      //console.log('Setting preview URL:', url)
+      setPreviewUrl(url)
+
       // Set form data
       const formDataToSet = {
         name: mini.name,
@@ -144,8 +155,8 @@ export function MiniatureOverviewModal({
         location: mini.location || '',
         quantity: mini.quantity || 1,
         painted_by_id: mini.painted_by?.id || 0,
-        base_size_id: mini.base_sizes?.id || 0,
-        product_set_id: mini.product_sets?.id || mini.product_set_id || null,
+        base_size_id: mini.base_size_id || 0,
+        product_set_id: mini.product_sets?.id || null,
         types: mini.types?.map(t => ({
           id: t.type.id,
           proxy_type: t.proxy_type
@@ -177,12 +188,6 @@ export function MiniatureOverviewModal({
         setSelectedTags(mini.tags)
       }
 
-      // Set preview URL if image exists
-      if (mini.image_path) {
-        const url = getMiniImagePath(mini.id)
-        setPreviewUrl(url)
-      }
-
       // Set product set display
       if (mini.product_sets) {
         const company = mini.product_sets.product_line?.company?.name || ''
@@ -190,20 +195,10 @@ export function MiniatureOverviewModal({
         const set = mini.product_sets.name || ''
         const displayValue = `${company} → ${line} → ${set}`
         setProductSearchTerm(displayValue)
-        setShowProductDropdown(true)
+        setShowProductDropdown(false)
         
         // Find and select the matching product set
-        for (const company of companies) {
-          const lines = getProductLinesByCompany(company.id)
-          for (const line of lines) {
-            const sets = getProductSetsByProductLine(line.id)
-            const matchingSet = sets.find(s => s.id === mini.product_sets?.id)
-            if (matchingSet) {
-              setFormData(prev => ({ ...prev, product_set_id: matchingSet.id }))
-              break
-            }
-          }
-        }
+        setFormData(prev => ({ ...prev, product_set_id: mini.product_sets.id }))
       }
     }
   }, [mini])
@@ -251,8 +246,13 @@ export function MiniatureOverviewModal({
       setTypeSearchTerm('')
       setShowProductDropdown(false)
       setShowTypeDropdown(false)
+    } else if (mini) {
+      // When modal opens with a mini, set the preview URL
+      const url = getMiniImagePath(mini.id, 'original')
+      // console.log('Setting preview URL:', url)
+      setPreviewUrl(url)
     }
-  }, [isOpen])
+  }, [isOpen, mini])
 
   useEffect(() => {
     if (!mini && isOpen) {
@@ -314,7 +314,7 @@ export function MiniatureOverviewModal({
         quantity: formData.quantity,
         painted_by_id: formData.painted_by_id,
         base_size_id: formData.base_size_id,
-        product_set_id: formData.product_set_id || null,
+        product_set_id: formData.product_set_id,
         types: selectedTypes.map(t => ({
           mini_id: mini?.id || 0,
           type_id: t.id,
@@ -335,6 +335,8 @@ export function MiniatureOverviewModal({
           name: t.name
         }))
       }
+
+      // console.log('Submitting miniature data:', miniatureData)
 
       if (isEditMode && mini?.id) {
         await updateMiniature(mini.id, miniatureData)
@@ -546,15 +548,7 @@ export function MiniatureOverviewModal({
   const selectedProductDisplay = useMemo(() => {
     if (!formData.product_set_id) return ''
 
-    // If we have the mini data with product set info, use that directly
-    if (mini?.product_sets?.id === formData.product_set_id) {
-      const company = mini.product_sets.product_line?.company?.name || ''
-      const line = mini.product_sets.product_line?.name || ''
-      const set = mini.product_sets.name || ''
-      return `${company} → ${line} → ${set}`
-    }
-
-    // Otherwise search through available product sets
+    // Search through available product sets
     for (const company of companies) {
       const lines = getProductLinesByCompany(company.id)
       for (const line of lines) {
@@ -566,7 +560,7 @@ export function MiniatureOverviewModal({
       }
     }
     return ''
-  }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine, mini])
+  }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine])
 
   // Add state for invalid product set
   const [isInvalidProductSet, setIsInvalidProductSet] = useState(false)
@@ -707,6 +701,19 @@ export function MiniatureOverviewModal({
     }
   }, [isOpen, mini, baseSizeOptions, paintedByOptions])
 
+  const [showImage, setShowImage] = useState(false)
+  
+  // Reset and trigger image animation when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setShowImage(false)
+      // Small delay to ensure component remounts
+      setTimeout(() => {
+        setShowImage(true)
+      }, 50)
+    }
+  }, [isOpen])
+
   if (loadingRef) {
     return (
       <UI.Modal isOpen={isOpen} onClose={onClose}>
@@ -729,13 +736,46 @@ export function MiniatureOverviewModal({
     <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
       <form onSubmit={handleSubmit} className="flex flex-col max-h-[calc(100vh-8rem)]">
         <UI.ModalHeader>
-          <div className="flex items-center gap-3">
-            <div className="text-xl text-blue-600">
-              <FaDiceD6 />
+          <div className="flex items-center justify-between w-full">
+            <div className="flex items-center gap-3">
+              <div className="text-xl text-blue-600">
+                <FaDiceD6 />
+              </div>
+              <h2 className="text-xl font-semibold">
+                {isEditMode ? 'Edit Miniature' : 'Add New Miniature'}
+              </h2>
             </div>
-            <h2 className="text-xl font-semibold">
-              {isEditMode ? 'Edit Miniature' : 'Add New Miniature'}
-            </h2>
+            <div className="flex items-center gap-4">
+              {isEditMode && mini?.created_at && (
+                <div className="italic text-right text-sm text-gray-400">
+                  ID: <span className="text-gray-300">{mini.id}</span>
+                  <br />
+                  Added: <span className="text-gray-300">{new Date(mini.created_at).toLocaleString('de-DE', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }).replace(',', '')}</span>
+                </div>
+              )}
+              {isEditMode && mini?.in_use && (
+                <div className="flex items-center gap-1 px-1 py-1 bg-red-500/30 border border-red-500/20 rounded text-red-500 text-xs">
+                  <FaExclamationTriangle className="text-yellow-500 w-8 h-8" />
+                  <span className="text-gray-300">In Use:<br></br>
+                  <span className="text-xs text-gray-400">
+                    {new Date(mini.in_use).toLocaleString('de-DE', {
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </UI.ModalHeader>
 
@@ -752,16 +792,43 @@ export function MiniatureOverviewModal({
               >
                 {previewUrl ? (
                   <div className="relative w-full h-full group">
-                    <img
-                      src={previewUrl}
-                      alt="Preview"
-                      className="w-full h-full object-contain"
-                      onError={(e) => {
-                        e.currentTarget.onerror = null
-                        e.currentTarget.style.display = 'none'
-                        e.currentTarget.parentElement?.querySelector('.placeholder-icon')?.classList.remove('hidden')
-                      }}
-                    />
+                    <AnimatePresence mode="wait">
+                      {showImage && (
+                        <motion.img
+                          key={`mini-image-${isOpen}`}
+                          initial={{ scale: 1, opacity: 0 }}
+                          animate={{ 
+                            scale: 1.1,
+                            opacity: 1 
+                          }}
+                          whileInView={{
+                            scale: 1,
+                            transition: {
+                              type: "spring",
+                              bounce: 0.4,
+                              duration: 0.8
+                            }
+                          }}
+                          transition={{ 
+                            scale: {
+                              duration: 0.2,
+                              ease: "easeOut"
+                            },
+                            opacity: {
+                              duration: 0.2
+                            }
+                          }}
+                          src={previewUrl}
+                          alt="Preview"
+                          className="w-full h-full object-contain"
+                          onError={(e) => {
+                            e.currentTarget.onerror = null
+                            e.currentTarget.style.display = 'none'
+                            e.currentTarget.parentElement?.querySelector('.placeholder-icon')?.classList.remove('hidden')
+                          }}
+                        />
+                      )}
+                    </AnimatePresence>
                     <div className="absolute inset-0 flex flex-col items-center justify-center hidden placeholder-icon">
                       <FaDiceD20 className="w-20 h-20 text-gray-700/50" />
                       <span className="text-sm text-center px-4 text-gray-700/50 mt-2">Drop image here or click to select</span>
@@ -825,7 +892,8 @@ export function MiniatureOverviewModal({
                 <select
                   value={formData.base_size_id}
                   onChange={(e) => {
-                    setFormData(prev => ({ ...prev, base_size_id: parseInt(e.target.value) }))
+                    const value = parseInt(e.target.value)
+                    setFormData(prev => ({ ...prev, base_size_id: value }))
                     if (validationErrors.base_size_id) {
                       setValidationErrors(prev => ({ ...prev, base_size_id: undefined }))
                     }
@@ -836,11 +904,14 @@ export function MiniatureOverviewModal({
                     validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
                   } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
                 >
-                  {baseSizeOptions.map(size => (
-                    <option key={size.id} value={size.id}>
-                      {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1)}
-                    </option>
-                  ))}
+                  <option value={0} disabled>Select base size</option>
+                  {baseSizeOptions
+                    .sort((a, b) => a.id - b.id)
+                    .map(size => (
+                      <option key={size.id} value={size.id}>
+                        {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
+                      </option>
+                    ))}
                 </select>
                 {validationErrors.base_size_id && (
                   <div className="text-sm text-red-500 mt-1">{validationErrors.base_size_id}</div>
@@ -910,7 +981,6 @@ export function MiniatureOverviewModal({
                     if (formData.product_set_id) {
                       setFormData(prev => ({ ...prev, product_set_id: null }))
                     }
-                    // Mark as invalid if there's input but no match in filtered products
                     setIsInvalidProductSet(newValue !== '' && !filteredProducts.some(p => 
                       `${p.company} → ${p.line} → ${p.set}`.toLowerCase().includes(newValue.toLowerCase())
                     ))
@@ -918,14 +988,12 @@ export function MiniatureOverviewModal({
                   placeholder="Search for Company → Line → Set..."
                   onFocus={() => {
                     setShowProductDropdown(true)
-                    // Only clear if user is typing new search
                     if (productSearchTerm && !selectedProductDisplay) {
                       setProductSearchTerm('')
                       setFormData(prev => ({ ...prev, product_set_id: null }))
                     }
                   }}
                   onBlur={() => {
-                    // On blur, if the input doesn't match any product and isn't empty, clear it
                     setTimeout(() => {
                       if (isInvalidProductSet && productSearchTerm) {
                         setProductSearchTerm('')
@@ -1044,21 +1112,32 @@ export function MiniatureOverviewModal({
                         </div>
 
                         {/* Consolidated Categories List */}
-                        <div className="mt-4 border-t border-gray-700 pt-4">
+                        <div className="mt-1">
                           <div className="text-sm font-medium text-gray-400 mb-2">All Categories:</div>
                           <div className="flex flex-wrap gap-1">
-                            {Array.from(new Set(
-                              selectedTypes.flatMap(type => 
-                                miniTypes.find(t => t.id === type.id)?.categories || []
-                              ).map(cat => cat.name)
-                            )).sort().map((categoryName, index) => (
-                              <div
-                                key={index}
-                                className="px-2 py-0.5 text-xs rounded-full bg-orange-600/30 text-orange-200 border border-orange-900/50"
-                              >
-                                {categoryName}
-                              </div>
-                            ))}
+                            <AnimatePresence>
+                              {Array.from(new Set(
+                                selectedTypes.flatMap(type => 
+                                  miniTypes.find(t => t.id === type.id)?.categories || []
+                                ).map(cat => cat.name)
+                              )).sort().map((categoryName, index) => (
+                                <motion.div
+                                  key={categoryName}
+                                  initial={{ opacity: 0, scale: 0.3 }}
+                                  animate={{ opacity: 1, scale: 1 }}
+                                  exit={{ opacity: 0, scale: 0.3 }}
+                                  transition={{ 
+                                    type: "spring",
+                                    stiffness: 500,
+                                    damping: 15,
+                                    mass: 1
+                                  }}
+                                  className="px-2 py-0.5 text-xs rounded-full bg-orange-600/30 text-orange-200 border border-orange-900/50"
+                                >
+                                  {categoryName}
+                                </motion.div>
+                              ))}
+                            </AnimatePresence>
                           </div>
                         </div>
                       </div>

@@ -21,6 +21,7 @@ interface ShowItemsProps {
   };
   textColor?: string;
   emptyMessage?: string;
+  maxPerRow?: number;
 }
 
 export function ShowItems({
@@ -32,12 +33,13 @@ export function ShowItems({
   itemStyle = {
     text: 'text-gray-200',
     bg: 'bg-gray-700',
-    size: 'sm',
+    size: 'xs',
     border: 'border border-gray-600',
     hover: 'hover:bg-gray-600'
   },
   textColor,
-  emptyMessage = 'No items'
+  emptyMessage = 'No items',
+  maxPerRow = 3
 }: ShowItemsProps) {
   const [showAll, setShowAll] = useState(false);
   const visibleItems = showAll ? items : items.slice(0, maxVisible);
@@ -54,10 +56,10 @@ export function ShowItems({
 
   const getPillPadding = () => {
     switch (itemStyle.size) {
-      case 'xs': return 'px-1.5 py-0.5';
-      case 'sm': return 'px-2 py-1';
-      case 'md': return 'px-3 py-1.5';
-      default: return 'px-2 py-1';
+      case 'xs': return 'px-3 py-1';
+      case 'sm': return 'px-4 py-1.5';
+      case 'md': return 'px-5 py-2';
+      default: return 'px-4 py-1.5';
     }
   };
 
@@ -86,12 +88,12 @@ export function ShowItems({
 
     if (displayType === 'pills') {
       return (
-        <div className="flex flex-wrap gap-1">
+        <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${maxPerRow}, minmax(0, 1fr))` }}>
           {visibleItems.map((item, index) => (
             <span
               key={index}
               className={`
-                inline-flex items-center rounded
+                inline-flex items-center justify-center rounded-full shadow-sm shadow-gray-900
                 ${getPillPadding()}
                 ${getTextSize()}
                 ${itemStyle.text}

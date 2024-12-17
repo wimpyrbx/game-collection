@@ -39,13 +39,19 @@ export function useMiniAdmin() {
           product_sets!inner(
             id,
             name,
-            product_lines!inner(
+            product_line:product_line_id!inner(
               id,
               name,
-              company:product_companies!inner(
+              company:company_id!inner(
                 id,
                 name
               )
+            )
+          ),
+          tags:mini_to_tags(
+            tag:tags(
+              id,
+              name
             )
           )
         `, { count: 'exact' })
@@ -55,8 +61,8 @@ export function useMiniAdmin() {
           name.ilike.%${search}%,
           types.type.name.ilike.%${search}%,
           product_sets.name.ilike.%${search}%,
-          product_sets.product_lines.name.ilike.%${search}%,
-          product_sets.product_lines.company.name.ilike.%${search}%
+          product_sets.product_line.name.ilike.%${search}%,
+          product_sets.product_line.company.name.ilike.%${search}%
         `)
       }
       

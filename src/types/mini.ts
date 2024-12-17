@@ -47,8 +47,10 @@ export interface Mini {
     }
   }
   tags?: Array<{
-    id: number
-    name: string
+    tag: {
+      id: number
+      name: string
+    }
   }>
 }
 

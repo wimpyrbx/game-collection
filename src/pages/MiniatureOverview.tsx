@@ -93,13 +93,32 @@ export default function MiniatureOverview() {
 
   const getItemColumns = (mini: Mini) => {
     const typeNames = mini.types?.map(t => t.type.name) || []
+    const tagNames = mini.tags?.map(t => t.tag?.name).filter(Boolean) || []
     
-    const company = mini.product_sets?.product_line?.company?.name || 'No company'
-    const productLine = mini.product_sets?.product_line?.name || 'No product line'
-    const productSet = mini.product_sets?.name || 'No set'
+    const company = mini.product_sets?.product_line?.company?.name
+    const productLine = mini.product_sets?.product_line?.name
+    const productSet = mini.product_sets?.name
+    const productSetDisplay = mini.product_sets 
+      ? (
+        <div className="space-y-0.5">
+          <div className="text-xs text-gray-300">{company}</div>
+          <div className="text-xs text-gray-400">{productLine}</div>
+          <div className="text-xs text-gray-500">{productSet}</div>
+        </div>
+      )
+      : <span className="text-xs text-gray-500">no product set</span>
+
     const location = mini.location || 'No location'
     const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
     const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
+    const infoDisplay = (
+      <div className="space-y-0.5">
+        <div className="text-xs"><span className="text-gray-400">Location:</span> <span className="text-gray-300">{location}</span></div>
+        <div className="text-xs"><span className="text-gray-400">Painted By:</span> <span className="text-gray-300">{paintedBy}</span></div>
+        <div className="text-xs"><span className="text-gray-400">Base Size:</span> <span className="text-gray-300">{baseSize}</span></div>
+      </div>
+    )
+
     const quantity = mini.quantity || 0
 
     const thumbPath = getMiniImagePath(mini.id, 'thumb')
@@ -108,7 +127,7 @@ export default function MiniatureOverview() {
     const showItemsToggle = {
       type: 'icon' as const,
       more: <span className="text-gray-200 text-xs">(Show More)</span>,
-      less: <span className="text-gray-200 text-xs">(Show Less)</span>
+      less: <span className="text-gray-200 text-xs">(Show Less)</span>,
     };
 
     return [
@@ -140,22 +159,35 @@ export default function MiniatureOverview() {
           border: '',
           hover: 'hover:bg-orange-800'
         }}
-        maxVisible={2}
+        maxVisible={4}
         toggle={showItemsToggle}
         emptyMessage="-"
       />,
-      company,
-      productLine,
-      productSet,
-      location,
-      paintedBy,
-      baseSize,
-      quantity.toString(),
+      <ShowItems 
+        key="tags" 
+        items={tagNames} 
+        displayType="pills"
+        maxPerRow={4}
+        itemStyle={{
+          text: 'text-gray-300',
+          bg: 'bg-cyan-900',
+          size: 'xs',
+          border: '',
+          hover: 'hover:bg-cyan-800'
+        }}
+        maxVisible={8}
+        toggle={showItemsToggle}
+        emptyMessage="-"
+      />,
+      productSetDisplay,
+      infoDisplay,
+      <div key="quantity" className="text-center">{quantity}</div>,
       <div 
         key="switch"
         onClick={(e) => {
           e.stopPropagation();
         }}
+        className="flex justify-center"
       >
         <Switch
           checked={!!mini.in_use}
@@ -172,7 +204,6 @@ export default function MiniatureOverview() {
               showError('Failed to update status');
             }
           }}
-          className="ml-2"
         />
       </div>
     ]
@@ -181,14 +212,11 @@ export default function MiniatureOverview() {
   const columnHeaders = [
     'Name',
     'Types',
-    'Company',
-    'Product Line',
+    'Tags',
     'Product Set',
-    'Location',
-    'Painted By',
-    'Base Size',
-    'Quantity',
-    'Active'
+    'Info',
+    { title: 'QTY', className: 'text-center w-20' },
+    { title: 'In Use', className: 'text-center w-20' }
   ]
 
   const handleAdd = () => {
@@ -504,9 +532,11 @@ export default function MiniatureOverview() {
                           {columnHeaders.map((header, index) => (
                             <th
                               key={index}
-                              className="px-6 py-2 bgTableHeader text-left text-xs font-medium text-gray-300 uppercase tracking-wider"
+                              className={`px-6 py-2 bgTableHeader text-left text-xs font-medium text-gray-300 uppercase tracking-wider ${
+                                typeof header === 'object' ? header.className : ''
+                              }`}
                             >
-                              {header}
+                              {typeof header === 'object' ? header.title : header}
                             </th>
                           ))}
                         </tr>
