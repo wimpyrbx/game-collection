@@ -1,16 +1,16 @@
 import { createContext, useContext, useEffect, useState } from 'react'
+import { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
-import type { User, Session } from '@supabase/supabase-js'
 
 interface AuthContextType {
-  user: User | null
   session: Session | null
+  user: User | null
   loading: boolean
-  signInWithGoogle: () => Promise<void>
+  signIn: () => Promise<void>
   signOut: () => Promise<void>
 }
 
-const AuthContext = createContext<AuthContextType | null>(null)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -18,96 +18,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    let mounted = true
+    // If we're in development, set a mock session and user
+    if (process.env.NODE_ENV === 'development') {
+      const mockUser = {
+        id: 'dev-user',
+        email: 'dev@local.host',
+        // Add other required user properties
+      } as User
 
-    async function initializeAuth() {
-      try {
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession()
+      const mockSession = {
+        user: mockUser,
+        // Add other required session properties
+      } as Session
 
-        if (error) {
-          if (mounted) setLoading(false)
-          return
-        }
-
-        if (initialSession && mounted) {
-          setSession(initialSession)
-          setUser(initialSession.user)
-          
-          const { data: profile, error: profileError } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', initialSession.user.id)
-            .single()
-
-          if (!profile && !profileError) {
-            await supabase
-              .from('profiles')
-              .insert([
-                {
-                  id: initialSession.user.id,
-                  email: initialSession.user.email
-                }
-              ])
-          }
-        }
-
-        if (mounted) setLoading(false)
-      } catch (error) {
-        if (mounted) setLoading(false)
-      }
+      setUser(mockUser)
+      setSession(mockSession)
+      setLoading(false)
+      return
     }
 
-    initializeAuth()
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      if (!mounted) return
-
-      if (event === 'SIGNED_IN' && currentSession) {
-        setSession(currentSession)
-        setUser(currentSession.user)
-      } else if (event === 'SIGNED_OUT') {
-        setSession(null)
-        setUser(null)
-      } else if (event === 'TOKEN_REFRESHED' && currentSession) {
-        setSession(currentSession)
-        setUser(currentSession.user)
-      }
+    // Normal authentication flow for production
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
     })
 
-    return () => {
-      mounted = false
-      subscription.unsubscribe()
-    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  const signInWithGoogle = async () => {
+  const signIn = async () => {
+    if (process.env.NODE_ENV === 'development') {
+      // No-op in development
+      return
+    }
+    
     const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
+      provider: 'discord',
       options: {
-        redirectTo: `${window.location.origin}${import.meta.env.BASE_URL}auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
-        }
+        redirectTo: `${window.location.origin}/auth/callback`
       }
     })
     if (error) throw error
   }
 
   const signOut = async () => {
+    if (process.env.NODE_ENV === 'development') {
+      // No-op in development
+      return
+    }
+    
     const { error } = await supabase.auth.signOut()
     if (error) throw error
   }
 
-  return (
-    <AuthContext.Provider value={{ user, session, loading, signInWithGoogle, signOut }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  const value = {
+    session,
+    user,
+    loading,
+    signIn,
+    signOut
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export const useAuth = () => {
+export function useAuth() {
   const context = useContext(AuthContext)
-  if (!context) throw new Error('useAuth must be used within AuthProvider')
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
   return context
 } 

@@ -8,11 +8,11 @@ interface Tag {
 interface TagInputProps {
   value: string
   onChange: (value: string) => void
-  onTagAdd: (value: string) => Promise<void>
+  onTagAdd?: (tag: string) => void
   placeholder?: string
-  availableTags: Tag[]
-  onTagSelect?: (tag: Tag) => void
-  className?: string
+  availableTags?: Array<{ id: number; name: string }>
+  onTagSelect?: (tag: { id: number; name: string }) => void
+  renderDropdown?: (filteredTags: Array<{ id: number; name: string }>) => React.ReactNode
 }
 
 export function TagInput({
@@ -20,9 +20,9 @@ export function TagInput({
   onChange,
   onTagAdd,
   placeholder,
-  availableTags,
+  availableTags = [],
   onTagSelect,
-  className = ""
+  renderDropdown
 }: TagInputProps) {
   const [showDropdown, setShowDropdown] = useState(false)
   const [filteredTags, setFilteredTags] = useState<Tag[]>([])
@@ -100,32 +100,19 @@ export function TagInput({
   }
 
   return (
-    <div className={`relative w-full ${className}`}>
+    <div className="relative">
       <input
         type="text"
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
         placeholder={placeholder}
-        className="h-10 w-full px-3 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
       />
-      {showDropdown && filteredTags.length > 0 && (
-        <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-          {filteredTags.map((tag, index) => (
-            <button
-              key={tag.id}
-              type="button"
-              className={`w-full text-left px-3 py-2 text-sm ${
-                index === selectedIndex 
-                  ? 'bg-gray-700 text-white' 
-                  : 'hover:bg-gray-700'
-              }`}
-              onClick={() => handleTagSelect(tag)}
-            >
-              {tag.name}
-            </button>
-          ))}
-        </div>
+      {value && availableTags.length > 0 && renderDropdown?.(
+        availableTags.filter(tag => 
+          tag.name.toLowerCase().includes(value.toLowerCase())
+        )
       )}
     </div>
   )

@@ -11,6 +11,7 @@ import { supabase } from '../../lib/supabase'
 import { TagInput } from '../ui/input/TagInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShowItems } from '../ShowItems'
+import { sortByKey } from '../../utils/generalUtils'
 
 interface MiniatureOverviewModalProps {
   isOpen: boolean
@@ -383,68 +384,33 @@ export function MiniatureOverviewModal({
   }
 
   const handleTypeSelect = (typeId: number) => {
-    const type = miniTypes.find(t => t.id === typeId)
-    
-    if (type && !selectedTypes.some(t => t.id === type.id)) {
-      // Map the categories correctly from the type object
-      const mappedCategories = type.categories?.map(c => ({
-        id: c.id,
-        name: c.name
-      })) || []
-      
+    const selectedType = miniTypes.find(t => t.id === typeId)
+    if (selectedType && !selectedTypes.some(t => t.id === typeId)) {
+      const isFirstType = selectedTypes.length === 0
       const newType = {
-        id: type.id,
-        name: type.name,
-        proxy_type: selectedTypes.some(t => !t.proxy_type), // If there's already a main type, this is a proxy
-        type: {
-          id: type.id,
-          name: type.name,
-          categories: mappedCategories
-        }
+        id: typeId,
+        name: selectedType.name,
+        proxy_type: !isFirstType,
+        type: selectedType
       }
       
-      setSelectedTypes(prev => {
-        const existingType = prev.find(t => t.id === type.id);
-        if (!existingType) {
-          return [...prev, {
-            id: type.id,
-            name: type.name,
-            proxy_type: false,
-            type: {
-              id: type.id,
-              name: type.name,
-              categories: type.categories?.map((cat: { id: number; name: string }) => ({
-                category: {
-                  id: cat.id,
-                  name: cat.name
-                }
-              })) || []
-            }
-          }];
-        }
-        return prev;
-      })
+      setSelectedTypes(prev => [...prev, newType])
       
       setFormData(prev => ({
         ...prev,
-        types: [...prev.types, { 
-          id: type.id,
-          type_id: type.id,
-          proxy_type: newType.proxy_type,
-          type: {
-            id: type.id,
-            name: type.name,
-            categories: type.categories || []
-          }
-        }]
+        types: [...prev.types, { id: typeId, proxy_type: !isFirstType }]
       }))
+      
+      setTypeSearchTerm('')
+      setShowTypeDropdown(false)
+      
+      // Ensure focus is set after state updates are complete
+      setTimeout(() => {
+        if (typeSearchInputRef.current) {
+          typeSearchInputRef.current.focus()
+        }
+      }, 0)
     }
-    setTypeSearchTerm('')
-    setShowTypeDropdown(false)
-    // Focus the input after selection
-    setTimeout(() => {
-      typeSearchInputRef.current?.focus()
-    }, 0)
   }
 
   const handleTypeRemove = (typeId: number) => {
@@ -792,6 +758,90 @@ export function MiniatureOverviewModal({
     }
   }, [isOpen, miniData, onClose]);
 
+  // Add this with your other refs
+  const searchContainerRef = useRef<HTMLDivElement>(null)
+
+  // Add this state for dropdown positioning
+  const [dropdownStyle, setDropdownStyle] = useState({
+    width: 0,
+    left: 0,
+    top: 0
+  })
+
+  // Add this effect to update dropdown position
+  useEffect(() => {
+    if (showTypeDropdown && searchContainerRef.current) {
+      const rect = searchContainerRef.current.getBoundingClientRect()
+      setDropdownStyle({
+        width: rect.width,
+        left: rect.left,
+        top: rect.bottom + 4 // 4px gap
+      })
+    }
+  }, [showTypeDropdown, typeSearchTerm])
+
+  // Add this with your other refs
+  const tagSearchContainerRef = useRef<HTMLDivElement>(null)
+
+  // Add this state for tag dropdown positioning
+  const [tagDropdownStyle, setTagDropdownStyle] = useState({
+    width: 0,
+    left: 0,
+    top: 0
+  })
+
+  // Add this effect to update tag dropdown position
+  useEffect(() => {
+    if (tagSearchContainerRef.current) {
+      const rect = tagSearchContainerRef.current.getBoundingClientRect()
+      setTagDropdownStyle({
+        width: rect.width,
+        left: rect.left,
+        top: rect.bottom + 4 // 4px gap
+      })
+    }
+  }, [tagInput])
+
+  // Add useEffect to reset search fields when miniId changes
+  useEffect(() => {
+    // Reset search fields when switching miniatures
+    setTypeSearchTerm('')
+    setTagInput('')
+    setShowTypeDropdown(false)
+  }, [miniData]) // Add miniData as dependency
+
+  // First, make sure we're getting the categories from all types
+  const selectedTypeCategories = useMemo(() => {
+    // Get categories from all types
+    const allCategories = selectedTypes.flatMap(type => {
+      const typeWithCategories = miniTypes.find(t => t.id === type.id)
+      return typeWithCategories?.categories || []
+    })
+    
+    // Remove duplicates based on category id
+    const uniqueCategories = Array.from(
+      new Map(allCategories.map(cat => [cat.id, cat])).values()
+    )
+    
+    return uniqueCategories
+  }, [selectedTypes, miniTypes])
+
+  // Sort categories, tags, and types
+  const sortedCategories = sortByKey(selectedTypeCategories, 'name');
+  const sortedTags = sortByKey(selectedTags, 'name');
+  const sortedTypes = sortByKey(selectedTypes, 'name');
+
+  // Map sorted categories, tags, and types to items
+  const categoryItems = sortedCategories.map(category => ({
+    id: category.id,
+    label: category.name
+  }));
+
+  const tagItems = sortedTags.map(tag => ({
+    id: tag.id,
+    label: tag.name
+  }));
+
   if (isOpen && !miniData) {
     return (
       <UI.Modal isOpen={isOpen} onClose={onClose}>
@@ -1106,12 +1156,12 @@ export function MiniatureOverviewModal({
               {/* Types and Tags grid */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Types Card */}
-                <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col max-h-[300px]">
-                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700 flex-shrink-0">
+                <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col h-full">
+                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
                     <h3 className="font-medium text-gray-200">Types</h3>
                   </div>
-                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40">
-                    <div className="relative">
+                  <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
+                    <div className="relative" ref={searchContainerRef}>
                       <UI.SearchInput
                         value={typeSearchTerm}
                         onChange={(e) => {
@@ -1121,7 +1171,14 @@ export function MiniatureOverviewModal({
                         placeholder="Search types..."
                       />
                       {showTypeDropdown && typeSearchTerm && (
-                        <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                        <div 
+                          className="fixed max-h-48 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999]"
+                          style={{
+                            width: dropdownStyle.width,
+                            left: dropdownStyle.left,
+                            top: dropdownStyle.top
+                          }}
+                        >
                           {filteredTypes.map(type => (
                             <button
                               key={type.id}
@@ -1145,7 +1202,7 @@ export function MiniatureOverviewModal({
                       )}
                     </div>
                     {selectedTypes.length === 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ top: '45px' }}>
+                      <div className="inset-0 flex items-center justify-center pointer-events-none">
                         <div className="text-3xl font-bold text-gray-800/70">No Types Assigned</div>
                       </div>
                     )}
@@ -1155,7 +1212,7 @@ export function MiniatureOverviewModal({
                           {selectedTypes.map((type, index) => (
                             <div key={`${type.id}-${index}`} className="border-b border-gray-700 last:border-b-0">
                               <div
-                                className="flex items-center justify-between px-3 py-2 hover:bg-gray-700 cursor-pointer"
+                                className="flex items-center justify-between px-3 py-1 hover:bg-gray-700 cursor-pointer"
                                 onClick={() => toggleProxyType(type.id)}
                               >
                                 <div className="flex items-center gap-2">
@@ -1179,24 +1236,20 @@ export function MiniatureOverviewModal({
 
                         {/* Categories */}
                         <div className="mt-1">
-                          <div className="text-sm font-medium text-gray-400 mb-2">All Categories:</div>
                           <ShowItems
-                            items={Array.from(new Set(
-                              selectedTypes.flatMap(type => 
-                                type.type?.categories?.map(cat => cat.category?.name).filter((name): name is string => !!name) || []
-                              )
-                            )).sort((a, b) => a.localeCompare(b))}
+                            items={categoryItems}
                             displayType="pills"
+                            maxVisible={999}
                             scaleAnimation={true}
                             shadowEnabled={true}
-                            maxVisible={999}
                             itemStyle={{
-                              text: 'text-orange-200',
-                              bg: 'bg-orange-600/30',
+                              text: 'text-gray-200',
+                              bg: 'bg-cyan-900',
                               size: 'xs',
-                              border: 'border border-orange-900/50',
-                              hover: ''
+                              border: 'border border-cyan-800',
+                              hover: 'hover:bg-cyan-700'
                             }}
+                            emptyMessage="No categories available"
                           />
                         </div>
                       </div>
@@ -1205,49 +1258,83 @@ export function MiniatureOverviewModal({
                 </div>
 
                 {/* Tags Card */}
-                <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col max-h-[300px]">
-                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700 flex-shrink-0">
+                <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col h-full">
+                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
                     <h3 className="font-medium text-gray-200">Tags</h3>
                   </div>
-                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40">
-                    <TagInput
-                      value={tagInput}
-                      onChange={setTagInput}
-                      onTagAdd={handleTagAdd}
-                      placeholder="Add tags..."
-                      availableTags={availableTags}
-                      onTagSelect={(tag) => {
-                        if (!selectedTags.some(t => t.id === tag.id)) {
-                          setSelectedTags(prev => [...prev, tag])
-                          setFormData(prev => ({
-                            ...prev,
-                            tags: [...prev.tags || [], { id: tag.id }]
-                          }))
-                        }
-                      }}
-                    />
-                    
-                    {selectedTags.length > 0 && (
-                      <ShowItems
-                        items={selectedTags.map(tag => ({
-                          id: tag.id,
-                          label: tag.name
-                        }))}
-                        onItemRemove={(index) => handleTagRemove(selectedTags[index].id)}
-                        displayType="pills"
-                        scaleAnimation={true}
-                        shadowEnabled={true}
-                        maxVisible={999}
-                        itemStyle={{
-                          text: 'text-gray-200',
-                          bg: 'bg-gray-700',
-                          size: 'xs',
-                          border: 'border border-gray-600',
-                          hover: 'hover:bg-gray-600'
+                  <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
+                    <div className="relative" ref={tagSearchContainerRef}>
+                      <TagInput
+                        value={tagInput}
+                        onChange={setTagInput}
+                        onTagAdd={handleTagAdd}
+                        placeholder="Add tags..."
+                        availableTags={availableTags}
+                        onTagSelect={(tag) => {
+                          if (!selectedTags.some(t => t.id === tag.id)) {
+                            setSelectedTags(prev => [...prev, tag])
+                            setFormData(prev => ({
+                              ...prev,
+                              tags: [...prev.tags || [], { id: tag.id }]
+                            }))
+                          }
                         }}
-                        showRemoveButton={true}
+                        renderDropdown={(filteredTags) => (
+                          <div 
+                            className="fixed max-h-48 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999]"
+                            style={{
+                              width: tagDropdownStyle.width,
+                              left: tagDropdownStyle.left,
+                              top: tagDropdownStyle.top
+                            }}
+                          >
+                            {filteredTags.map(tag => (
+                              <button
+                                key={tag.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
+                                onClick={() => {
+                                  if (!selectedTags.some(t => t.id === tag.id)) {
+                                    setSelectedTags(prev => [...prev, tag])
+                                    setFormData(prev => ({
+                                      ...prev,
+                                      tags: [...prev.tags || [], { id: tag.id }]
+                                    }))
+                                  }
+                                }}
+                              >
+                                {tag.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       />
-                    )}
+                    </div>
+
+                    <div>
+                      {selectedTags.length === 0 ? (
+                        <div className="flex items-center justify-center">
+                          <div className="text-3xl font-bold text-gray-800/70">No Tags Assigned</div>
+                        </div>
+                      ) : (
+                        <ShowItems
+                          items={tagItems}
+                          onItemRemove={(index) => handleTagRemove(tagItems[index].id)}
+                          displayType="pills"
+                          scaleAnimation={true}
+                          shadowEnabled={true}
+                          maxVisible={999}
+                          itemStyle={{
+                            text: 'text-gray-200',
+                            bg: 'bg-gray-700',
+                            size: 'xs',
+                            border: 'border border-gray-600',
+                            hover: 'hover:bg-gray-600'
+                          }}
+                          showRemoveButton={true}
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

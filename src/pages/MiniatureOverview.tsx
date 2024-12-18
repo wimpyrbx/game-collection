@@ -101,7 +101,12 @@ export default function MiniatureOverview() {
   }, [currentPage, totalMinis, loading, isModalOpen, setCurrentPage])
 
   const getItemColumns = (mini: Mini) => {
-    const typeNames = mini.types?.map(t => t.type.name) || []
+    const typeNames = mini.types?.map(t => ({
+      id: t.type_id,
+      label: t.type.name,
+      proxy_type: t.proxy_type
+    })) || []
+    const mainTypeId = mini.types?.find(t => !t.proxy_type)?.type_id
     const tagNames = mini.tags?.map(t => t.tag?.name).filter(Boolean) || []
     
     const categoryNames = mini.types?.flatMap(t => 
@@ -173,6 +178,14 @@ export default function MiniatureOverview() {
             size: 'xs',
             border: '',
             hover: 'hover:bg-orange-800'
+          }}
+          selectedItem={mainTypeId}
+          selectedStyle={{
+            text: 'text-gray-200',
+            bg: 'bg-orange-900',
+            border: '',
+            hover: 'hover:bg-orange-800',
+            indicator: <div className="w-2 h-2 rounded-full bg-green-500" />
           }}
           maxVisible={3}
           emptyMessage="-"

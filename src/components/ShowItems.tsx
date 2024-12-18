@@ -20,6 +20,7 @@ interface ShowItemsProps {
     size?: 'xs' | 'sm' | 'base';
     border?: string;
     hover?: string;
+    cursor?: string;
   };
   emptyMessage?: string;
   showRemoveButton?: boolean;
@@ -36,6 +37,14 @@ interface ShowItemsProps {
     hover?: string;
   };
   togglePlacement?: 'start' | 'end' | 'right' | 'top';
+  selectedItem?: string | number;
+  selectedStyle?: {
+    text?: string;
+    bg?: string;
+    border?: string;
+    hover?: string;
+    indicator?: React.ReactNode;
+  };
 }
 
 export function ShowItems({
@@ -53,7 +62,8 @@ export function ShowItems({
     bg: 'bg-gray-700',
     size: 'xs',
     border: '',
-    hover: 'hover:bg-gray-600'
+    hover: 'hover:bg-gray-600',
+    cursor: 'cursor-pointer'
   },
   emptyMessage = 'No items',
   showRemoveButton,
@@ -65,13 +75,17 @@ export function ShowItems({
     border: 'border border-gray-600',
     hover: 'hover:bg-gray-600'
   },
-  togglePlacement = 'end'
+  togglePlacement = 'end',
+  selectedItem,
+  selectedStyle
 }: ShowItemsProps) {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const [showAll, setShowAll] = useState(false);
   
   const renderItem = (item: any, index: number) => {
     const itemText = typeof item === 'string' ? item : item.label || item.name || ''
+    const itemId = typeof item === 'string' ? item : item.id
+    const isSelected = selectedItem !== undefined && itemId === selectedItem
     
     const itemContent = (
       <motion.div
@@ -84,10 +98,11 @@ export function ShowItems({
         }}
         className={`
           inline-flex items-center gap-1
-          ${displayType === 'pills' ? 'rounded-full px-2 py-0.5' : ''}
-          ${itemStyle?.bg || 'bg-blue-500/20'}
-          ${itemStyle?.border || ''}
-          ${itemStyle?.hover || 'hover:bg-blue-500/30'}
+          ${displayType === 'pills' ? 'rounded-full px-2 py-0.5 pb-1' : ''}
+          ${isSelected ? selectedStyle?.bg || 'bg-green-600/20' : itemStyle?.bg || 'bg-blue-500/20'}
+          ${isSelected ? selectedStyle?.border || 'border-green-600' : itemStyle?.border || ''}
+          ${itemStyle?.cursor || 'cursor-pointer'}
+          ${isSelected ? selectedStyle?.hover || 'hover:bg-green-600/30' : itemStyle?.hover || 'hover:bg-blue-500/30'}
           ${shadowEnabled ? 'shadow-sm' : ''}
           transition-colors
           relative
@@ -96,8 +111,11 @@ export function ShowItems({
         onMouseEnter={() => showTooltip && setIsTooltipVisible(true)}
         onMouseLeave={() => showTooltip && setIsTooltipVisible(false)}
       >
+        {isSelected && selectedStyle?.indicator && (
+          <span className="mr-1">{selectedStyle.indicator}</span>
+        )}
         <span className={`
-          ${textColor || itemStyle?.text || 'text-blue-200'} 
+          ${isSelected ? selectedStyle?.text : textColor || itemStyle?.text || 'text-blue-200'} 
           ${itemStyle?.size === 'xs' ? 'text-xs' : 
             itemStyle?.size === 'sm' ? 'text-sm' : 
             'text-base'
@@ -110,9 +128,9 @@ export function ShowItems({
           <button
             type="button"
             onClick={() => onItemRemove(index)}
-            className="text-gray-400 hover:text-gray-300 transition-colors"
+            className="text-red-500 hover:text-red-400 transition-colors flex items-center justify-center text-xs font-bold ml-1 -mt-0.5"
           >
-            <FaTimesCircle className="w-3 h-3" />
+            x
           </button>
         )}
         {showTooltip && isTooltipVisible && (
