@@ -82,7 +82,7 @@ export function ShowItems({
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const [showAll, setShowAll] = useState(false);
   
-  const renderItem = (item: any, index: number, isLastVisibleItem: boolean) => {
+  const renderItem = (item: any, index: number) => {
     const itemText = typeof item === 'string' ? item : item.label || item.name || ''
     const itemId = typeof item === 'string' ? item : item.id
     const isSelected = selectedItem !== undefined && itemId === selectedItem
@@ -214,7 +214,7 @@ export function ShowItems({
       {togglePlacement === 'start' && toggleButton}
       <div className={`flex flex-wrap gap-1.5 ${togglePlacement === 'top' ? 'w-full' : ''}`}>
         <AnimatePresence mode="sync">
-          {visibleItems.map((item, index) => renderItem(item, index, index === visibleItems.length - 1))}
+          {visibleItems.map((item, index) => renderItem(item, index))}
         </AnimatePresence>
         {tooltipContent}
       </div>

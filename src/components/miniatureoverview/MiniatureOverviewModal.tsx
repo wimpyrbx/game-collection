@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle } from 'react-icons/fa'
+import { HiOutlineArrowSmallLeft, HiOutlineArrowSmallRight } from 'react-icons/hi2'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath, getCompanyLogoPath } from '../../utils/imageUtils'
@@ -64,7 +65,7 @@ export function MiniatureOverviewModal({
   onPrevious,
   onNext,
   hasPrevious = true,
-  hasNext = true
+  hasNext = true,
 }: MiniatureOverviewModalProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -235,19 +236,17 @@ export function MiniatureOverviewModal({
       setSelectedTypes([])
       setSelectedTags([])
       setPendingTags([])
-      setPreviewUrl(null)
       setImage(null)
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl)
+        setPreviewUrl(null)
+      }
       setProductSearchTerm('')
       setTypeSearchTerm('')
       setShowProductDropdown(false)
       setShowTypeDropdown(false)
-    } else if (miniData) {
-      // When modal opens with a mini, set the preview URL
-      const url = getMiniImagePath(miniData.id, 'original')
-      // console.log('Setting preview URL:', url)
-      setPreviewUrl(url)
     }
-  }, [isOpen, miniData])
+  }, [isOpen, miniData, previewUrl])
 
   useEffect(() => {
     if (!miniData && isOpen) {
@@ -387,11 +386,20 @@ export function MiniatureOverviewModal({
     const selectedType = miniTypes.find(t => t.id === typeId)
     if (selectedType && !selectedTypes.some(t => t.id === typeId)) {
       const isFirstType = selectedTypes.length === 0
-      const newType = {
+      const newType: SelectedType = {
         id: typeId,
         name: selectedType.name,
         proxy_type: !isFirstType,
-        type: selectedType
+        type: {
+          id: selectedType.id,
+          name: selectedType.name,
+          categories: selectedType.categories?.map(cat => ({
+            category: {
+              id: cat.id,
+              name: cat.name
+            }
+          })) || []
+        }
       }
       
       setSelectedTypes(prev => [...prev, newType])
@@ -688,76 +696,6 @@ export function MiniatureOverviewModal({
     }
   }, [isOpen, miniData, baseSizeOptions, paintedByOptions])
 
-  const [showImage, setShowImage] = useState(false)
-  const [isImageLoading, setIsImageLoading] = useState(false)
-  const [imageError, setImageError] = useState<string | null>(null)
-
-  // Update the image initialization effect
-  useEffect(() => {
-    let mounted = true;
-
-    const initializeImage = (miniId: number) => {
-      if (!mounted) return;
-      
-      setIsImageLoading(true);
-      setImageError(null);
-      setShowImage(false);
-      
-      // Create new image object
-      const img = new Image();
-      
-      img.onload = () => {
-        if (!mounted) return;
-        setIsImageLoading(false);
-        // Add small delay before showing image for smooth animation
-        requestAnimationFrame(() => {
-          if (mounted) setShowImage(true);
-        });
-      };
-      
-      img.onerror = () => {
-        if (!mounted) return;
-        setIsImageLoading(false);
-        setImageError('Image not available');
-        setShowImage(false);
-      };
-      // Set source last
-      img.src = getMiniImagePath(miniId, 'original');
-    };
-
-    if (isOpen && miniData?.id) {
-      // Reset states when modal opens
-      setShowImage(false);
-      
-      // Small delay to ensure modal transition is complete
-      const timer = setTimeout(() => {
-        if (mounted) {
-          initializeImage(miniData.id);
-        }
-      }, 100);
-
-      return () => {
-        mounted = false;
-        clearTimeout(timer);
-      };
-    } else {
-      setShowImage(false);
-      setIsImageLoading(false);
-      setImageError(null);
-    }
-
-    return () => {
-      mounted = false;
-    };
-  }, [isOpen, miniData?.id]);
-
-  useEffect(() => {
-    if (isOpen && !miniData) {
-      console.error('Modal opened but no mini data available');
-      onClose();
-    }
-  }, [isOpen, miniData, onClose]);
-
   // Add this with your other refs
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
@@ -871,6 +809,47 @@ export function MiniatureOverviewModal({
     }
   }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine, isOpen])
 
+  // Update the image initialization effect
+  useEffect(() => {
+    let mounted = true;
+
+    if (isOpen && miniData?.id) {
+      // Small delay to ensure modal transition is complete
+      const timer = setTimeout(() => {
+        if (mounted) {
+          // Preload the image
+          const img = new Image();
+          img.src = getMiniImagePath(miniData.id, 'original');
+        }
+      }, 100);
+
+      return () => {
+        mounted = false;
+        clearTimeout(timer);
+      };
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen, miniData?.id]);
+
+  // Add useEffect to clean up preview URL when component unmounts
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  useEffect(() => {
+    if (isOpen && !miniData) {
+      console.error('Modal opened but no mini data available');
+      onClose();
+    }
+  }, [isOpen, miniData, onClose]);
+
   if (isOpen && !miniData) {
     return (
       <UI.Modal isOpen={isOpen} onClose={onClose}>
@@ -904,10 +883,10 @@ export function MiniatureOverviewModal({
         <button
           onClick={onPrevious}
           disabled={!hasPrevious}
-          className="absolute left-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-800 rounded-full shadow-lg"
+          className="absolute left-[-75px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed bg-blue-950/90 hover:bg-blue-900 rounded-xl shadow-2xl shadow-black/50 border border-blue-800/50 hover:border-blue-700 transition-all duration-300 hover:scale-105 hover:-translate-x-1 group disabled:hover:scale-100 disabled:hover:translate-x-0"
           title="Previous miniature"
         >
-          <FaChevronLeft className="w-10 h-10 text-white" />
+          <HiOutlineArrowSmallLeft className="w-8 h-8 text-blue-100 opacity-90 group-hover:opacity-100 transition-opacity duration-300 group-disabled:opacity-50" />
         </button>
       )}
       
@@ -915,17 +894,17 @@ export function MiniatureOverviewModal({
         <button
           onClick={onNext}
           disabled={!hasNext}
-          className="absolute right-[-60px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed bg-gray-800 rounded-full shadow-lg"
+          className="absolute right-[-75px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed bg-blue-950/90 hover:bg-blue-900 rounded-xl shadow-2xl shadow-black/50 border border-blue-800/50 hover:border-blue-700 transition-all duration-300 hover:scale-105 hover:translate-x-1 group disabled:hover:scale-100 disabled:hover:translate-x-0"
           title="Next miniature"
         >
-          <FaChevronRight className="w-10 h-10 text-white" />
+          <HiOutlineArrowSmallRight className="w-8 h-8 text-blue-100 opacity-90 group-hover:opacity-100 transition-opacity duration-300 group-disabled:opacity-50" />
         </button>
       )}
 
       <form onSubmit={handleSubmit} className="flex flex-col max-h-[calc(100vh-8rem)]">
         <UI.ModalHeader>
           <div className="flex items-center justify-between w-full">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <div className="text-xl text-blue-600">
                 <FaDiceD6 />
               </div>
@@ -933,9 +912,9 @@ export function MiniatureOverviewModal({
                 {isEditMode ? 'Edit Miniature' : 'Add New Miniature'}
               </h2>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 p-0">
               {isEditMode && miniData?.created_at && (
-                <div className="italic text-right text-sm text-gray-400">
+                <div className="italic text-right text-xs text-gray-400">
                   ID: <span className="text-gray-300">{miniData.id}</span>
                   <br />
                   Added: <span className="text-gray-300">{new Date(miniData.created_at).toLocaleString('de-DE', {
@@ -948,10 +927,9 @@ export function MiniatureOverviewModal({
                 </div>
               )}
               {isEditMode && miniData?.in_use && (
-                <div className="flex items-center gap-1 px-1 py-1 bg-red-500/30 border border-red-500/20 rounded text-red-500 text-xs">
-                  <FaExclamationTriangle className="text-yellow-500 w-7 h-7 ml-1 mr-2" />
-                  <span className="text-gray-300">In Use:<br></br>
-                  <span className="text-xs text-gray-400">
+                <div className="flex items-center gap-1 px-1 py-1 m-0 bg-red-500/30 border border-red-500/20 rounded h-[23px] text-red-500 text-xs">
+                  <FaExclamationTriangle className="text-yellow-500 w-4 h-4 ml-1 mr-2" />
+                  <span className="text-gray-300">In Use: <span className="text-xs text-gray-400">
                     {new Date(miniData.in_use).toLocaleString('de-DE', {
                       day: '2-digit',
                       month: '2-digit',
@@ -1192,7 +1170,7 @@ export function MiniatureOverviewModal({
               <div className="grid grid-cols-2 gap-4">
                 {/* Types Card */}
                 <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col h-full">
-                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
+                  <div className="bg-gray-900/80 px-4 py-3 border-b border-gray-700">
                     <h3 className="font-medium text-gray-200">Types</h3>
                   </div>
                   <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
@@ -1290,7 +1268,7 @@ export function MiniatureOverviewModal({
 
                 {/* Tags Card */}
                 <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col h-full">
-                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
+                  <div className="bg-gray-900/80 px-4 py-3 border-b border-gray-700">
                     <h3 className="font-medium text-gray-200">Tags</h3>
                   </div>
                   <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">

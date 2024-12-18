@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export interface ModalProps {
   children: ReactNode
@@ -18,46 +19,62 @@ export function Modal({ children, onClose, isOpen, className }: ModalProps) {
   }, [onClose])
 
   useEffect(() => {
-    // Always add the event listener to ensure it's available immediately when modal opens
     window.addEventListener('keydown', handleEscapeKey, true)
     return () => window.removeEventListener('keydown', handleEscapeKey, true)
   }, [handleEscapeKey])
-
-  if (!isOpen) return null
 
   const modalRoot = document.getElementById('modal-root')
   if (!modalRoot) return null
 
   return createPortal(
-    <div 
-      ref={modalRef}
-      className="fixed inset-0 pointer-events-auto"
-      style={{ zIndex: 9999 }}
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/25 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      
-      {/* Modal container */}
-      <div className="fixed inset-0 overflow-y-auto">
-        <div 
-          className="min-h-full flex items-center justify-center p-4"
-          onClick={onClose}
+    <AnimatePresence mode="wait">
+      {isOpen && (
+        <motion.div 
+          ref={modalRef}
+          className="fixed inset-0 pointer-events-auto"
+          style={{ zIndex: 9999 }}
+          role="dialog"
+          aria-modal="true"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
         >
-          {/* Modal content */}
-          <div 
-            className={`relative bg-gray-900 rounded-lg border border-gray-800 shadow-xl ${className ? className : 'w-full max-w-2xl'}`}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {children}
+          {/* Backdrop */}
+          <motion.div 
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          />
+          
+          {/* Modal container */}
+          <div className="fixed inset-0 overflow-y-auto">
+            <div 
+              className="min-h-full flex items-center justify-center p-4"
+              onClick={onClose}
+            >
+              {/* Modal content */}
+              <motion.div 
+                className={`relative bg-gray-900 rounded-lg border border-gray-800 shadow-xl ${className ? className : 'w-full max-w-2xl'}`}
+                onClick={(e) => e.stopPropagation()}
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                transition={{ 
+                  duration: 0.2,
+                  ease: "easeOut"
+                }}
+              >
+                {children}
+              </motion.div>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>,
+        </motion.div>
+      )}
+    </AnimatePresence>,
     modalRoot
   )
 }

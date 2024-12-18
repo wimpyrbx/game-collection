@@ -131,7 +131,7 @@ export function useMinis(
     }
   }, [])
 
-  const getPageMinis = async (pageNum: number): Promise<Mini[] | null> => {
+  const getPageMinis = async (pageNum: number): Promise<Mini[]> => {
     try {
       const startRow = (pageNum - 1) * pageSize
       const endRow = startRow + pageSize - 1
@@ -194,17 +194,82 @@ export function useMinis(
 
       if (error) {
         console.error('Error fetching minis:', error)
-        return null
+        return []
       }
 
-      if (data) {
-        return data.map((mini: SupabaseMini) => transformMini(mini))
-      }
-
-      return null
+      return data ? data.map((mini: SupabaseMini) => transformMini(mini)) : []
     } catch (error) {
       console.error('Error in getPageMinis:', error)
-      return null
+      return []
+    }
+  }
+
+  const getAllMinis = async (): Promise<Mini[]> => {
+    try {
+      const query = supabase
+        .from('minis')
+        .select(`
+          *,
+          painted_by:painted_by_id(
+            id,
+            painted_by_name
+          ),
+          base_sizes:base_size_id(
+            id,
+            base_size_name
+          ),
+          types:mini_to_types(
+            mini_id,
+            type_id,
+            proxy_type,
+            type:mini_types(
+              id,
+              name,
+              categories:type_to_categories(
+                category:mini_categories(
+                  id,
+                  name
+                )
+              )
+            )
+          ),
+          product_sets:product_set_id(
+            id,
+            name,
+            product_line:product_line_id(
+              id,
+              name,
+              company:company_id(
+                id,
+                name
+              )
+            )
+          ),
+          tags:mini_to_tags(
+            tag:tags(
+              id,
+              name
+            )
+          )
+        `)
+
+      if (searchTerm) {
+        query.ilike('name', `%${searchTerm}%`)
+      }
+
+      const { data, error } = await query
+        .returns<Array<SupabaseMini>>()
+        .order('name')
+
+      if (error) {
+        console.error('Error fetching all minis:', error)
+        return []
+      }
+
+      return data ? data.map((mini: SupabaseMini) => transformMini(mini)) : []
+    } catch (error) {
+      console.error('Error in getAllMinis:', error)
+      return []
     }
   }
 
@@ -329,7 +394,8 @@ export function useMinis(
     error, 
     totalMinis, 
     totalQuantity, 
-    getPageMinis, 
+    getPageMinis,
+    getAllMinis, 
     setMinis, 
     getTotalQuantity,
     currentPage,

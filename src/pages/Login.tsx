@@ -7,7 +7,7 @@ import { DndQuote } from '../components/ui/DndQuote'
 export function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { signInWithGoogle, user } = useAuth()
+  const { signIn, user } = useAuth()
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -21,7 +21,7 @@ export function Login() {
     try {
       setLoading(true)
       setError(null)
-      await signInWithGoogle()
+      await signIn()
     } catch (err) {
       console.error('Login error:', err)
       setError(err instanceof Error ? err.message : 'An error occurred during sign in')

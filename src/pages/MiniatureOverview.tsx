@@ -28,6 +28,7 @@ export default function MiniatureOverview() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
   const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
+  const [allMinis, setAllMinis] = useState<Mini[]>([])
   const itemsPerPage = 10
 
   const {
@@ -36,7 +37,8 @@ export default function MiniatureOverview() {
     error, 
     totalMinis, 
     totalQuantity, 
-    getPageMinis, 
+    getPageMinis,
+    getAllMinis, 
     setMinis, 
     getTotalQuantity,
     currentPage,
@@ -53,20 +55,71 @@ export default function MiniatureOverview() {
       // Preload next page
       if (currentPage < totalPages) {
         getPageMinis(currentPage + 1).then(nextPageMinis => {
-          if (nextPageMinis) preloadImages(nextPageMinis)
+          preloadImages(nextPageMinis)
         })
       }
       
       // Preload previous page
       if (currentPage > 1) {
         getPageMinis(currentPage - 1).then(prevPageMinis => {
-          if (prevPageMinis) preloadImages(prevPageMinis)
+          preloadImages(prevPageMinis)
         })
       }
     }
   }, [currentPage, loading, totalMinis, getPageMinis])
 
-  // Update keyboard navigation to use currentPage from hook
+  // Add useEffect to load all minis when needed
+  useEffect(() => {
+    if (isModalOpen) {
+      const loadAllMinis = async () => {
+        const allMinisData = await getAllMinis()
+        setAllMinis(allMinisData)
+      }
+      loadAllMinis()
+    }
+  }, [isModalOpen, getAllMinis])
+
+  // Update handleEdit to use the global index
+  const handleEdit = async (mini: Mini, localIndex: number) => {
+    const globalIndex = (currentPage - 1) * itemsPerPage + localIndex
+    await loadMiniature(mini, globalIndex)
+  }
+
+  const handlePrevious = async () => {
+    if (selectedMiniIndex > 0 && allMinis.length > 0) {
+      const prevMini = allMinis[selectedMiniIndex - 1]
+      const newIndex = selectedMiniIndex - 1
+      const newPage = Math.floor(newIndex / itemsPerPage) + 1
+      
+      // Update the current page if it's different
+      if (newPage !== currentPage) {
+        setCurrentPage(newPage)
+        const pageMinis = await getPageMinis(newPage)
+        setMinis(pageMinis)
+      }
+      
+      await loadMiniature(prevMini, newIndex)
+    }
+  }
+
+  const handleNext = async () => {
+    if (selectedMiniIndex < allMinis.length - 1 && allMinis.length > 0) {
+      const nextMini = allMinis[selectedMiniIndex + 1]
+      const newIndex = selectedMiniIndex + 1
+      const newPage = Math.floor(newIndex / itemsPerPage) + 1
+      
+      // Update the current page if it's different
+      if (newPage !== currentPage) {
+        setCurrentPage(newPage)
+        const pageMinis = await getPageMinis(newPage)
+        setMinis(pageMinis)
+      }
+      
+      await loadMiniature(nextMini, newIndex)
+    }
+  }
+
+  // Update keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check if we're in an input field
@@ -82,9 +135,9 @@ export default function MiniatureOverview() {
       if (isModalOpen) {
         // Handle modal navigation
         if (e.key === 'ArrowLeft' && selectedMiniIndex > 0) {
-          setSelectedMiniIndex(prev => prev - 1)
-        } else if (e.key === 'ArrowRight' && selectedMiniIndex < minis.length - 1) {
-          setSelectedMiniIndex(prev => prev + 1)
+          handlePrevious()
+        } else if (e.key === 'ArrowRight' && selectedMiniIndex < allMinis.length - 1) {
+          handleNext()
         }
       } else {
         // Handle page navigation
@@ -98,7 +151,7 @@ export default function MiniatureOverview() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentPage, totalMinis, loading, isModalOpen, setCurrentPage])
+  }, [currentPage, totalMinis, isModalOpen, selectedMiniIndex, allMinis.length, handlePrevious, handleNext])
 
   const getItemColumns = (mini: Mini) => {
     const typeNames = mini.types?.map(t => ({
@@ -252,16 +305,21 @@ export default function MiniatureOverview() {
     setIsModalOpen(true)
   }
 
-  const handleEdit = async (mini: Mini, index: number) => {
-    await loadMiniature(mini, index)
-  }
-
   const loadMiniature = async (mini: Mini, index: number) => {
     try {
       const completeData = await getMiniature(mini.id)
       if (completeData) {
         setSelectedMini(completeData)
         setSelectedMiniIndex(index)
+        
+        // Update the current page to match the mini's position
+        const newPage = Math.floor(index / itemsPerPage) + 1
+        if (newPage !== currentPage) {
+          setCurrentPage(newPage)
+          const pageMinis = await getPageMinis(newPage)
+          setMinis(pageMinis)
+        }
+        
         setIsModalOpen(true)
       }
     } catch (error) {
@@ -270,45 +328,13 @@ export default function MiniatureOverview() {
     }
   }
 
-  const handlePrevious = async () => {
-    // Get the global index in the full list
-    const globalIndex = selectedMiniIndex - 1
-    if (globalIndex >= 0) {
-      // If we need to load the previous page
-      if (globalIndex < (currentPage - 1) * itemsPerPage) {
-        const prevPageMinis = await getPageMinis(currentPage - 1)
-        if (prevPageMinis && prevPageMinis.length > 0) {
-          const lastMiniOnPrevPage = prevPageMinis[prevPageMinis.length - 1]
-          await loadMiniature(lastMiniOnPrevPage, globalIndex)
-        }
-      } else {
-        // Same page navigation
-        const prevMini = minis[globalIndex % itemsPerPage]
-        await loadMiniature(prevMini, globalIndex)
-      }
-    }
-  }
-
-  const handleNext = async () => {
-    const globalIndex = selectedMiniIndex + 1
-    if (globalIndex < totalMinis) {
-      // If we need to load the next page
-      if (globalIndex >= currentPage * itemsPerPage) {
-        const nextPageMinis = await getPageMinis(currentPage + 1)
-        if (nextPageMinis && nextPageMinis.length > 0) {
-          const firstMiniOnNextPage = nextPageMinis[0]
-          await loadMiniature(firstMiniOnNextPage, globalIndex)
-        }
-      } else {
-        // Same page navigation
-        const nextMini = minis[globalIndex % itemsPerPage]
-        await loadMiniature(nextMini, globalIndex)
-      }
-    }
-  }
-
-  const handleSave = async () => {
+  const handleSave = async (miniatureData?: Partial<Mini>) => {
     try {
+      // If we have miniature data, update the selected mini with it
+      if (miniatureData) {
+        setSelectedMini(prev => prev ? { ...prev, ...miniatureData } : undefined);
+      }
+
       setIsModalOpen(false);
       
       // Wait a bit to let the modal close animation finish
@@ -316,16 +342,14 @@ export default function MiniatureOverview() {
 
       // Refresh the minis list for the current page with current search term
       const updatedMinis = await getPageMinis(currentPage);
-      if (updatedMinis) {
-        setMinis(updatedMinis);
-        await getTotalQuantity();
-        
-        // If we were editing a miniature, update the selected miniature with the new data
-        if (selectedMini?.id) {
-          const updatedMini = updatedMinis.find(mini => mini.id === selectedMini.id);
-          if (updatedMini) {
-            setSelectedMini(updatedMini);
-          }
+      setMinis(updatedMinis);
+      await getTotalQuantity();
+      
+      // If we were editing a miniature, update the selected miniature with the new data
+      if (selectedMini?.id) {
+        const updatedMini = updatedMinis.find(mini => mini.id === selectedMini.id);
+        if (updatedMini) {
+          setSelectedMini(updatedMini);
         }
       }
       
@@ -335,6 +359,10 @@ export default function MiniatureOverview() {
       showError('Failed to save miniature');
     }
   };
+
+  const handleSaveMiniature = async (data: Partial<Mini>) => {
+    await handleSave(data);
+  }
 
   const handleDelete = async (miniId: number) => {
     try {
@@ -500,6 +528,27 @@ export default function MiniatureOverview() {
       </div>
     )
   }
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false)
+    setSelectedMini(undefined)
+  }
+
+  const handleDeleteMiniature = async (miniId: number) => {
+    await handleDelete(miniId)
+  }
+
+  const handlePreviousMini = () => {
+    handlePrevious()
+  }
+
+  const handleNextMini = () => {
+    handleNext()
+  }
+
+  const hasPreviousMini = selectedMiniIndex > 0
+  const hasNextMini = selectedMiniIndex < allMinis.length - 1
+  const selectedMiniId = selectedMini?.id
 
   if (error) {
     return <div className="p-4 text-red-500">Error: {error}</div>
@@ -667,16 +716,16 @@ export default function MiniatureOverview() {
 
       <MiniatureOverviewModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        miniId={selectedMini?.id}
+        onClose={handleCloseModal}
+        miniId={selectedMiniId}
         miniData={selectedMini}
-        onSave={handleSave}
-        onDelete={handleDelete}
-        onPrevious={handlePrevious}
-        onNext={handleNext}
-        hasPrevious={selectedMiniIndex > 0}
-        hasNext={selectedMiniIndex < totalMinis - 1}
+        onSave={handleSaveMiniature}
+        onDelete={handleDeleteMiniature}
         isLoading={loading}
+        onPrevious={handlePreviousMini}
+        onNext={handleNextMini}
+        hasPrevious={hasPreviousMini}
+        hasNext={hasNextMini}
       />
     </>
   )

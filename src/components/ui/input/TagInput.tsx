@@ -56,7 +56,7 @@ export function TagInput({
         e.preventDefault()
         if (selectedIndex >= 0) {
           handleTagSelect(filteredTags[selectedIndex])
-        } else if (value.trim()) {
+        } else if (value.trim() && onTagAdd) {
           await onTagAdd(value.trim())
           onChange('')
           setShowDropdown(false)
@@ -65,7 +65,7 @@ export function TagInput({
         setShowDropdown(false)
         setSelectedIndex(-1)
       }
-    } else if (e.key === 'Enter' || e.key === ',') {
+    } else if ((e.key === 'Enter' || e.key === ',') && onTagAdd) {
       e.preventDefault()
       const inputValue = value.trim()
       if (inputValue) {
@@ -78,7 +78,7 @@ export function TagInput({
 
   const handleChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.value
-    if (newValue.includes(',')) {
+    if (newValue.includes(',') && onTagAdd) {
       const tagValue = newValue.replace(',', '').trim()
       if (tagValue) {
         await onTagAdd(tagValue)
