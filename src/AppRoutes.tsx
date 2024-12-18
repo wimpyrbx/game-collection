@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { Login } from './pages/Login'
 import { Layout } from './components/Layout'
@@ -8,6 +8,7 @@ import TypeCategoryAdmin from './pages/TypeCategoryAdmin'
 import ProductAdmin from './pages/ProductAdmin'
 import MiniatureOverview from './pages/MiniatureOverview'
 import { useState, useEffect } from 'react'
+import { supabase } from './lib/supabase'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, session, loading } = useAuth()
@@ -53,11 +54,54 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return null
 }
 
+// Add this component to handle the auth callback
+function AuthCallback() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const { hash } = location
+  
+  useEffect(() => {
+    async function handleCallback() {
+      if (hash) {
+        try {
+          // Let Supabase handle the token exchange
+          const { data: { session }, error } = await supabase.auth.getSession()
+          
+          if (error) throw error
+          
+          if (session) {
+            // Use navigate instead of window.location for smoother transition
+            navigate('/', { replace: true })
+          }
+        } catch (error) {
+          console.error('Auth callback error:', error)
+          navigate('/login', { replace: true })
+        }
+      }
+    }
+    
+    handleCallback()
+  }, [hash, navigate])
+
+  return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-white text-xl flex items-center gap-3">
+        <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        Processing authentication...
+      </div>
+    </div>
+  )
+}
+
 export function AppRoutes() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="login" element={<Login />} />
+        <Route path="auth/callback" element={<AuthCallback />} />
         <Route
           path="/"
           element={

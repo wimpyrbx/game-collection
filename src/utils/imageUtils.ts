@@ -4,9 +4,8 @@
  * @param type The type of image (thumb or original)
  * @returns The path to the image
  */
-export const getMiniImagePath = (id: number, type: 'thumb' | 'original' = 'original'): string => {
-  const idStr = id.toString()
-  const x = idStr[0]
-  const y = idStr.length > 1 ? idStr[1] : '0'
-  return `/images/miniatures/${type}/${x}/${y}/${id}.webp`
+export function getMiniImagePath(id: number, type: 'thumb' | 'full' | 'original' = 'full') {
+  const lastDigits = id.toString().slice(-2)
+  const [secondToLast, last] = lastDigits.padStart(2, '0').split('')
+  return `/miniatures/images/miniatures/${type}/${secondToLast}/${last}/${id}.webp`
 } 

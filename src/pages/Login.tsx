@@ -35,7 +35,7 @@ export function Login() {
       {/* Background image with overlay */}
       <div 
         className="absolute inset-0 bg-cover bg-center bg-no-repeat"
-        style={{ backgroundImage: 'url(/images/login/login_background.webp)' }}
+        style={{ backgroundImage: 'url(/miniatures/images/login/login_background.webp)' }}
       >
         {/* Dark overlay */}
         <div className="absolute inset-0 bg-black/80" />
@@ -44,7 +44,7 @@ export function Login() {
       <div className="max-w-md w-full mx-4 relative z-10">
         {/* Miniature image */}
         <img 
-          src="/images/login/login_miniature.webp" 
+          src="/miniatures/images/login/login_miniature.webp" 
           alt="Login" 
           className="w-full object-cover rounded-t-xl shadow-xl"
           style={{ marginBottom: '-1px' }}
