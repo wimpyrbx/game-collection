@@ -3,6 +3,15 @@ import os
 from supabase import create_client
 from datetime import datetime
 
+def read_credentials():
+    load_dotenv('../.env')
+    return {
+        'ftp_user': os.getenv('FTP_USER'),
+        'ftp_pass': os.getenv('FTP_PASS'),
+        'supabase_url': os.getenv('VITE_SUPABASE_URL'),
+        'supabase_key': os.getenv('VITE_SUPABASE_ANON_KEY')
+    }
+
 def format_sql_value(v):
     if isinstance(v, (str, datetime)):
         # Use double quotes to avoid escaping issues
@@ -63,51 +72,51 @@ def get_schema_sql(supabase, table):
     return f"{result.data[0]['create_stmt']};\n{result.data[0]['alter_stmts']};"
 
 def main():
-   load_dotenv()
-   supabase = create_client(os.getenv('SUPABASE_URL'), os.getenv('SUPABASE_KEY'))
+    creds = read_credentials()
+    supabase = create_client(creds['supabase_url'], creds['supabase_key'])
 
-   tables = [
-       'base_sizes', 'mini_categories', 'mini_to_tags', 'mini_to_types',
-       'mini_types', 'minis', 'painted_by', 'product_companies',
-       'product_lines', 'product_sets', 'profiles', 'settings',
-       'tags', 'type_to_categories', 'user_settings'
-   ]
+    tables = [
+        'base_sizes', 'mini_categories', 'mini_to_tags', 'mini_to_types',
+        'mini_types', 'minis', 'painted_by', 'product_companies',
+        'product_lines', 'product_sets', 'profiles', 'settings',
+        'tags', 'type_to_categories', 'user_settings'
+    ]
 
-   backup_file = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
+    backup_file = f"backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.sql"
 
-   with open(backup_file, 'w') as f:
-       # Write header
-       f.write("-- Backup created at " + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n\n")
-       f.write("BEGIN;\n\n")
+    with open(backup_file, 'w') as f:
+        # Write header
+        f.write("-- Backup created at " + datetime.now().strftime('%Y-%m-%d %H:%M:%S') + "\n\n")
+        f.write("BEGIN;\n\n")
 
-       # Drop existing tables in reverse order (for foreign keys)
-       f.write("-- Drop existing tables\n")
-       for table in reversed(tables):
-           f.write(f"DROP TABLE IF EXISTS {table} CASCADE;\n")
-       f.write("\n")
+        # Drop existing tables in reverse order (for foreign keys)
+        f.write("-- Drop existing tables\n")
+        for table in reversed(tables):
+            f.write(f"DROP TABLE IF EXISTS {table} CASCADE;\n")
+        f.write("\n")
 
-       # Create tables and constraints
-       f.write("-- Create tables and constraints\n")
-       for table in tables:
-           schema_sql = get_schema_sql(supabase, table)
-           f.write(f"{schema_sql}\n\n")
+        # Create tables and constraints
+        f.write("-- Create tables and constraints\n")
+        for table in tables:
+            schema_sql = get_schema_sql(supabase, table)
+            f.write(f"{schema_sql}\n\n")
 
-       # Insert data
-       f.write("-- Insert data\n")
-       for table in tables:
-           data = supabase.table(table).select('*').execute()
-           if data.data:
-               f.write(f"\n-- Data for {table}\n")
-               for row in data.data:
-                   columns = ', '.join(row.keys())
-                   values = ', '.join(
-                       format_sql_value(v) for v in row.values()
-                   )
-                   f.write(f"INSERT INTO {table} ({columns}) VALUES ({values});\n")
+        # Insert data
+        f.write("-- Insert data\n")
+        for table in tables:
+            data = supabase.table(table).select('*').execute()
+            if data.data:
+                f.write(f"\n-- Data for {table}\n")
+                for row in data.data:
+                    columns = ', '.join(row.keys())
+                    values = ', '.join(
+                        format_sql_value(v) for v in row.values()
+                    )
+                    f.write(f"INSERT INTO {table} ({columns}) VALUES ({values});\n")
 
-       f.write("\nCOMMIT;\n")
+        f.write("\nCOMMIT;\n")
 
-   print(f"Backup created: {backup_file}")
+    print(f"Backup created: {backup_file}")
 
 if __name__ == "__main__":
-   main()
+    main()

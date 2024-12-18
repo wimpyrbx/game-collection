@@ -122,11 +122,10 @@ export default function MiniatureOverview() {
       ? (
         <div className="space-y-0.5">
           <div className="text-xs text-gray-300">{company}</div>
-          <div className="text-xs text-gray-400">{productLine}</div>
-          <div className="text-xs text-gray-500">{productSet}</div>
+          <div className="text-xs text-gray-400">{productLine} <span className="text-gray-200">·</span> <span className="text-gray-200">{productSet}</span></div>
         </div>
       )
-      : <span className="text-xs text-gray-500">no product set</span>
+      : <span className="text-xs text-gray-500"></span>
 
     return [
       <div key="name" className="flex items-center gap-4">
@@ -163,7 +162,7 @@ export default function MiniatureOverview() {
           emptyMessage="-"
         />
       </div>,
-      <div key="types" className="min-w-[150px]">
+      <div key="types" className="min-w-[150px] relative overflow-visible">
         <ShowItems 
           items={typeNames} 
           displayType="pills"
@@ -171,7 +170,6 @@ export default function MiniatureOverview() {
           shadowEnabled={true}
           showTooltip={true}
           tooltipTitle="Types"
-          maxPerRow={4}
           itemStyle={{
             text: 'text-gray-200',
             bg: 'bg-orange-900',
@@ -191,7 +189,7 @@ export default function MiniatureOverview() {
           emptyMessage="-"
         />
       </div>,
-      <div key="tags" className="min-w-[200px]">
+      <div key="tags" className="min-w-[200px] relative overflow-visible">
         <ShowItems 
           items={tagNames} 
           displayType="pills"
@@ -201,24 +199,24 @@ export default function MiniatureOverview() {
           tooltipTitle="Tags"
           maxPerRow={4}
           itemStyle={{
-            text: 'text-white',
-            bg: 'bg-cyan-700',
+            text: 'text-gray-200',
+            bg: 'bg-gray-700',
             size: 'xs',
-            border: '',
-            hover: 'hover:bg-cyan-600'
+            border: 'border border-gray-600',
+            hover: 'hover:bg-gray-600'
           }}
           maxVisible={3}
           emptyMessage="-"
         />
       </div>,
       productSetDisplay,
-      <div key="quantity" className="text-center">{mini.quantity || 0}</div>,
+      <div key="quantity" className="text-center w-[25px]">{mini.quantity || 0}</div>,
       <div 
         key="switch"
         onClick={(e) => {
           e.stopPropagation();
         }}
-        className="flex justify-center"
+        className="flex justify-center w-[40px]"
       >
         <Switch
           checked={!!mini.in_use}
@@ -312,7 +310,6 @@ export default function MiniatureOverview() {
   const handleSave = async () => {
     try {
       setIsModalOpen(false);
-      setSelectedMini(undefined);
       
       // Wait a bit to let the modal close animation finish
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -322,6 +319,14 @@ export default function MiniatureOverview() {
       if (updatedMinis) {
         setMinis(updatedMinis);
         await getTotalQuantity();
+        
+        // If we were editing a miniature, update the selected miniature with the new data
+        if (selectedMini?.id) {
+          const updatedMini = updatedMinis.find(mini => mini.id === selectedMini.id);
+          if (updatedMini) {
+            setSelectedMini(updatedMini);
+          }
+        }
       }
       
       showSuccess(`Miniature ${selectedMini ? 'updated' : 'added'} successfully`);

@@ -3,8 +3,8 @@ import os
 from datetime import datetime
 import zipfile
 import argparse
-from dotenv import load_dotenv
-from colorama import Fore, Style, init
+from dotenv import load_dotenv # type: ignore
+from colorama import Fore, Style, init # type: ignore
 
 init(autoreset=True)
 

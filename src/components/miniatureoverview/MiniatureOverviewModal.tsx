@@ -4,7 +4,7 @@ import * as UI from '../ui'
 import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
-import { getMiniImagePath } from '../../utils/imageUtils'
+import { getMiniImagePath, getCompanyLogoPath } from '../../utils/imageUtils'
 import { createMiniature, updateMiniature } from '../../services/miniatureService'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { supabase } from '../../lib/supabase'
@@ -808,6 +808,8 @@ export function MiniatureOverviewModal({
     setTypeSearchTerm('')
     setTagInput('')
     setShowTypeDropdown(false)
+    setProductSearchTerm('')  // Clear product search term
+    setShowProductDropdown(false)  // Hide product dropdown
   }, [miniData]) // Add miniData as dependency
 
   // First, make sure we're getting the categories from all types
@@ -829,7 +831,6 @@ export function MiniatureOverviewModal({
   // Sort categories, tags, and types
   const sortedCategories = sortByKey(selectedTypeCategories, 'name');
   const sortedTags = sortByKey(selectedTags, 'name');
-  const sortedTypes = sortByKey(selectedTypes, 'name');
 
   // Map sorted categories, tags, and types to items
   const categoryItems = sortedCategories.map(category => ({
@@ -841,6 +842,34 @@ export function MiniatureOverviewModal({
     id: tag.id,
     label: tag.name
   }));
+
+  // Add state for company logo
+  const [companyLogo, setCompanyLogo] = useState<string>('');
+
+  // Update company logo when product set changes or modal opens
+  useEffect(() => {
+    if (!isOpen) {
+      setCompanyLogo('');
+      return;
+    }
+
+    if (formData.product_set_id) {
+      for (const company of companies) {
+        const lines = getProductLinesByCompany(company.id)
+        for (const line of lines) {
+          const sets = getProductSetsByProductLine(line.id)
+          const set = sets.find(s => s.id === formData.product_set_id)
+          if (set) {
+            const logoPath = getCompanyLogoPath(company.name);
+            setCompanyLogo(logoPath);
+            return;
+          }
+        }
+      }
+    } else {
+      setCompanyLogo('');
+    }
+  }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine, isOpen])
 
   if (isOpen && !miniData) {
     return (
@@ -949,65 +978,32 @@ export function MiniatureOverviewModal({
                 onDragOver={(e) => e.preventDefault()}
                 onClick={handleImageClick}
               >
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+                  <FaDiceD20 className="w-12 h-12 mb-2" />
+                  <span className="text-sm">Drop image here or click to select</span>
+                </div>
                 <AnimatePresence mode="wait">
-                  {showImage && miniData?.id && !imageError ? (
-                    <motion.div
-                      key={`mini-image-${miniData.id}`}
-                      className="absolute inset-0 flex items-center justify-center"
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ 
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 25,
-                        duration: 0.3
-                      }}
+                  {(miniData?.id || previewUrl) && (
+                    <motion.div 
+                      key={`image-${miniData?.id || previewUrl}`}
+                      className="absolute inset-0 flex items-center justify-center bg-gray-900/50 z-10"
                     >
-                      <img
-                        src={getMiniImagePath(miniData.id, 'original')}
-                        alt={miniData.name}
+                      <motion.img
+                        initial={{ opacity: 0, scale: 0.3, y: 50 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 20,
+                          mass: 0.8
+                        }}
+                        src={miniData?.id ? getMiniImagePath(miniData.id, 'original') : previewUrl || ''}
+                        alt={miniData?.name || "Preview"}
                         className="w-full h-full object-contain"
+                        onError={(e) => {
+                          e.currentTarget.parentElement?.classList.add('hidden');
+                        }}
                       />
-                    </motion.div>
-                  ) : previewUrl ? (
-                    <motion.div
-                      key="preview-image"
-                      className="absolute inset-0 flex items-center justify-center"
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ 
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 25,
-                        duration: 0.3
-                      }}
-                    >
-                      <img
-                        src={previewUrl}
-                        alt="Preview"
-                        className="w-full h-full object-contain"
-                        onError={() => setPreviewUrl(null)}
-                      />
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="placeholder"
-                      className="absolute inset-0 flex flex-col items-center justify-center text-gray-500"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {isImageLoading ? (
-                        <UI.LoadingSpinner message="Loading..." />
-                      ) : (
-                        <>
-                          <FaDiceD20 className="w-12 h-12 mb-2" />
-                          <span className="text-sm">Drop image here or click to select</span>
-                        </>
-                      )}
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1076,6 +1072,31 @@ export function MiniatureOverviewModal({
                   </button>
                 ))}
               </div>
+
+              {/* Company Logo with animation */}
+              <div className="h-32 flex items-start justify-center">
+                <AnimatePresence mode="wait">
+                  {companyLogo && (
+                    <motion.img 
+                      key={companyLogo}
+                      src={companyLogo} 
+                      alt="Company Logo" 
+                      className="h-24 w-auto object-contain"
+                      initial={{ opacity: 0, scale: 0.3, y: 50 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ 
+                        type: "spring",
+                        stiffness: 300,
+                        damping: 20,
+                        mass: 0.8
+                      }}
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Right Column - Types, Tags, and moved fields */}
@@ -1131,6 +1152,20 @@ export function MiniatureOverviewModal({
                   }}
                   placeholder="Product Set"
                 />
+                {/* Clear button */}
+                {(selectedProductDisplay || productSearchTerm) && (
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 transition-colors"
+                    onClick={() => {
+                      setProductSearchTerm('')
+                      setFormData(prev => ({ ...prev, product_set_id: null }))
+                      setShowProductDropdown(false)
+                    }}
+                  >
+                    <FaTimesCircle className="w-4 h-4" />
+                  </button>
+                )}
                 {showProductDropdown && (productSearchTerm || formData.product_set_id) && (
                   <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
                     {filteredProducts.map(product => (
@@ -1170,7 +1205,7 @@ export function MiniatureOverviewModal({
                         }}
                         placeholder="Search types..."
                       />
-                      {showTypeDropdown && typeSearchTerm && (
+                      {showTypeDropdown && typeSearchTerm && filteredTypes.length > 0 && (
                         <div 
                           className="fixed max-h-48 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999]"
                           style={{
@@ -1193,17 +1228,12 @@ export function MiniatureOverviewModal({
                               {type.name}
                             </button>
                           ))}
-                          {filteredTypes.length === 0 && (
-                            <div className="px-3 py-2 text-sm text-gray-500">
-                              No matches found
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
                     {selectedTypes.length === 0 && (
                       <div className="inset-0 flex items-center justify-center pointer-events-none">
-                        <div className="text-3xl font-bold text-gray-800/70">No Types Assigned</div>
+                        <div className="text-3xl font-bold text-gray-600/70">No Types Assigned</div>
                       </div>
                     )}
                     {selectedTypes.length > 0 && (
@@ -1247,7 +1277,8 @@ export function MiniatureOverviewModal({
                               bg: 'bg-cyan-900',
                               size: 'xs',
                               border: 'border border-cyan-800',
-                              hover: 'hover:bg-cyan-700'
+                              hover: 'hover:bg-cyan-700',
+                              cursor: 'cursor-default'
                             }}
                             emptyMessage="No categories available"
                           />
@@ -1278,6 +1309,12 @@ export function MiniatureOverviewModal({
                               tags: [...prev.tags || [], { id: tag.id }]
                             }))
                           }
+                          setTagInput('') // Clear the input
+                          // Focus back on the input
+                          const tagInputElement = tagSearchContainerRef.current?.querySelector('input')
+                          if (tagInputElement) {
+                            tagInputElement.focus()
+                          }
                         }}
                         renderDropdown={(filteredTags) => (
                           <div 
@@ -1285,7 +1322,8 @@ export function MiniatureOverviewModal({
                             style={{
                               width: tagDropdownStyle.width,
                               left: tagDropdownStyle.left,
-                              top: tagDropdownStyle.top
+                              top: tagDropdownStyle.top,
+                              display: filteredTags.length > 0 ? 'block' : 'none'
                             }}
                           >
                             {filteredTags.map(tag => (
@@ -1301,6 +1339,12 @@ export function MiniatureOverviewModal({
                                       tags: [...prev.tags || [], { id: tag.id }]
                                     }))
                                   }
+                                  setTagInput('') // Clear the input
+                                  // Focus back on the input
+                                  const tagInputElement = tagSearchContainerRef.current?.querySelector('input')
+                                  if (tagInputElement) {
+                                    tagInputElement.focus()
+                                  }
                                 }}
                               >
                                 {tag.name}
@@ -1314,7 +1358,7 @@ export function MiniatureOverviewModal({
                     <div>
                       {selectedTags.length === 0 ? (
                         <div className="flex items-center justify-center">
-                          <div className="text-3xl font-bold text-gray-800/70">No Tags Assigned</div>
+                          <div className="text-3xl font-bold text-gray-600/70">No Tags Assigned</div>
                         </div>
                       ) : (
                         <ShowItems

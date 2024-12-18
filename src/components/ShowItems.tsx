@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaQuestionCircle, FaTimesCircle } from 'react-icons/fa';
+import { FaQuestionCircle } from 'react-icons/fa';
 
 export type TogglePlacement = 'start' | 'end' | 'right' | 'top';
 
@@ -82,7 +82,7 @@ export function ShowItems({
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const [showAll, setShowAll] = useState(false);
   
-  const renderItem = (item: any, index: number) => {
+  const renderItem = (item: any, index: number, isLastVisibleItem: boolean) => {
     const itemText = typeof item === 'string' ? item : item.label || item.name || ''
     const itemId = typeof item === 'string' ? item : item.id
     const isSelected = selectedItem !== undefined && itemId === selectedItem
@@ -98,21 +98,20 @@ export function ShowItems({
         }}
         className={`
           inline-flex items-center gap-1
-          ${displayType === 'pills' ? 'rounded-full px-2 py-0.5 pb-1' : ''}
+          ${displayType === 'pills' ? 'rounded-full px-2 py-0.5 pb-1 pr-2.5' : ''}
           ${isSelected ? selectedStyle?.bg || 'bg-green-600/20' : itemStyle?.bg || 'bg-blue-500/20'}
           ${isSelected ? selectedStyle?.border || 'border-green-600' : itemStyle?.border || ''}
-          ${itemStyle?.cursor || 'cursor-pointer'}
-          ${isSelected ? selectedStyle?.hover || 'hover:bg-green-600/30' : itemStyle?.hover || 'hover:bg-blue-500/30'}
-          ${shadowEnabled ? 'shadow-sm' : ''}
+          ${showRemoveButton ? 'cursor-pointer hover:bg-red-900/30' : itemStyle?.cursor || 'cursor-pointer'}
+          ${!showRemoveButton && (isSelected ? selectedStyle?.hover || 'hover:bg-green-600/30' : itemStyle?.hover || 'hover:bg-blue-500/30')}
+          ${shadowEnabled ? 'shadow-sm shadow-gray-800' : ''}
           transition-colors
           relative
           ${maxPerRow ? 'w-auto' : ''}
         `}
-        onMouseEnter={() => showTooltip && setIsTooltipVisible(true)}
-        onMouseLeave={() => showTooltip && setIsTooltipVisible(false)}
+        onClick={() => showRemoveButton && onItemRemove && onItemRemove(index)}
       >
         {isSelected && selectedStyle?.indicator && (
-          <span className="mr-1">{selectedStyle.indicator}</span>
+          <span className="mr-1 mt-0.5">{selectedStyle.indicator}</span>
         )}
         <span className={`
           ${isSelected ? selectedStyle?.text : textColor || itemStyle?.text || 'text-blue-200'} 
@@ -120,22 +119,13 @@ export function ShowItems({
             itemStyle?.size === 'sm' ? 'text-sm' : 
             'text-base'
           }
+          ${showRemoveButton ? 'group-hover:line-through' : ''}
         `}>
-          {showTooltip && <FaQuestionCircle className="inline mr-1 text-gray-400" />}
           {itemText}
         </span>
         {showRemoveButton && onItemRemove && (
-          <button
-            type="button"
-            onClick={() => onItemRemove(index)}
-            className="text-red-500 hover:text-red-400 transition-colors flex items-center justify-center text-xs font-bold ml-1 -mt-0.5"
-          >
-            x
-          </button>
-        )}
-        {showTooltip && isTooltipVisible && (
-          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-gray-200 rounded shadow-lg whitespace-nowrap">
-            {tooltipTitle}
+          <div className="text-red-500 group-hover:text-red-400 transition-colors flex items-center justify-center text-xs font-bold ml-1 -mt-0.5">
+            ×
           </div>
         )}
       </motion.div>
@@ -168,13 +158,65 @@ export function ShowItems({
     </button>
   );
 
+  const visibleItems = items.slice(0, showAll ? items.length : maxVisible);
+
+  // Render tooltip icon and content
+  const tooltipContent = showTooltip && !showAll && items.length > maxVisible && (
+    <div className="relative inline-block ml-1">
+      <div
+        className="text-gray-400 hover:text-gray-300 cursor-help"
+        onMouseEnter={() => setIsTooltipVisible(true)}
+        onMouseLeave={() => setIsTooltipVisible(false)}
+      >
+        <FaQuestionCircle className="w-4 h-7" />
+      </div>
+      {isTooltipVisible && (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.95 }}
+          transition={{ duration: 0.15 }}
+          className="absolute z-[99999] left-full top-1/2 -translate-y-1/2 ml-2 bg-gray-800 rounded shadow-xl shadow-black/50 border border-gray-700 w-[200px]"
+        >
+          <div className="text-xs">
+            <div className="font-medium px-3 py-2.5 border-b border-gray-700 bg-gray-900/80 text-gray-300">
+              {tooltipTitle} ({items.length})
+            </div>
+            <div className="p-3 flex flex-wrap gap-2">
+              {items.map((item, index) => {
+                const itemText = typeof item === 'string' ? item : item.label || item.name || ''
+                return (
+                  <div 
+                    key={index} 
+                    className={`
+                      inline-flex items-center rounded-full px-2 py-0.5
+                      ${itemStyle?.bg || 'bg-gray-700'}
+                      ${itemStyle?.border || ''}
+                      ${itemStyle?.hover || 'hover:bg-gray-600'}
+                      transition-colors
+                      text-xs
+                      ${itemStyle?.text || 'text-gray-200'}
+                    `}
+                  >
+                    {itemText}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+
   return (
     <div className={`flex flex-wrap gap-1.5 ${maxPerRow ? 'justify-start' : ''}`}>
       {togglePlacement === 'start' && toggleButton}
       <div className={`flex flex-wrap gap-1.5 ${togglePlacement === 'top' ? 'w-full' : ''}`}>
         <AnimatePresence mode="sync">
-          {items.slice(0, showAll ? items.length : maxVisible).map((item, index) => renderItem(item, index))}
+          {visibleItems.map((item, index) => renderItem(item, index, index === visibleItems.length - 1))}
         </AnimatePresence>
+        {tooltipContent}
       </div>
       {(togglePlacement === 'end' || togglePlacement === 'right') && toggleButton}
     </div>

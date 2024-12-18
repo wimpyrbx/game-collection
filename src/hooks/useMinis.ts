@@ -149,17 +149,19 @@ export function useMinis(
             base_size_name
           ),
           types:mini_to_types(
-            type:type_id(
+            mini_id,
+            type_id,
+            proxy_type,
+            type:mini_types(
               id,
               name,
               categories:type_to_categories(
-                category:category_id(
+                category:mini_categories(
                   id,
                   name
                 )
               )
-            ),
-            proxy_type
+            )
           ),
           product_sets:product_set_id(
             id,
