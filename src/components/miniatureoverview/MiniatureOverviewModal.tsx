@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaImage, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaExclamationCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
+import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaChevronLeft, FaChevronRight } from 'react-icons/fa'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath } from '../../utils/imageUtils'
@@ -30,6 +30,16 @@ interface SelectedType {
   id: number
   name: string
   proxy_type: boolean
+  type?: {
+    id: number
+    name: string
+    categories?: Array<{
+      category?: {
+        id: number
+        name: string
+      }
+    }>
+  }
 }
 
 // Add new interface for validation errors
@@ -42,19 +52,10 @@ interface ValidationErrors {
 }
 
 // Add this utility function at the top of the file
-const checkImageExists = async (url: string): Promise<boolean> => {
-  try {
-    const response = await fetch(url, { method: 'HEAD' });
-    return response.ok;
-  } catch {
-    return false;
-  }
-};
 
 export function MiniatureOverviewModal({ 
   isOpen, 
   onClose, 
-  miniId, 
   miniData,
   onSave,
   onDelete,
@@ -158,69 +159,41 @@ export function MiniatureOverviewModal({
   // Load mini data when editing
   useEffect(() => {
     if (miniData) {
-      // console.log('Loading mini data:', {
-      //   id: miniData.id,
-      //   name: miniData.name,
-      //   image_path: miniData.image_path
-      // })
+      // Handle types with proper type and category structure
+      const mappedTypes = miniData.types?.filter(t => t && t.type)?.map(t => ({
+        id: t.type_id,
+        proxy_type: t.proxy_type,
+        name: t.type.name,
+        type: {
+          id: t.type.id,
+          name: t.type.name,
+          categories: t.type.categories?.map(cat => ({
+            category: cat.category  // Keep the nested category structure
+          })) || []
+        }
+      })) || []
 
-      // Always try to set preview URL if we have a mini ID
-      const url = getMiniImagePath(miniData.id, 'original')
-      // console.log('Image URL:', url) // Debugging: Log the image URL
-      setPreviewUrl(url)
+      // Handle tags with proper tag structure
+      const mappedTags = miniData.tags?.filter(t => t && t.tag)?.map(t => ({
+        id: t.tag.id,
+        name: t.tag.name
+      })) || []
 
-      // Set form data
-      const formDataToSet = {
-        name: miniData.name,
+      setFormData(prev => ({
+        ...prev,
+        name: miniData.name || '',
         description: miniData.description || '',
         location: miniData.location || '',
         quantity: miniData.quantity || 1,
-        painted_by_id: miniData.painted_by?.id || 0,
+        painted_by_id: miniData.painted_by_id || 0,
         base_size_id: miniData.base_size_id || 0,
-        product_set_id: miniData.product_sets?.id || null,
-        types: miniData.types?.map(t => ({
-          id: t.type.id,
-          proxy_type: t.proxy_type
-        })) || [],
-        tags: miniData.tags?.map(t => ({
-          id: t.id
-        })) || []
-      }
+        product_set_id: miniData.product_set_id || null,
+        types: mappedTypes,
+        tags: mappedTags
+      }))
 
-      setFormData(formDataToSet)
-
-      // Set selected types
-      if (miniData.types) {
-        const typesToSet = miniData.types.map(t => ({
-          id: t.type.id,
-          name: t.type.name,
-          proxy_type: t.proxy_type,
-          type: {
-            id: t.type.id,
-            name: t.type.name,
-            categories: t.type.categories || []
-          }
-        }))
-        setSelectedTypes(typesToSet)
-      }
-
-      // Set selected tags
-      if (miniData.tags) {
-        setSelectedTags(miniData.tags)
-      }
-
-      // Set product set display
-      if (miniData.product_sets) {
-        const company = miniData.product_sets.product_line?.company?.name || ''
-        const line = miniData.product_sets.product_line?.name || ''
-        const set = miniData.product_sets.name || ''
-        const displayValue = `${company} → ${line} → ${set}`
-        setProductSearchTerm(displayValue)
-        setShowProductDropdown(false)
-        
-        // Find and select the matching product set
-        setFormData(prev => ({ ...prev, product_set_id: miniData.product_sets.id }))
-      }
+      setSelectedTypes(mappedTypes)
+      setSelectedTags(mappedTags)
     }
   }, [miniData])
 
@@ -364,9 +337,19 @@ export function MiniatureOverviewModal({
       } else {
         await createMiniature(miniatureData)
       }
-
       setPendingTags([])
-      await onSave(miniatureData)
+      // Transform tags to match expected type before saving
+      const transformedMiniatureData = {
+        ...miniatureData,
+        tags: miniatureData.tags.map(t => ({
+          id: t.id,
+          tag: {
+            id: t.id,
+            name: t.name
+          }
+        }))
+      }
+      await onSave(transformedMiniatureData)
 
     } catch (error) {
       console.error('Error saving miniature:', error)
@@ -421,8 +404,25 @@ export function MiniatureOverviewModal({
       }
       
       setSelectedTypes(prev => {
-        const updated = [...prev, newType]
-        return updated
+        const existingType = prev.find(t => t.id === type.id);
+        if (!existingType) {
+          return [...prev, {
+            id: type.id,
+            name: type.name,
+            proxy_type: false,
+            type: {
+              id: type.id,
+              name: type.name,
+              categories: type.categories?.map((cat: { id: number; name: string }) => ({
+                category: {
+                  id: cat.id,
+                  name: cat.name
+                }
+              })) || []
+            }
+          }];
+        }
+        return prev;
       })
       
       setFormData(prev => ({
@@ -584,7 +584,7 @@ export function MiniatureOverviewModal({
   }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine])
 
   // Add state for invalid product set
-  const [isInvalidProductSet, setIsInvalidProductSet] = useState(false)
+  const [, setIsInvalidProductSet] = useState(false)
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -607,8 +607,8 @@ export function MiniatureOverviewModal({
     }
   }
 
-  // Add new state for tags
-  const [selectedTags, setSelectedTags] = useState<{ id: number, name: string }[]>([])
+  // State for tags
+  const [selectedTags, setSelectedTags] = useState<Array<{ id: number; name: string }>>([])
   const [tagInput, setTagInput] = useState('')
 
   // Add state for available tags
@@ -755,9 +755,8 @@ export function MiniatureOverviewModal({
         setImageError('Image not available');
         setShowImage(false);
       };
-      
       // Set source last
-      img.src = getMiniImagePath(miniId, 'full');
+      img.src = getMiniImagePath(miniId, 'original');
     };
 
     if (isOpen && miniData?.id) {
@@ -916,7 +915,7 @@ export function MiniatureOverviewModal({
                       }}
                     >
                       <img
-                        src={getMiniImagePath(miniData.id, 'full')}
+                        src={getMiniImagePath(miniData.id, 'original')}
                         alt={miniData.name}
                         className="w-full h-full object-contain"
                       />
@@ -952,7 +951,7 @@ export function MiniatureOverviewModal({
                       transition={{ duration: 0.2 }}
                     >
                       {isImageLoading ? (
-                        <UI.LoadingSpinner size="sm" />
+                        <UI.LoadingSpinner message="Loading..." />
                       ) : (
                         <>
                           <FaDiceD20 className="w-12 h-12 mb-2" />
@@ -1107,11 +1106,11 @@ export function MiniatureOverviewModal({
               {/* Types and Tags grid */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Types Card */}
-                <div className="border border-gray-700 rounded-lg overflow-hidden h-[300px] flex flex-col">
-                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
+                <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col max-h-[300px]">
+                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700 flex-shrink-0">
                     <h3 className="font-medium text-gray-200">Types</h3>
                   </div>
-                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40 relative">
+                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40">
                     <div className="relative">
                       <UI.SearchInput
                         value={typeSearchTerm}
@@ -1184,13 +1183,13 @@ export function MiniatureOverviewModal({
                           <ShowItems
                             items={Array.from(new Set(
                               selectedTypes.flatMap(type => 
-                                miniTypes.find(t => t.id === type.id)?.categories || []
-                              ).map(cat => cat.name)
+                                type.type?.categories?.map(cat => cat.category?.name).filter((name): name is string => !!name) || []
+                              )
                             )).sort((a, b) => a.localeCompare(b))}
                             displayType="pills"
-                            maxVisible={999}
                             scaleAnimation={true}
                             shadowEnabled={true}
+                            maxVisible={999}
                             itemStyle={{
                               text: 'text-orange-200',
                               bg: 'bg-orange-600/30',
@@ -1206,11 +1205,11 @@ export function MiniatureOverviewModal({
                 </div>
 
                 {/* Tags Card */}
-                <div className="border border-gray-700 rounded-lg overflow-hidden h-[300px] flex flex-col">
-                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700">
+                <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col max-h-[300px]">
+                  <div className="bg-gray-800 px-4 py-3 border-b border-gray-700 flex-shrink-0">
                     <h3 className="font-medium text-gray-200">Tags</h3>
                   </div>
-                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40 relative">
+                  <div className="p-4 space-y-3 flex-1 overflow-y-auto bg-gray-800/40">
                     <TagInput
                       value={tagInput}
                       onChange={setTagInput}
@@ -1229,29 +1228,25 @@ export function MiniatureOverviewModal({
                     />
                     
                     {selectedTags.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        <AnimatePresence>
-                          <ShowItems
-                            items={selectedTags.map(tag => tag.name).sort((a, b) => a.localeCompare(b))}
-                            displayType="pills"
-                            scaleAnimation={true}
-                            shadowEnabled={true}
-                            maxVisible={999}
-                            render={(tagName) => (
-                              <div className="flex items-center gap-1 px-2 py-1 pb-1.5 text-xs rounded-full bg-gray-700 cursor-default">
-                                <span>{tagName}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => handleTagRemove(selectedTags.find(t => t.name === tagName)?.id || 0)}
-                                  className="text-gray-400 hover:text-red-400 transition-colors"
-                                >
-                                  <FaTimesCircle className="w-3 h-3" />
-                                </button>
-                              </div>
-                            )}
-                          />
-                        </AnimatePresence>
-                      </div>
+                      <ShowItems
+                        items={selectedTags.map(tag => ({
+                          id: tag.id,
+                          label: tag.name
+                        }))}
+                        onItemRemove={(index) => handleTagRemove(selectedTags[index].id)}
+                        displayType="pills"
+                        scaleAnimation={true}
+                        shadowEnabled={true}
+                        maxVisible={999}
+                        itemStyle={{
+                          text: 'text-gray-200',
+                          bg: 'bg-gray-700',
+                          size: 'xs',
+                          border: 'border border-gray-600',
+                          hover: 'hover:bg-gray-600'
+                        }}
+                        showRemoveButton={true}
+                      />
                     )}
                   </div>
                 </div>

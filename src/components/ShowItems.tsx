@@ -1,175 +1,164 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FaQuestionCircle, FaTimesCircle } from 'react-icons/fa';
 
 export type TogglePlacement = 'start' | 'end' | 'right' | 'top';
 
 interface ShowItemsProps {
-  items: string[];
-  displayType: 'text' | 'pills';
+  items: (string | { id?: string | number; label?: string; name?: string })[];
+  displayType: 'pills' | 'text';
   maxVisible?: number;
-  toggle?: {
-    type: 'text' | 'icon';
-    more: React.ReactNode;
-    less: React.ReactNode;
-  };
-  togglePlacement?: TogglePlacement;
+  maxPerRow?: number;
+  scaleAnimation?: boolean;
+  shadowEnabled?: boolean;
+  showTooltip?: boolean;
+  tooltipTitle?: string;
+  textColor?: string;
   itemStyle?: {
     text?: string;
     bg?: string;
-    size?: 'xs' | 'sm' | 'md';
+    size?: 'xs' | 'sm' | 'base';
     border?: string;
     hover?: string;
   };
-  textColor?: string;
   emptyMessage?: string;
-  maxPerRow?: number;
-  shadowEnabled?: boolean;
-  scaleAnimation?: boolean;
-  render?: (item: string) => React.ReactNode;
+  showRemoveButton?: boolean;
+  onItemRemove?: (index: number) => void;
+  toggle?: boolean | {
+    type: string;
+    more: React.ReactNode;
+    less: React.ReactNode;
+  };
+  toggleStyle?: {
+    text?: string;
+    bg?: string;
+    border?: string;
+    hover?: string;
+  };
+  togglePlacement?: 'start' | 'end' | 'right' | 'top';
 }
 
 export function ShowItems({
   items,
-  displayType,
+  displayType = 'pills',
   maxVisible = 3,
-  toggle,
-  togglePlacement = 'end',
+  maxPerRow,
+  scaleAnimation = false,
+  shadowEnabled = false,
+  showTooltip = false,
+  tooltipTitle = 'Items',
+  textColor,
   itemStyle = {
     text: 'text-gray-200',
     bg: 'bg-gray-700',
     size: 'xs',
+    border: '',
+    hover: 'hover:bg-gray-600'
+  },
+  emptyMessage = 'No items',
+  showRemoveButton,
+  onItemRemove,
+  toggle,
+  toggleStyle = {
+    text: 'text-gray-400',
+    bg: 'bg-gray-700',
     border: 'border border-gray-600',
     hover: 'hover:bg-gray-600'
   },
-  textColor,
-  emptyMessage = 'No items',
-  maxPerRow = 3,
-  shadowEnabled = false,
-  scaleAnimation = false,
-  render
+  togglePlacement = 'end'
 }: ShowItemsProps) {
+  const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  const visibleItems = showAll ? items : items.slice(0, maxVisible);
-  const hasMore = items.length > maxVisible;
-
-  const getTextSize = () => {
-    switch (itemStyle.size) {
-      case 'xs': return 'text-xs';
-      case 'sm': return 'text-sm';
-      case 'md': return 'text-base';
-      default: return 'text-sm';
-    }
-  };
-
-  const getPillPadding = () => {
-    switch (itemStyle.size) {
-      case 'xs': return 'px-3 py-1 pb-1.5';
-      case 'sm': return 'px-4 py-1.5';
-      case 'md': return 'px-5 py-2';
-      default: return 'px-4 py-1.5';
-    }
-  };
-
-  const renderToggleButton = () => {
-    if (!toggle || !hasMore) return null;
-
-    const handleClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      setShowAll(!showAll);
-    };
-
-    return (
-      <button
-        onClick={handleClick}
-        className="inline-flex items-center gap-1 text-gray-400 hover:text-gray-300 transition-colors"
+  
+  const renderItem = (item: any, index: number) => {
+    const itemText = typeof item === 'string' ? item : item.label || item.name || ''
+    
+    const itemContent = (
+      <motion.div
+        key={typeof item === 'string' ? `${item}-${index}` : item.id || index}
+        initial={scaleAnimation ? { scale: 0.8, opacity: 0 } : undefined}
+        animate={scaleAnimation ? { scale: 1, opacity: 1 } : undefined}
+        transition={{ 
+          delay: scaleAnimation ? index * 0.05 : 0,
+          duration: 0.15
+        }}
+        className={`
+          inline-flex items-center gap-1
+          ${displayType === 'pills' ? 'rounded-full px-2 py-0.5' : ''}
+          ${itemStyle?.bg || 'bg-blue-500/20'}
+          ${itemStyle?.border || ''}
+          ${itemStyle?.hover || 'hover:bg-blue-500/30'}
+          ${shadowEnabled ? 'shadow-sm' : ''}
+          transition-colors
+          relative
+          ${maxPerRow ? 'w-auto' : ''}
+        `}
+        onMouseEnter={() => showTooltip && setIsTooltipVisible(true)}
+        onMouseLeave={() => showTooltip && setIsTooltipVisible(false)}
       >
-        {showAll ? toggle.less : toggle.more}
-      </button>
-    );
-  };
+        <span className={`
+          ${textColor || itemStyle?.text || 'text-blue-200'} 
+          ${itemStyle?.size === 'xs' ? 'text-xs' : 
+            itemStyle?.size === 'sm' ? 'text-sm' : 
+            'text-base'
+          }
+        `}>
+          {showTooltip && <FaQuestionCircle className="inline mr-1 text-gray-400" />}
+          {itemText}
+        </span>
+        {showRemoveButton && onItemRemove && (
+          <button
+            type="button"
+            onClick={() => onItemRemove(index)}
+            className="text-gray-400 hover:text-gray-300 transition-colors"
+          >
+            <FaTimesCircle className="w-3 h-3" />
+          </button>
+        )}
+        {showTooltip && isTooltipVisible && (
+          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-xs text-gray-200 rounded shadow-lg whitespace-nowrap">
+            {tooltipTitle}
+          </div>
+        )}
+      </motion.div>
+    )
 
-  const pillClasses = `
-    inline-block whitespace-nowrap rounded-full cursor-default
-    ${shadowEnabled ? 'shadow-sm shadow-gray-900' : ''}
-    ${getPillPadding()}
-    ${getTextSize()}
-    ${itemStyle.text}
-    ${itemStyle.bg}
-    ${itemStyle.border}
-    ${itemStyle.hover}
-    transition-colors duration-200
-  `;
+    return itemContent;
+  }
 
-  const renderItems = () => {
-    if (items.length === 0) {
-      return <span className="text-gray-500 italic">{emptyMessage}</span>;
-    }
+  if (items.length === 0) {
+    return <div className="text-sm text-gray-500">{emptyMessage}</div>
+  }
 
-    if (displayType === 'pills') {
-      return (
-        <div className="flex flex-wrap gap-1">
-          <AnimatePresence>
-            {visibleItems.map((item, index) => {
-              const content = render ? render(item) : item;
-              
-              return scaleAnimation ? (
-                <motion.div
-                  key={index}
-                  initial={{ opacity: 0, scale: 0.3 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ 
-                    type: "spring",
-                    stiffness: 500,
-                    damping: 15,
-                    mass: 1,
-                    delay: index * 0.1 
-                  }}
-                >
-                  {render ? content : (
-                    <span className={pillClasses}>
-                      {content}
-                    </span>
-                  )}
-                </motion.div>
-              ) : (
-                <div key={index}>
-                  {render ? content : (
-                    <span className={pillClasses}>
-                      {content}
-                    </span>
-                  )}
-                </div>
-              )
-            })}
-          </AnimatePresence>
-        </div>
-      );
-    }
-
-    return (
-      <span className={`
-        ${getTextSize()} 
-        ${textColor || itemStyle.text}
-        ${shadowEnabled ? 'drop-shadow-sm' : ''}
-      `}>
-        {visibleItems.join(', ')}
+  const toggleButton = toggle && items.length > maxVisible && (
+    <button
+      type="button"
+      onClick={() => setShowAll(!showAll)}
+      className={`
+        inline-flex items-center gap-1 rounded-full px-2 py-0.5
+        ${toggleStyle?.bg || 'bg-gray-700'}
+        ${toggleStyle?.border || 'border border-gray-600'}
+        ${toggleStyle?.hover || 'hover:bg-gray-600'}
+        transition-colors
+      `}
+    >
+      <span className={toggleStyle?.text || 'text-gray-400'}>
+        {typeof toggle === 'object' 
+          ? (showAll ? toggle.less : toggle.more)
+          : (showAll ? 'Show Less' : `+${items.length - maxVisible} More`)}
       </span>
-    );
-  };
-
-  const toggleButton = renderToggleButton();
+    </button>
+  );
 
   return (
-    <div className="flex items-center gap-2">
+    <div className={`flex flex-wrap gap-1.5 ${maxPerRow ? 'justify-start' : ''}`}>
       {togglePlacement === 'start' && toggleButton}
-      {togglePlacement === 'top' && (
-        <div className="flex flex-col items-start gap-1">
-          {toggleButton}
-          {renderItems()}
-        </div>
-      )}
-      {togglePlacement !== 'top' && renderItems()}
-      {['end', 'right'].includes(togglePlacement) && toggleButton}
+      <div className={`flex flex-wrap gap-1.5 ${togglePlacement === 'top' ? 'w-full' : ''}`}>
+        <AnimatePresence mode="sync">
+          {items.slice(0, showAll ? items.length : maxVisible).map((item, index) => renderItem(item, index))}
+        </AnimatePresence>
+      </div>
+      {(togglePlacement === 'end' || togglePlacement === 'right') && toggleButton}
     </div>
-  );
+  )
 } 

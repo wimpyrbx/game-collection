@@ -1,13 +1,6 @@
-interface InputProps {
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string
-  value: string
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
-  placeholder?: string
-  type?: string
-  className?: string
-  required?: boolean
-  autoFocus?: boolean
-  error?: string
+  helper?: string
 }
 
 export function Input({
@@ -19,7 +12,6 @@ export function Input({
   className = "",
   required,
   autoFocus,
-  error
 }: InputProps) {
   return (
     <div>

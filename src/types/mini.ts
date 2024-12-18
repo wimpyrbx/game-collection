@@ -19,6 +19,7 @@ export interface Mini {
       id: number
       name: string
       categories: Array<{
+        [x: string]: any
         category: {
           id: number
           name: string

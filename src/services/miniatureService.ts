@@ -182,22 +182,49 @@ export async function deleteMiniature(miniId: number) {
   }
 }
 
-export const getMiniature = async (id: number) => {
+export async function getMiniature(id: number) {
   const { data, error } = await supabase
     .from('minis')
     .select(`
       *,
-      painted_by:painted_by_id(*),
-      base_size:base_size_id(*),
-      product_sets(*),
       types:mini_to_types(
-        type:type_id(*),
-        proxy_type
+        type_id,
+        proxy_type,
+        type:mini_types(
+          id,
+          name,
+          categories:type_to_categories(
+            category:mini_categories(
+              id,
+              name
+            )
+          )
+        )
       ),
       tags:mini_to_tags(
         tag:tags(
           id,
           name
+        )
+      ),
+      painted_by:painted_by(
+        id,
+        painted_by_name
+      ),
+      base_size:base_sizes(
+        id,
+        base_size_name
+      ),
+      product_sets:product_sets(
+        id,
+        name,
+        product_line:product_lines(
+          id,
+          name,
+          company:product_companies(
+            id,
+            name
+          )
         )
       )
     `)
@@ -205,15 +232,6 @@ export const getMiniature = async (id: number) => {
     .single()
 
   if (error) throw error
-
-  // Transform the tags data structure to match what the component expects
-  if (data && data.tags) {
-    data.tags = data.tags.map((tagRel: any) => ({
-      id: tagRel.tag.id,
-      name: tagRel.tag.name
-    }))
-  }
-
   return data
 }
 

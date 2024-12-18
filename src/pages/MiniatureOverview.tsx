@@ -30,7 +30,7 @@ export default function MiniatureOverview() {
   const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
   const itemsPerPage = 10
 
-  const { 
+  const {
     minis, 
     loading, 
     error, 
@@ -104,6 +104,12 @@ export default function MiniatureOverview() {
     const typeNames = mini.types?.map(t => t.type.name) || []
     const tagNames = mini.tags?.map(t => t.tag?.name).filter(Boolean) || []
     
+    const categoryNames = mini.types?.flatMap(t => 
+      t.type.categories?.map(category => category.name) || []
+    ).filter((name, index, self) => 
+      name && self.indexOf(name) === index
+    ) || []
+
     const company = mini.product_sets?.product_line?.company?.name
     const productLine = mini.product_sets?.product_line?.name
     const productSet = mini.product_sets?.name
@@ -117,33 +123,11 @@ export default function MiniatureOverview() {
       )
       : <span className="text-xs text-gray-500">no product set</span>
 
-    const location = mini.location || 'No location'
-    const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
-    const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
-    const infoDisplay = (
-      <div className="space-y-0.5">
-        <div className="text-xs"><span className="text-gray-400">Location:</span> <span className="text-gray-300">{location}</span></div>
-        <div className="text-xs"><span className="text-gray-400">Painted By:</span> <span className="text-gray-300">{paintedBy}</span></div>
-        <div className="text-xs"><span className="text-gray-400">Base Size:</span> <span className="text-gray-300">{baseSize}</span></div>
-      </div>
-    )
-
-    const quantity = mini.quantity || 0
-
-    const thumbPath = getMiniImagePath(mini.id, 'thumb')
-
-    // Example Toggle for ShowItems
-    const showItemsToggle = {
-      type: 'icon' as const,
-      more: <span className="text-gray-200 text-xs">(Show More)</span>,
-      less: <span className="text-gray-200 text-xs">(Show Less)</span>,
-    };
-
     return [
       <div key="name" className="flex items-center gap-4">
         <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-800 flex items-center justify-center">
           <img
-            src={thumbPath}
+            src={getMiniImagePath(mini.id, 'thumb')}
             alt={mini.name}
             loading="lazy"
             className="w-full h-full object-cover"
@@ -157,40 +141,65 @@ export default function MiniatureOverview() {
         </div>
         <span>{mini.name}</span>
       </div>,
-      <ShowItems 
-        key="types" 
-        items={typeNames} 
-        displayType="pills"
-        itemStyle={{
-          text: 'text-gray-200',
-          bg: 'bg-orange-900',
-          size: 'xs',
-          border: '',
-          hover: 'hover:bg-orange-800'
-        }}
-        maxVisible={4}
-        toggle={showItemsToggle}
-        emptyMessage="-"
-      />,
-      <ShowItems 
-        key="tags" 
-        items={tagNames} 
-        displayType="pills"
-        maxPerRow={4}
-        itemStyle={{
-          text: 'text-gray-300',
-          bg: 'bg-cyan-900',
-          size: 'xs',
-          border: '',
-          hover: 'hover:bg-cyan-800'
-        }}
-        maxVisible={8}
-        toggle={showItemsToggle}
-        emptyMessage="-"
-      />,
+      <div key="categories" className="min-w-[150px]">
+        <ShowItems 
+          items={categoryNames} 
+          displayType="pills"
+          scaleAnimation={true}
+          shadowEnabled={true}
+          itemStyle={{
+            text: 'text-gray-200',
+            bg: 'bg-purple-900',
+            size: 'xs',
+            border: '',
+            hover: 'hover:bg-purple-800'
+          }}
+          maxVisible={3}
+          emptyMessage="-"
+        />
+      </div>,
+      <div key="types" className="min-w-[150px]">
+        <ShowItems 
+          items={typeNames} 
+          displayType="pills"
+          scaleAnimation={true}
+          shadowEnabled={true}
+          showTooltip={true}
+          tooltipTitle="Types"
+          maxPerRow={4}
+          itemStyle={{
+            text: 'text-gray-200',
+            bg: 'bg-orange-900',
+            size: 'xs',
+            border: '',
+            hover: 'hover:bg-orange-800'
+          }}
+          maxVisible={3}
+          emptyMessage="-"
+        />
+      </div>,
+      <div key="tags" className="min-w-[200px]">
+        <ShowItems 
+          items={tagNames} 
+          displayType="pills"
+          scaleAnimation={true}
+          shadowEnabled={true}
+          showTooltip={true}
+          tooltipTitle="Tags"
+          maxPerRow={4}
+          itemStyle={{
+            text: 'text-white',
+            bg: 'bg-cyan-700',
+            size: 'xs',
+            border: '',
+            hover: 'hover:bg-cyan-600'
+          }}
+          maxVisible={3}
+          emptyMessage="-"
+        />
+      </div>,
       productSetDisplay,
-      infoDisplay,
-      <div key="quantity" className="text-center">{quantity}</div>,
+      <div key="quantity" className="text-center">{mini.quantity || 0}</div>,
       <div 
         key="switch"
         onClick={(e) => {
@@ -203,7 +212,6 @@ export default function MiniatureOverview() {
           onChange={async (checked) => {
             try {
               await updateMiniatureInUse(mini.id, checked);
-              // Refresh the current page with current search term
               const updatedMinis = await getPageMinis(currentPage);
               if (updatedMinis) {
                 setMinis(updatedMinis);
@@ -220,10 +228,10 @@ export default function MiniatureOverview() {
 
   const columnHeaders = [
     'Name',
+    'Categories',
     'Types',
     'Tags',
     'Product Set',
-    'Info',
     { title: 'QTY', className: 'text-center w-20' },
     { title: 'In Use', className: 'text-center w-20' }
   ]
