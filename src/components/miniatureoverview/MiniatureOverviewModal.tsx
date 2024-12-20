@@ -786,15 +786,21 @@ export function MiniatureOverviewModal({
 
   // Add this effect to update dropdown position
   useEffect(() => {
-    if (showTypeDropdown && searchContainerRef.current) {
-      const rect = searchContainerRef.current.getBoundingClientRect()
+    let mounted = true;
+
+    if (showTypeDropdown && searchContainerRef.current && mounted) {
+      const rect = searchContainerRef.current.getBoundingClientRect();
       setDropdownStyle({
         width: rect.width,
         left: rect.left,
         top: rect.bottom + 4 // 4px gap
-      })
+      });
     }
-  }, [showTypeDropdown, typeSearchTerm])
+
+    return () => {
+      mounted = false;
+    };
+  }, [showTypeDropdown, typeSearchTerm]);
 
   // Add this with your other refs
   const tagSearchContainerRef = useRef<HTMLDivElement>(null)
@@ -808,25 +814,39 @@ export function MiniatureOverviewModal({
 
   // Add this effect to update tag dropdown position
   useEffect(() => {
-    if (tagSearchContainerRef.current) {
-      const rect = tagSearchContainerRef.current.getBoundingClientRect()
+    let mounted = true;
+
+    if (tagSearchContainerRef.current && mounted) {
+      const rect = tagSearchContainerRef.current.getBoundingClientRect();
       setTagDropdownStyle({
         width: rect.width,
         left: rect.left,
         top: rect.bottom + 4 // 4px gap
-      })
+      });
     }
-  }, [tagInput])
+
+    return () => {
+      mounted = false;
+    };
+  }, [tagInput]);
 
   // Add useEffect to reset search fields when miniId changes
   useEffect(() => {
-    // Reset search fields when switching miniatures
-    setTypeSearchTerm('')
-    setTagInput('')
-    setShowTypeDropdown(false)
-    setProductSearchTerm('')  // Clear product search term
-    setShowProductDropdown(false)  // Hide product dropdown
-  }, [miniData]) // Add miniData as dependency
+    let mounted = true;
+
+    if (mounted) {
+      // Reset search fields when switching miniatures
+      setTypeSearchTerm('');
+      setTagInput('');
+      setShowTypeDropdown(false);
+      setProductSearchTerm('');  // Clear product search term
+      setShowProductDropdown(false);  // Hide product dropdown
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [miniData]); // Add miniData as dependency
 
   // First, make sure we're getting the categories from all types
   const selectedTypeCategories = useMemo(() => {
@@ -902,15 +922,9 @@ export function MiniatureOverviewModal({
     // Check if new miniature has an image
     if (miniData?.id) {
       const imagePath = getMiniImagePath(miniData.id, 'original');
-      // console.log('Checking for image:', {
-      //   miniId: miniData.id,
-      //   imagePath,
-      //   timestamp: new Date().getTime()
-      // });
 
       const img = new Image();
       img.onload = () => {
-        console.log('Image loaded successfully:', imagePath);
         setImageExists(true);
       };
       img.onerror = (e) => {
@@ -966,8 +980,44 @@ export function MiniatureOverviewModal({
 
   if (isOpen && !miniData) {
     return (
-      <UI.Modal isOpen={isOpen} onClose={onClose}>
-        <UI.LoadingSpinner message="Loading miniature data..." />
+      <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
+        <form onSubmit={handleSubmit} className="flex flex-col max-h-[calc(100vh-8rem)]">
+          <UI.ModalHeader>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-4">
+                <div className="text-xl text-blue-600">
+                  <FaDiceD6 />
+                </div>
+                <h2 className="text-xl font-semibold">
+                  Add New Miniature
+                </h2>
+              </div>
+            </div>
+          </UI.ModalHeader>
+
+          <UI.ModalBody className="flex-1">
+            {/* ... existing form content ... */}
+          </UI.ModalBody>
+
+          <UI.ModalFooter>
+            <div className="flex gap-2 ml-auto">
+              <UI.Button
+                variant="btnPrimary"
+                onClick={onClose}
+                type="button"
+              >
+                Cancel
+              </UI.Button>
+              <UI.Button
+                variant="btnSuccess"
+                type="submit"
+                disabled={isLoading}
+              >
+                {isLoading ? 'Adding...' : 'Add Miniature'}
+              </UI.Button>
+            </div>
+          </UI.ModalFooter>
+        </form>
       </UI.Modal>
     );
   }
@@ -992,8 +1042,8 @@ export function MiniatureOverviewModal({
 
   return (
     <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
-      {/* Update navigation buttons */}
-      {onPrevious && (
+      {/* Update navigation buttons to only show when editing */}
+      {miniData?.id && onPrevious && (
         <button
           onClick={handlePrevious}
           disabled={!hasPrevious}
@@ -1004,7 +1054,7 @@ export function MiniatureOverviewModal({
         </button>
       )}
       
-      {onNext && (
+      {miniData?.id && onNext && (
         <button
           onClick={handleNext}
           disabled={!hasNext}
@@ -1023,11 +1073,11 @@ export function MiniatureOverviewModal({
                 <FaDiceD6 />
               </div>
               <h2 className="text-xl font-semibold">
-                {isEditMode ? 'Edit Miniature' : 'Add New Miniature'}
+                {miniData?.id ? 'Edit Miniature' : 'Add New Miniature'}
               </h2>
             </div>
             <div className="flex items-center gap-4 p-0">
-              {isEditMode && miniData?.created_at && (
+              {miniData?.id && miniData?.created_at && (
                 <div className="italic text-right text-xs text-gray-400">
                   ID: <span className="text-gray-300">{miniData.id}</span>
                   <br />
@@ -1040,7 +1090,7 @@ export function MiniatureOverviewModal({
                   }).replace(',', '')}</span>
                 </div>
               )}
-              {isEditMode && miniData?.in_use && (
+              {miniData?.in_use && (
                 <div className="flex items-center gap-1 px-1 py-1 m-0 bg-red-500/30 border border-red-500/20 rounded h-[23px] text-red-500 text-xs">
                   <FaExclamationTriangle className="text-yellow-500 w-4 h-4 ml-1 mr-2" />
                   <span className="text-gray-300">In Use: <span className="text-xs text-gray-400">

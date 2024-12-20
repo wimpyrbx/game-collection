@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 interface UseAdminPaginationProps {
   itemsPerPage?: number
@@ -28,13 +28,6 @@ export function useAdminPagination({
 }: UseAdminPaginationProps = {}): UseAdminPaginationReturn {
   const [currentPage, setCurrentPage] = useState(defaultPage)
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage))
-
-  // Ensure current page is within valid range
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(Math.max(1, totalPages))
-    }
-  }, [totalPages, currentPage])
 
   const handlePageChange = (page: number) => {
     // Ensure page is within valid range

@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabaseMonitor'
 
 export function useMiniAdmin() {
   const loadMinis = useCallback(async (

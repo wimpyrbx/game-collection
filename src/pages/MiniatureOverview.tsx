@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FaTable, FaDiceD6, FaThLarge, FaShareAltSquare, FaDiceD20 } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
@@ -31,6 +31,7 @@ export default function MiniatureOverview() {
   const [allMinis, setAllMinis] = useState<Mini[]>([])
   const [imageTimestamp, setImageTimestamp] = useState(() => Date.now())
   const itemsPerPage = 12
+  const initialLoadRef = useRef(true)
 
   const {
     paintedByOptions,
@@ -48,48 +49,82 @@ export default function MiniatureOverview() {
     setMinis, 
     getTotalQuantity,
     currentPage,
-    setCurrentPage 
-  } = useMinis(1, itemsPerPage, miniSearch.searchTerm)
+    setCurrentPage,
+    invalidateCache
+  } = useMinis(itemsPerPage, miniSearch.searchTerm)
 
   const { showSuccess, showError } = useNotifications()
 
   // Preload images for adjacent pages
   useEffect(() => {
     if (!loading && totalMinis) {
+      // Skip preloading on initial load
+      if (initialLoadRef.current) {
+        initialLoadRef.current = false
+        return
+      }
+
       const totalPages = Math.ceil(totalMinis / itemsPerPage)
+      
+      // Skip if we don't have any minis yet
+      if (minis.length === 0) return
+
+      // Use Promise.all to load both pages in parallel if needed
+      const preloadPromises: Promise<void>[] = []
       
       // Preload next page
       if (currentPage < totalPages) {
-        getPageMinis(currentPage + 1).then(nextPageMinis => {
-          preloadImages(nextPageMinis)
-        })
+        preloadPromises.push(
+          getPageMinis(currentPage + 1).then(nextPageMinis => {
+            preloadImages(nextPageMinis)
+          })
+        )
       }
       
       // Preload previous page
       if (currentPage > 1) {
-        getPageMinis(currentPage - 1).then(prevPageMinis => {
-          preloadImages(prevPageMinis)
-        })
+        preloadPromises.push(
+          getPageMinis(currentPage - 1).then(prevPageMinis => {
+            preloadImages(prevPageMinis)
+          })
+        )
       }
+
+      // Wait for all preloads to complete
+      Promise.all(preloadPromises).catch(error => {
+        console.error('Error preloading images:', error)
+      })
     }
-  }, [currentPage, loading, totalMinis, getPageMinis])
+  }, [currentPage, loading, totalMinis, getPageMinis, minis.length])
 
   // Add useEffect to load all minis when needed
   useEffect(() => {
+    let mounted = true;
+
     if (isModalOpen) {
       const loadAllMinis = async () => {
-        const allMinisData = await getAllMinis()
-        setAllMinis(allMinisData)
-      }
-      loadAllMinis()
+        try {
+          const allMinisData = await getAllMinis();
+          if (mounted) {
+            setAllMinis(allMinisData);
+          }
+        } catch (error) {
+          console.error('Error loading all minis:', error);
+        }
+      };
+      loadAllMinis();
     }
-  }, [isModalOpen, getAllMinis])
+
+    return () => {
+      mounted = false;
+    };
+  }, [isModalOpen]);
 
   // Update handleEdit to use the global index
   const handleEdit = async (mini: Mini, localIndex: number) => {
-    const globalIndex = (currentPage - 1) * itemsPerPage + localIndex
-    await loadMiniature(mini, globalIndex)
-  }
+    const globalIndex = (currentPage - 1) * itemsPerPage + localIndex;
+    await loadMiniature(mini, globalIndex);
+  };
 
   const handlePrevious = async () => {
     if (selectedMiniIndex > 0 && allMinis.length > 0) {
@@ -147,17 +182,21 @@ export default function MiniatureOverview() {
         }
       } else {
         // Handle page navigation
+        const maxPage = Math.max(1, Math.ceil((totalMinis || 0) / itemsPerPage))
+        
         if (e.key === 'ArrowLeft' && currentPage > 1) {
-          setCurrentPage(prev => prev - 1)
-        } else if (e.key === 'ArrowRight' && currentPage < Math.ceil((totalMinis || 0) / itemsPerPage)) {
-          setCurrentPage(prev => prev + 1)
+          const newPage = Math.max(1, currentPage - 1)
+          setCurrentPage(newPage)
+        } else if (e.key === 'ArrowRight' && currentPage < maxPage) {
+          const newPage = Math.min(maxPage, currentPage + 1)
+          setCurrentPage(newPage)
         }
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentPage, totalMinis, isModalOpen, selectedMiniIndex, allMinis.length, handlePrevious, handleNext])
+  }, [currentPage, totalMinis, isModalOpen, selectedMiniIndex, allMinis.length, handlePrevious, handleNext, itemsPerPage])
 
   const refreshImages = () => setImageTimestamp(Date.now())
 
@@ -391,12 +430,17 @@ export default function MiniatureOverview() {
       // Wait a bit to let the modal close animation finish
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Refresh the minis list for the current page with current search term
-      const updatedMinis = await getPageMinis(currentPage);
+      // Invalidate the cache to force a fresh fetch
+      invalidateCache();
+
+      // Refresh all data in a single batch
+      const [updatedMinis, newTotalQuantity] = await Promise.all([
+        getPageMinis(currentPage),
+        getTotalQuantity()
+      ]);
+
+      // Update states
       setMinis(updatedMinis);
-      await getTotalQuantity();
-      
-      // Force refresh of images
       refreshImages();
       
       // If we were editing a miniature, update the selected miniature with the new data
@@ -406,8 +450,7 @@ export default function MiniatureOverview() {
           setSelectedMini(updatedMini);
         }
       }
-      
-      showSuccess(`Miniature ${selectedMini ? 'updated' : 'added'} successfully`);
+    
     } catch (error) {
       console.error('Error saving miniature:', error);
       showError('Failed to save miniature');
@@ -605,9 +648,9 @@ export default function MiniatureOverview() {
                   <div className="grid grid-cols-4 auto-rows-fr gap-2 h-[calc(92vh-22rem)] overflow-y-auto p-5">
                     {minis.map((mini, index) => {
                       const originalPath = `${getMiniImagePath(mini.id, 'original')}?t=${imageTimestamp}`
-                      const company = mini.product_sets?.product_line?.company?.name || 'No company'
-                      const productLine = mini.product_sets?.product_line?.name || 'No product line'
-                      const productSet = mini.product_sets?.name || 'No set'
+                      const company = mini.product_sets?.product_line?.company?.name
+                      const productLine = mini.product_sets?.product_line?.name
+                      const productSet = mini.product_sets?.name
                       const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
                       const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
                       const quantity = mini.quantity || 0
@@ -698,34 +741,38 @@ export default function MiniatureOverview() {
 
                             {/* Middle Content - Scrollable if needed */}
                             <div className="flex-1 min-h-0 mt-2">
-                              {company && (
-                                <div className="flex flex-col items-start gap-1 mb-1.5">
-                                  <img
-                                    src={getCompanyLogoPath(company)}
-                                    alt={company}
-                                    className="h-5 w-auto object-contain opacity-90 mb-0.5"
-                                    onError={(e) => {
-                                      e.currentTarget.style.display = 'none';
-                                    }}
-                                  />
-                                  <p className="text-blue-400 text-sm">{company}</p>
-                                </div>
-                              )}
-                              {productLine && productSet && (
-                                productLine.toLowerCase() === productSet.toLowerCase() ? (
-                                  <p className="text-gray-300 text-xs truncate">
-                                    {productSet}
-                                  </p>
-                                ) : (
-                                  <>
-                                    <p className="text-gray-300 text-xs truncate">
-                                      {productLine}
-                                    </p>
-                                    <p className="text-gray-400 text-xs truncate">
-                                      {productSet}
-                                    </p>
-                                  </>
-                                )
+                              {mini.product_sets && (
+                                <>
+                                  {company && (
+                                    <div className="flex flex-col items-start gap-1 mb-1.5">
+                                      <img
+                                        src={getCompanyLogoPath(company)}
+                                        alt={company}
+                                        className="h-5 w-auto object-contain opacity-90 mb-0.5"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                      <p className="text-blue-400 text-sm">{company}</p>
+                                    </div>
+                                  )}
+                                  {productLine && productSet && (
+                                    productLine.toLowerCase() === productSet.toLowerCase() ? (
+                                      <p className="text-gray-300 text-xs truncate">
+                                        {productSet}
+                                      </p>
+                                    ) : (
+                                      <>
+                                        <p className="text-gray-300 text-xs truncate">
+                                          {productLine}
+                                        </p>
+                                        <p className="text-gray-300 text-xs truncate">
+                                          {productSet}
+                                        </p>
+                                      </>
+                                    )
+                                  )}
+                                </>
                               )}
                             </div>
 

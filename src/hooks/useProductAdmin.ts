@@ -1,73 +1,324 @@
 // src/hooks/useProductAdmin.ts
-import { useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, useCallback } from 'react'
+import { supabase } from '../lib/supabaseMonitor'
+
+interface Company {
+  id: number
+  name: string
+}
+
+interface ProductLine {
+  id: number
+  name: string
+  company_id: number
+}
+
+interface ProductSet {
+  id: number
+  name: string
+  product_line_id: number
+}
+
+interface Cache {
+  companies: Company[]
+  productLines: ProductLine[]
+  productSets: ProductSet[]
+  timestamp: number
+  searchTerm: string
+}
+
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Singleton cache manager
+class ProductCache {
+  private static instance: ProductCache
+  private cache: Cache | null = null
+  private loadPromise: Promise<Cache> | null = null
+
+  private constructor() {}
+
+  static getInstance(): ProductCache {
+    if (!ProductCache.instance) {
+      ProductCache.instance = new ProductCache()
+    }
+    return ProductCache.instance
+  }
+
+  isValid(): boolean {
+    if (!this.cache) return false
+    if (Date.now() - this.cache.timestamp > CACHE_DURATION) return false
+    return true
+  }
+
+  get data(): Cache | null {
+    return this.cache
+  }
+
+  invalidate(): void {
+    console.log('Invalidating product cache')
+    this.cache = null
+    this.loadPromise = null
+  }
+
+  private async fetchAllPages<T>(
+    query: (page: number) => Promise<{ data: T[] | null; error: any }>,
+    pageSize: number = 1000
+  ): Promise<T[]> {
+    let allData: T[] = []
+    let page = 0
+    
+    while (true) {
+      const { data, error } = await query(page)
+      if (error) throw error
+      if (!data || data.length === 0) break
+      
+      allData = [...allData, ...data]
+      if (data.length < pageSize) break
+      page++
+    }
+    
+    return allData
+  }
+
+  async loadData(): Promise<Cache> {
+    // If we're already loading, return the existing promise
+    if (this.loadPromise) {
+      return this.loadPromise
+    }
+
+    // Start new load
+    this.loadPromise = (async () => {
+      console.log('Fetching fresh product data')
+      
+      // Single query to fetch all related data, sorted at each level
+      const { data, error } = await supabase
+        .from('product_companies')
+        .select(`
+          id,
+          name,
+          product_lines:product_lines!company_id(
+            id,
+            name,
+            company_id,
+            product_sets:product_sets!product_line_id(
+              id,
+              name,
+              product_line_id
+            )
+          )
+        `)
+        .order('name')
+
+      if (error) throw error
+
+      // Transform the nested data into flat arrays, sorting at each level
+      const companies: Company[] = []
+      const productLines: ProductLine[] = []
+      const productSets: ProductSet[] = []
+
+      data?.forEach(company => {
+        companies.push({ id: company.id, name: company.name })
+        
+        // Sort product lines for this company
+        const sortedLines = [...(company.product_lines || [])].sort((a, b) => 
+          a.name.localeCompare(b.name)
+        )
+        
+        sortedLines.forEach(line => {
+          productLines.push({
+            id: line.id,
+            name: line.name,
+            company_id: line.company_id
+          })
+          
+          // Sort product sets for this line
+          const sortedSets = [...(line.product_sets || [])].sort((a, b) => 
+            a.name.localeCompare(b.name)
+          )
+          
+          sortedSets.forEach(set => {
+            productSets.push({
+              id: set.id,
+              name: set.name,
+              product_line_id: set.product_line_id
+            })
+          })
+        })
+      })
+
+      const newCache: Cache = {
+        companies,
+        productLines,
+        productSets,
+        timestamp: Date.now(),
+        searchTerm: ''
+      }
+
+      this.cache = newCache
+      return newCache
+    })()
+
+    try {
+      const result = await this.loadPromise
+      this.loadPromise = null
+      return result
+    } catch (error) {
+      this.loadPromise = null
+      throw error
+    }
+  }
+
+  getCompanyLines(companyId: number): ProductLine[] {
+    if (!this.cache) return []
+    return this.cache.productLines.filter(line => line.company_id === companyId)
+  }
+
+  getLineSets(lineId: number): ProductSet[] {
+    if (!this.cache) return []
+    return this.cache.productSets.filter(set => set.product_line_id === lineId)
+  }
+}
 
 export function useProductAdmin() {
   const [error, setError] = useState<string>('')
+  const cache = ProductCache.getInstance()
+
+  const invalidateCache = useCallback(() => {
+    cache.invalidate()
+  }, [])
+
+  const filterAndPaginateData = useCallback((
+    data: any[],
+    offset: number,
+    limit: number,
+    searchTerm: string
+  ) => {
+    // Only filter if there's actually a search term
+    const filtered = searchTerm.trim()
+      ? data.filter(item => 
+          item.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : data
+
+    const startIndex = offset
+    const endIndex = offset + limit
+    const pageItems = filtered.slice(startIndex, endIndex)
+
+    return {
+      items: pageItems,
+      totalCount: filtered.length
+    }
+  }, [])
 
   const loadCompanies = async (offset: number, limit: number, search = '') => {
-    let query = supabase
-      .from('product_companies')
-      .select('*', { count: 'exact' })
-      
-    if (search) {
-      query = query.ilike('name', `%${search}%`)
-    }
-    
-    const { data, error, count } = await query
-      .range(offset, offset + limit - 1)
-      .order('name')
+    try {
+      if (!cache.isValid()) {
+        await cache.loadData()
+      }
 
-    if (error) {
-      console.error('Error loading companies:', error)
+      const cacheData = cache.data!
+      
+      // Skip filtering if no search term
+      if (!search.trim()) {
+        const startIndex = offset
+        const endIndex = offset + limit
+        const pageCompanies = cacheData.companies.slice(startIndex, endIndex)
+        
+        return {
+          data: pageCompanies,
+          count: cacheData.companies.length
+        }
+      }
+
+      const { items: pageCompanies, totalCount } = filterAndPaginateData(
+        cacheData.companies,
+        offset,
+        limit,
+        search
+      )
+
+      return {
+        data: pageCompanies,
+        count: totalCount
+      }
+    } catch (err) {
+      console.error('Error loading companies:', err)
       return { data: [], count: 0 }
     }
-
-    return { data, count }
   }
 
   const loadProductLines = async (companyId: number, offset: number, limit: number, search = '') => {
-    let query = supabase
-      .from('product_lines')
-      .select('*', { count: 'exact' })
-      .eq('company_id', companyId)
+    try {
+      if (!cache.isValid()) {
+        await cache.loadData()
+      }
+
+      const companyLines = cache.getCompanyLines(companyId)
       
-    if (search) {
-      query = query.ilike('name', `%${search}%`)
-    }
-    
-    const { data, error, count } = await query
-      .range(offset, offset + limit - 1)
-      .order('name')
-    
-    if (error) {
-      console.error('Error loading product lines:', error)
+      // Skip filtering if no search term
+      if (!search.trim()) {
+        const startIndex = offset
+        const endIndex = offset + limit
+        const pageLines = companyLines.slice(startIndex, endIndex)
+        
+        return {
+          data: pageLines,
+          count: companyLines.length
+        }
+      }
+
+      const { items: pageLines, totalCount } = filterAndPaginateData(
+        companyLines,
+        offset,
+        limit,
+        search
+      )
+
+      return {
+        data: pageLines,
+        count: totalCount
+      }
+    } catch (err) {
+      console.error('Error loading product lines:', err)
       return { data: [], count: 0 }
     }
-
-    return { data, count }
   }
 
   const loadProductSets = async (lineId: number, offset: number, limit: number, search = '') => {
-    let query = supabase
-      .from('product_sets')
-      .select('*', { count: 'exact' })
-      .eq('product_line_id', lineId)
+    try {
+      if (!cache.isValid()) {
+        await cache.loadData()
+      }
+
+      const lineSets = cache.getLineSets(lineId)
       
-    if (search) {
-      query = query.ilike('name', `%${search}%`)
-    }
-    
-    const { data, error, count } = await query
-      .range(offset, offset + limit - 1)
-      .order('name')
-    
-    if (error) {
-      console.error('Error loading product sets:', error)
+      // Skip filtering if no search term
+      if (!search.trim()) {
+        const startIndex = offset
+        const endIndex = offset + limit
+        const pageSets = lineSets.slice(startIndex, endIndex)
+        
+        return {
+          data: pageSets,
+          count: lineSets.length
+        }
+      }
+
+      const { items: pageSets, totalCount } = filterAndPaginateData(
+        lineSets,
+        offset,
+        limit,
+        search
+      )
+
+      return {
+        data: pageSets,
+        count: totalCount
+      }
+    } catch (err) {
+      console.error('Error loading product sets:', err)
       return { data: [], count: 0 }
     }
-
-    return { data, count }
   }
 
   const addCompany = async (name: string) => {
@@ -81,6 +332,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { data }
   }
 
@@ -98,6 +350,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { data }
   }
 
@@ -115,6 +368,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { data }
   }
 
@@ -130,6 +384,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { data }
   }
 
@@ -145,6 +400,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { data }
   }
 
@@ -160,42 +416,31 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { data }
   }
 
   const checkCompanyUsage = async (companyId: number) => {
-    const { data, error } = await supabase
-      .from('product_lines')
-      .select('id')
-      .eq('company_id', companyId)
-      .limit(1)
-
-    if (error) {
-      setError(error.message)
-      return { canDelete: false, error: error.message }
+    if (!cache.isValid()) {
+      await cache.loadData()
     }
 
+    const companyLines = cache.getCompanyLines(companyId)
     return {
-      canDelete: !data?.length,
-      inUseBy: data?.length ? { lines: true } : null
+      canDelete: companyLines.length === 0,
+      inUseBy: companyLines.length ? { lines: true } : null
     }
   }
 
   const checkLineUsage = async (lineId: number) => {
-    const { data, error } = await supabase
-      .from('product_sets')
-      .select('id')
-      .eq('product_line_id', lineId)
-      .limit(1)
-
-    if (error) {
-      setError(error.message)
-      return { canDelete: false, error: error.message }
+    if (!cache.isValid()) {
+      await cache.loadData()
     }
 
+    const lineSets = cache.getLineSets(lineId)
     return {
-      canDelete: !data?.length,
-      inUseBy: data?.length ? { sets: true } : null
+      canDelete: lineSets.length === 0,
+      inUseBy: lineSets.length ? { sets: true } : null
     }
   }
 
@@ -241,6 +486,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { error: null }
   }
 
@@ -268,6 +514,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { error: null }
   }
 
@@ -295,6 +542,7 @@ export function useProductAdmin() {
       return { error: error.message }
     }
 
+    invalidateCache()
     return { error: null }
   }
 
@@ -314,6 +562,7 @@ export function useProductAdmin() {
     checkSetUsage,
     deleteCompany,
     deleteProductLine,
-    deleteProductSet
+    deleteProductSet,
+    invalidateCache
   }
 }

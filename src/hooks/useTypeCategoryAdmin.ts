@@ -1,60 +1,212 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabaseMonitor'
 import type { MiniType, MiniCategory } from '../types/mini'
+
+interface TypeCategoryRelation {
+  type_id: number
+  category_id: number
+}
+
+interface Cache {
+  types: MiniType[]
+  categories: MiniCategory[]
+  typeCategoryRelations: TypeCategoryRelation[]
+  timestamp: number
+  searchTerm: string
+  typesWithoutCategories: number
+}
+
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Singleton cache manager
+class TypeCategoryCache {
+  private static instance: TypeCategoryCache
+  private cache: Cache | null = null
+  private loadPromise: Promise<Cache> | null = null
+
+  private constructor() {}
+
+  static getInstance(): TypeCategoryCache {
+    if (!TypeCategoryCache.instance) {
+      TypeCategoryCache.instance = new TypeCategoryCache()
+    }
+    return TypeCategoryCache.instance
+  }
+
+  isValid(): boolean {
+    if (!this.cache) return false
+    if (Date.now() - this.cache.timestamp > CACHE_DURATION) return false
+    return true
+  }
+
+  get data(): Cache | null {
+    return this.cache
+  }
+
+  invalidate(): void {
+    console.log('Invalidating type/category cache')
+    this.cache = null
+    this.loadPromise = null
+  }
+
+  private async fetchAllPages<T>(
+    query: (page: number) => Promise<{ data: T[] | null; error: any }>,
+    pageSize: number = 1000
+  ): Promise<T[]> {
+    let allData: T[] = []
+    let page = 0
+    
+    while (true) {
+      const { data, error } = await query(page)
+      if (error) throw error
+      if (!data || data.length === 0) break
+      
+      allData = [...allData, ...data]
+      if (data.length < pageSize) break
+      page++
+    }
+    
+    return allData
+  }
+
+  async loadData(): Promise<Cache> {
+    // If we're already loading, return the existing promise
+    if (this.loadPromise) {
+      return this.loadPromise
+    }
+
+    // Start new load
+    this.loadPromise = (async () => {
+      console.log('Fetching fresh type/category data')
+      
+      // Get all categories first in a single query
+      const { data: categoriesData, error: categoriesError } = await supabase
+        .from('mini_categories')
+        .select('*')
+        .order('name')
+
+      if (categoriesError) throw categoriesError
+
+      // Then get all types with their category relationships in a single query
+      const { data: typesData, error: typesError } = await supabase
+        .from('mini_types')
+        .select(`
+          id,
+          name,
+          type_to_categories!type_id(
+            category_id
+          )
+        `)
+        .order('name')
+
+      if (typesError) throw typesError
+
+      // Count types without categories
+      const typesWithoutCategories = typesData.filter(
+        type => !type.type_to_categories?.length
+      ).length
+
+      // Transform the data
+      const types = typesData.map(type => ({
+        id: type.id,
+        name: type.name
+      }))
+
+      const typeCategoryRelations = typesData.flatMap(type => 
+        (type.type_to_categories || []).map(rel => ({
+          type_id: type.id,
+          category_id: rel.category_id
+        }))
+      )
+
+      const newCache: Cache = {
+        types,
+        categories: categoriesData,
+        typeCategoryRelations,
+        timestamp: Date.now(),
+        searchTerm: '',
+        typesWithoutCategories
+      }
+
+      this.cache = newCache
+      return newCache
+    })()
+
+    try {
+      const result = await this.loadPromise
+      this.loadPromise = null
+      return result
+    } catch (error) {
+      this.loadPromise = null
+      throw error
+    }
+  }
+
+  getTypeCategoryIds(typeId: number): number[] {
+    if (!this.cache) return []
+    return this.cache.typeCategoryRelations
+      .filter(rel => rel.type_id === typeId)
+      .map(rel => rel.category_id)
+  }
+}
 
 export function useTypeCategoryAdmin() {
   const [miniTypes, setMiniTypes] = useState<MiniType[]>([])
   const [categories, setCategories] = useState<MiniCategory[]>([])
   const [selectedTypeCategories, setSelectedTypeCategories] = useState<number[]>([])
   const [totalCount, setTotalCount] = useState(0)
+  const [totalCategories, setTotalCategories] = useState(0)
   const [error, setError] = useState('')
 
-  useEffect(() => {
-    loadData()
+  const cache = TypeCategoryCache.getInstance()
+
+  const invalidateCache = useCallback(() => {
+    cache.invalidate()
   }, [])
 
-  async function loadData(offset: number = 0, limit: number = 10, search: string = '') {
-    setCurrentPaginationState({ offset, limit, search })
-    
+  const filterAndPaginateData = useCallback((
+    data: MiniType[] | MiniCategory[],
+    offset: number,
+    limit: number,
+    searchTerm: string
+  ) => {
+    // Only filter if there's actually a search term
+    const filtered = searchTerm.trim()
+      ? data.filter(item => 
+          item.name.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      : data
+
+    const startIndex = offset
+    const endIndex = offset + limit
+    const pageItems = filtered.slice(startIndex, endIndex)
+
+    return {
+      items: pageItems,
+      totalCount: filtered.length
+    }
+  }, [])
+
+  async function initializeData(offset: number = 0, limit: number = 10) {
     try {
-      let query = supabase
-        .from('mini_types')
-        .select('*', { count: 'exact' })
+      const cacheData = await cache.loadData()
       
-      if (search) {
-        query = query.ilike('name', `%${search}%`)
-      }
+      const { items: pageTypes, totalCount: filteredCount } = filterAndPaginateData(
+        cacheData.types,
+        offset,
+        limit,
+        ''
+      )
       
-      const { data: types, error: typesError, count } = await query
-        .range(offset, offset + limit - 1)
-        .order('name')
-
-      if (typesError) throw typesError
-
-      const { data: cats, error: catsError } = await supabase
-        .from('mini_categories')
-        .select('*')
-        .order('name')
-
-      if (catsError) throw catsError
-
-      if (types) setMiniTypes(types)
-      if (cats) setCategories(cats)
-      if (count !== null) setTotalCount(count)
-
-      // Get count of types without categories
-      const { count: typesWithoutCategories } = await supabase
-        .from('mini_types')
-        .select('id, type_to_categories(*)', { 
-          count: 'exact',
-          head: true 
-        })
-        .is('type_to_categories', null);
-
-      return { 
-        data: types || [], 
-        count, 
-        typesWithoutCategories: typesWithoutCategories || 0
+      setMiniTypes(pageTypes)
+      setCategories(cacheData.categories)
+      setTotalCount(filteredCount)
+      setTotalCategories(cacheData.categories.length)
+      
+      return {
+        data: pageTypes,
+        count: filteredCount,
+        typesWithoutCategories: cacheData.typesWithoutCategories
       }
     } catch (err) {
       console.error('Error loading data:', err)
@@ -64,23 +216,124 @@ export function useTypeCategoryAdmin() {
     }
   }
 
-  async function loadTypeCategoryIds(typeId: number) {
-    const { data, error } = await supabase
-      .from('type_to_categories')
-      .select('category_id')
-      .eq('type_id', typeId)
-    
-    if (error) {
-      return { error: error.message }
+  async function loadData(offset: number = 0, limit: number = 10, search: string = '') {
+    try {
+      if (!cache.isValid()) {
+        return initializeData(offset, limit)
+      }
+
+      const cacheData = cache.data!
+      
+      // Skip filtering if no search term
+      if (!search.trim()) {
+        const startIndex = offset
+        const endIndex = offset + limit
+        const pageTypes = cacheData.types.slice(startIndex, endIndex)
+        
+        setMiniTypes(pageTypes)
+        if (totalCount !== cacheData.types.length) {
+          setTotalCount(cacheData.types.length)
+        }
+        
+        return {
+          data: pageTypes,
+          count: cacheData.types.length,
+          typesWithoutCategories: cacheData.typesWithoutCategories
+        }
+      }
+
+      const { items: pageTypes, totalCount: filteredCount } = filterAndPaginateData(
+        cacheData.types,
+        offset,
+        limit,
+        search
+      )
+      
+      setMiniTypes(pageTypes)
+      if (totalCount !== filteredCount) {
+        setTotalCount(filteredCount)
+      }
+      
+      return {
+        data: pageTypes,
+        count: filteredCount,
+        typesWithoutCategories: cacheData.typesWithoutCategories
+      }
+    } catch (err) {
+      console.error('Error loading data:', err)
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      setError(errorMessage)
+      return { data: [], count: 0, error: errorMessage }
     }
-    
-    setSelectedTypeCategories(data?.map(item => item.category_id) || [])
-    return { error: null }
   }
 
+  const loadCategories = async (
+    offset: number,
+    limit: number,
+    searchTerm?: string
+  ) => {
+    try {
+      if (!cache.isValid()) {
+        await initializeData()
+      }
+
+      const cacheData = cache.data!
+
+      // Skip filtering if no search term
+      if (!searchTerm?.trim()) {
+        const startIndex = offset
+        const endIndex = offset + limit
+        const pageCategories = cacheData.categories.slice(startIndex, endIndex)
+        
+        if (totalCategories !== cacheData.categories.length) {
+          setTotalCategories(cacheData.categories.length)
+        }
+
+        return { 
+          data: pageCategories, 
+          count: cacheData.categories.length 
+        }
+      }
+
+      const { items: pageCategories, totalCount: filteredCount } = filterAndPaginateData(
+        cacheData.categories,
+        offset,
+        limit,
+        searchTerm
+      )
+
+      if (totalCategories !== filteredCount) {
+        setTotalCategories(filteredCount)
+      }
+
+      return { 
+        data: pageCategories, 
+        count: filteredCount 
+      }
+    } catch (error) {
+      return { data: null, error, count: 0 }
+    }
+  }
+
+  async function loadTypeCategoryIds(typeId: number) {
+    try {
+      if (!cache.isValid()) {
+        await initializeData()
+      }
+
+      const categoryIds = cache.getTypeCategoryIds(typeId)
+      setSelectedTypeCategories(categoryIds)
+      return { error: null }
+    } catch (err) {
+      console.error('Error loading type category IDs:', err)
+      const errorMessage = err instanceof Error ? err.message : 'An error occurred'
+      return { error: errorMessage }
+    }
+  }
+
+  // Update CRUD operations to use loadData with current parameters
   async function addType(name: string) {
     try {
-      // First check if name already exists
       const { data: existingType, error: checkError } = await supabase
         .from('mini_types')
         .select('id')
@@ -105,9 +358,7 @@ export function useTypeCategoryAdmin() {
         return { error: insertError.message }
       }
 
-      // Reload data with current pagination state
-      const { offset, limit, search } = getCurrentPaginationState()
-      await loadData(offset, limit, search)
+      invalidateCache()
       return { data }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred'
@@ -132,9 +383,7 @@ export function useTypeCategoryAdmin() {
       return { error: error.message }
     }
 
-    // Reload data with current pagination state
-    const { offset, limit, search } = getCurrentPaginationState()
-    await loadData(offset, limit, search)
+    invalidateCache()
     return { error: null }
   }
 
@@ -171,7 +420,6 @@ export function useTypeCategoryAdmin() {
   }
 
   async function deleteType(typeId: number) {
-    // First check if type can be deleted
     const { canDelete, inUseBy, error: checkError } = await checkTypeUsage(typeId)
     
     if (checkError) {
@@ -199,24 +447,27 @@ export function useTypeCategoryAdmin() {
       return { error: error.message, canDelete: false }
     }
 
-    // Reload data with current pagination state
-    const { offset, limit, search } = getCurrentPaginationState()
-    await loadData(offset, limit, search)
+    invalidateCache()
     return { error: null, canDelete: true }
   }
 
   async function updateTypeCategories(typeId: number, categoryIds: number[]) {
     setError('')
 
-    // Delete existing relationships
-    await supabase
+    // Delete existing relations
+    const { error: deleteError } = await supabase
       .from('type_to_categories')
       .delete()
       .eq('type_id', typeId)
 
-    // Add new relationships
+    if (deleteError) {
+      setError(deleteError.message)
+      return { error: deleteError.message }
+    }
+
+    // Insert new relations if any
     if (categoryIds.length > 0) {
-      const { error } = await supabase
+      const { error: insertError } = await supabase
         .from('type_to_categories')
         .insert(
           categoryIds.map(categoryId => ({
@@ -225,59 +476,33 @@ export function useTypeCategoryAdmin() {
           }))
         )
 
-      if (error) {
-        setError(error.message)
-        return { error: error.message }
+      if (insertError) {
+        setError(insertError.message)
+        return { error: insertError.message }
       }
     }
 
-    loadTypeCategoryIds(typeId)
+    // Invalidate cache and reload data
+    invalidateCache()
+    
+    // Update the selected categories immediately
+    setSelectedTypeCategories(categoryIds)
+    
+    // Reload cache and update all states
+    const cacheData = await cache.loadData()
+    setCategories(cacheData.categories)
+    setMiniTypes(cacheData.types.slice(0, 10)) // Refresh first page of types
+    
     return { error: null }
   }
 
-  // Add state for current pagination
-  const [currentPaginationState, setCurrentPaginationState] = useState({
-    offset: 0,
-    limit: 10,
-    search: ''
-  })
-
-  function getCurrentPaginationState() {
-    return currentPaginationState
-  }
-
   // Category CRUD operations
-  const loadCategories = async (
-    offset: number,
-    limit: number,
-    searchTerm?: string
-  ) => {
-    try {
-      let query = supabase
-        .from('mini_categories')
-        .select('*', { count: 'exact' })
-
-      if (searchTerm) {
-        query = query.ilike('name', `%${searchTerm}%`)
-      }
-
-      const { data, error, count } = await query
-        .range(offset, offset + limit - 1)
-        .order('name')
-
-      return { data, error, count }
-    } catch (error) {
-      return { data: null, error, count: 0 }
-    }
-  }
-
   const addCategory = async (name: string) => {
     try {
       if (!name || !name.trim()) {
         return { error: { message: 'Category name is required' } }
       }
 
-      // First check if name already exists
       const { data: existingCategory, error: checkError } = await supabase
         .from('mini_categories')
         .select('id')
@@ -304,6 +529,7 @@ export function useTypeCategoryAdmin() {
         return { error }
       }
 
+      invalidateCache()
       return { data }
     } catch (error) {
       console.error('Unexpected error in addCategory:', error)
@@ -319,6 +545,10 @@ export function useTypeCategoryAdmin() {
         .eq('id', id)
         .select()
         .single()
+
+      if (!error) {
+        invalidateCache()
+      }
 
       return { data, error }
     } catch (error) {
@@ -354,7 +584,6 @@ export function useTypeCategoryAdmin() {
 
   const deleteCategory = async (id: number) => {
     try {
-      // First check if category can be deleted
       const { canDelete, error: checkError, inUseBy } = await checkCategoryUsage(id)
       
       if (checkError) {
@@ -379,6 +608,7 @@ export function useTypeCategoryAdmin() {
         return { error }
       }
 
+      invalidateCache()
       return { error: null }
     } catch (error) {
       console.error('Unexpected error in deleteCategory:', error)
@@ -403,6 +633,7 @@ export function useTypeCategoryAdmin() {
     addCategory,
     editCategory,
     deleteCategory,
-    checkCategoryUsage
+    checkCategoryUsage,
+    invalidateCache
   }
 } 

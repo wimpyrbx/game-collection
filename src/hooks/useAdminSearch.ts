@@ -1,12 +1,15 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 
 interface UseAdminSearchProps {
   defaultSearchTerm?: string
   searchFields?: string[]
+  debounceMs?: number
+  onSearch?: (term: string) => void
 }
 
 interface UseAdminSearchReturn {
   searchTerm: string
+  debouncedSearchTerm: string
   setSearchTerm: (term: string) => void
   handleSearch: (term: string) => void
   filterItems: <T extends Record<string, any>>(items: T[]) => T[]
@@ -19,28 +22,43 @@ interface UseAdminSearchReturn {
 
 export function useAdminSearch({
   defaultSearchTerm = '',
-  searchFields = ['name']
+  searchFields = ['name'],
+  debounceMs = 300,
+  onSearch
 }: UseAdminSearchProps = {}): UseAdminSearchReturn {
   const [searchTerm, setSearchTerm] = useState(defaultSearchTerm)
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState(defaultSearchTerm)
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+      onSearch?.(searchTerm)
+    }, debounceMs)
+
+    return () => {
+      clearTimeout(handler)
+    }
+  }, [searchTerm, debounceMs, onSearch])
 
   const handleSearch = useCallback((term: string) => {
     setSearchTerm(term)
   }, [])
 
   const filterItems = useCallback(<T extends Record<string, any>>(items: T[]): T[] => {
-    if (!searchTerm) return items
+    if (!debouncedSearchTerm) return items
 
-    const lowerSearchTerm = searchTerm.toLowerCase()
+    const lowerSearchTerm = debouncedSearchTerm.toLowerCase()
     return items.filter(item => 
       searchFields.some(field => {
         const value = item[field]
         return value && value.toString().toLowerCase().includes(lowerSearchTerm)
       })
     )
-  }, [searchTerm, searchFields])
+  }, [debouncedSearchTerm, searchFields])
 
   return {
     searchTerm,
+    debouncedSearchTerm,
     setSearchTerm,
     handleSearch,
     filterItems,

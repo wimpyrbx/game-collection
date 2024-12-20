@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { useState, useEffect, useCallback } from 'react'
+import { supabase } from '../lib/supabaseMonitor'
 
 export type UserSetting = {
   id: number
@@ -9,61 +9,156 @@ export type UserSetting = {
   updated_at: string
 }
 
+interface SettingsStore {
+  settings: Map<string, string>
+  loading: boolean
+  error: string | null
+  lastFetch: number
+}
+
+let store: SettingsStore = {
+  settings: new Map(),
+  loading: true,
+  error: null,
+  lastFetch: 0
+}
+
+let storePromise: Promise<void> | null = null
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+// Add a subscription cleanup function
+let cleanupSubscription: (() => void) | null = null
+
+async function loadSettings() {
+  try {
+    store.loading = true
+    store.error = null
+
+    const { data, error } = await supabase
+      .from('user_settings')
+      .select('setting_name, setting_value')
+
+    if (error) throw error
+
+    // Update store
+    store.settings = new Map(data?.map(setting => [setting.setting_name, setting.setting_value]) || [])
+    store.loading = false
+    store.lastFetch = Date.now()
+  } catch (err) {
+    store.error = err instanceof Error ? err.message : 'An error occurred'
+    store.loading = false
+    throw err
+  }
+}
+
 export function useUserSettings() {
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [state, setState] = useState<SettingsStore>(store)
 
-  const getSetting = async (settingName: string): Promise<string | null> => {
+  // Setup real-time subscription only once
+  useEffect(() => {
+    if (cleanupSubscription) return; // Skip if subscription already exists
+
+    const subscription = supabase
+      .channel('user_settings_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_settings'
+        },
+        async () => {
+          // Invalidate cache and reload settings
+          store.lastFetch = 0
+          if (!storePromise) {
+            storePromise = loadSettings().finally(() => {
+              storePromise = null
+              setState({ ...store })
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    cleanupSubscription = () => {
+      subscription.unsubscribe()
+      cleanupSubscription = null
+    }
+
+    return () => {
+      cleanupSubscription?.()
+    }
+  }, []) // Empty dependency array as we want this to run once
+
+  useEffect(() => {
+    const loadData = async () => {
+      const now = Date.now()
+      const needsRefresh = now - store.lastFetch > CACHE_DURATION
+
+      if (needsRefresh || store.error || store.loading) {
+        if (!storePromise) {
+          storePromise = loadSettings().finally(() => {
+            storePromise = null
+            setState({ ...store })
+          })
+        } else {
+          try {
+            await storePromise
+            setState({ ...store })
+          } catch (err) {
+            console.error('Error loading settings:', err)
+          }
+        }
+      }
+    }
+
+    loadData()
+  }, [])
+
+  const getSetting = useCallback(async (name: string): Promise<string | null> => {
+    // Return from cache if available and valid
+    if (store.settings.has(name) && Date.now() - store.lastFetch <= CACHE_DURATION) {
+      return store.settings.get(name) || null
+    }
+
+    // Load settings if cache is invalid
+    if (!storePromise) {
+      storePromise = loadSettings().finally(() => {
+        storePromise = null
+        setState({ ...store })
+      })
+    }
+
     try {
-      const { data, error } = await supabase
-        .from('user_settings')
-        .select('setting_value')
-        .eq('setting_name', settingName)
-        .single()
-
-      if (error) throw error
-      return data?.setting_value || null
+      await storePromise
+      return store.settings.get(name) || null
     } catch (err) {
-      console.error('Error fetching setting:', err)
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      console.error('Error getting setting:', err)
       return null
     }
-  }
+  }, [])
 
-  const setSetting = async (settingName: string, settingValue: string): Promise<void> => {
+  const setSetting = useCallback(async (name: string, value: string): Promise<void> => {
     try {
-      // First try to update
-      const { data: updateData, error: updateError } = await supabase
+      const { error } = await supabase
         .from('user_settings')
-        .update({ 
-          setting_value: settingValue,
-          updated_at: new Date().toISOString()
-        })
-        .eq('setting_name', settingName)
-        .select()
+        .upsert({ setting_name: name, setting_value: value })
 
-      // If no rows were updated, insert instead
-      if (!updateData || updateData.length === 0) {
-        const { error: insertError } = await supabase
-          .from('user_settings')
-          .insert({
-            setting_name: settingName,
-            setting_value: settingValue
-          })
+      if (error) throw error
 
-        if (insertError) throw insertError
-      }
-
-      if (updateError) throw updateError
+      // Update local cache immediately
+      store.settings.set(name, value)
+      setState({ ...store })
     } catch (err) {
-      console.error('Error saving setting:', err)
-      setError(err instanceof Error ? err.message : 'Unknown error')
+      console.error('Error setting value:', err)
+      throw err
     }
-  }
+  }, [])
 
   return {
-    isLoading,
-    error,
+    settings: state.settings,
+    loading: state.loading,
+    error: state.error,
     getSetting,
     setSetting
   }

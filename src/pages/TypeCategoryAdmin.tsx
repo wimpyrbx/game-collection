@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
@@ -18,6 +18,7 @@ export default function TypeCategoryAdmin() {
   const [categories, setCategories] = useState<MiniCategory[]>([])
   const [allCategories, setAllCategories] = useState<MiniCategory[]>([])
   const [typesWithoutCategoriesCount, setTypesWithoutCategoriesCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(false)
 
   const {
     miniTypes,
@@ -46,7 +47,14 @@ export default function TypeCategoryAdmin() {
   })
 
   const search = useAdminSearch({
-    searchFields: ['name']
+    searchFields: ['name'],
+    debounceMs: 300,
+    onSearch: (term) => {
+      if (!isLoading && term.trim() !== search.debouncedSearchTerm) {
+        pagination.setCurrentPage(1)
+        handleLoadTypes(0, pagination.itemsPerPage, term)
+      }
+    }
   })
 
   // Pagination and search for categories
@@ -56,86 +64,81 @@ export default function TypeCategoryAdmin() {
   })
 
   const categorySearch = useAdminSearch({
-    searchFields: ['name']
+    searchFields: ['name'],
+    debounceMs: 300,
+    onSearch: (term) => {
+      if (!isLoading && term.trim() !== categorySearch.debouncedSearchTerm) {
+        categoryPagination.setCurrentPage(1)
+        handleLoadCategories(0, categoryPagination.itemsPerPage, term)
+      }
+    }
   })
 
-  useEffect(() => {
-    const fetchCategories = async () => {
-      const { data: cats, count } = await loadCategories(
-        0,
-        pagination.itemsPerPage,
-        categorySearch.searchTerm
-      )
-      if (cats) {
-        setCategories(cats)
-      }
-      if (count !== undefined && count !== null) {
-        setTotalCategories(count)
-      }
-      categoryPagination.setCurrentPage(1)
-    }
-    fetchCategories()
-  }, [categorySearch.searchTerm])
-
-  // Load data when page changes
-  useEffect(() => {
-    const fetchData = async () => {
-      await loadData(
-        (pagination.currentPage - 1) * pagination.itemsPerPage,
-        pagination.itemsPerPage,
-        search.searchTerm
-      )
-    }
-    fetchData()
-  }, [pagination.currentPage, search.searchTerm])
-
-  // Initial load of categories
-  useEffect(() => {
-    const fetchCategories = async () => {
-      const { data: cats, count } = await loadCategories(
-        (categoryPagination.currentPage - 1) * pagination.itemsPerPage,
-        pagination.itemsPerPage,
-        categorySearch.searchTerm
-      )
-      if (cats) {
-        setCategories(cats)
-      }
-      if (count !== undefined && count !== null) {
-        setTotalCategories(count)
-      } else {
-        setTotalCategories(0)
-      }
-    }
-    fetchCategories()
-  }, [categoryPagination.currentPage])
-
-  // Load initial data and counts
+  // Load initial data
   useEffect(() => {
     const fetchInitialData = async () => {
-      const result = await loadData()
-      if (result?.typesWithoutCategories !== undefined) {
-        setTypesWithoutCategoriesCount(result.typesWithoutCategories)
-      }
-      const catResult = await loadCategories(0, pagination.itemsPerPage, '')
-      if (catResult?.count !== undefined && catResult?.count !== null) {
-        setTotalCategories(catResult.count)
-      } else {
-        setTotalCategories(0)
+      if (isLoading) return
+      setIsLoading(true)
+      try {
+        const result = await loadData(0, pagination.itemsPerPage, '')
+        if (result?.typesWithoutCategories !== undefined) {
+          setTypesWithoutCategoriesCount(result.typesWithoutCategories)
+        }
+        if (result?.count !== undefined) {
+          setTotalCategories(result.count)
+        }
+        
+        // Load initial categories
+        const catResult = await loadCategories(0, categoryPagination.itemsPerPage, '')
+        if (catResult.data) {
+          setCategories(catResult.data)
+        }
+        
+        // Load all categories for the type-categories section
+        await loadAllCategories()
+      } finally {
+        setIsLoading(false)
       }
     }
     fetchInitialData()
-  }, [])
+  }, []) // Only run once on mount
 
-  // Update counts when data changes
-  useEffect(() => {
-    const fetchCounts = async () => {
-      const result = await loadData()
-      if (result?.typesWithoutCategories !== undefined) {
-        setTypesWithoutCategoriesCount(result.typesWithoutCategories)
-      }
+  const handleLoadTypes = async (offset: number, limit: number, searchTerm: string) => {
+    const result = await loadData(offset, limit, searchTerm)
+    if (result?.typesWithoutCategories !== undefined) {
+      setTypesWithoutCategoriesCount(result.typesWithoutCategories)
     }
-    fetchCounts()
-  }, [categories.length, totalCategories])
+  }
+
+  const handleLoadCategories = async (offset: number, limit: number, searchTerm: string) => {
+    const result = await loadCategories(offset, limit, searchTerm)
+    if (result.data) {
+      setCategories(result.data)
+    }
+    if (result.count !== undefined && result.count !== null) {
+      setTotalCategories(result.count)
+    }
+    return result
+  }
+
+  // Handle pagination changes
+  const handlePageChange = useCallback((page: number) => {
+    if (isLoading) return
+    setIsLoading(true)
+    pagination.setCurrentPage(page)
+    const offset = (page - 1) * pagination.itemsPerPage
+    handleLoadTypes(offset, pagination.itemsPerPage, search.debouncedSearchTerm)
+      .finally(() => setIsLoading(false))
+  }, [pagination, search.debouncedSearchTerm])
+
+  const handleCategoryPageChange = useCallback((page: number) => {
+    if (isLoading) return
+    setIsLoading(true)
+    categoryPagination.setCurrentPage(page)
+    const offset = (page - 1) * categoryPagination.itemsPerPage
+    handleLoadCategories(offset, categoryPagination.itemsPerPage, categorySearch.debouncedSearchTerm)
+      .finally(() => setIsLoading(false))
+  }, [categoryPagination, categorySearch.debouncedSearchTerm])
 
   // Modal state management
   const [modalState, setModalState] = useState<{
@@ -193,6 +196,9 @@ export default function TypeCategoryAdmin() {
   const handleModalAction = async (action: string, data?: any) => {
     try {
       let result;
+      const currentOffset = (pagination.currentPage - 1) * pagination.itemsPerPage;
+      const currentCategoryOffset = (categoryPagination.currentPage - 1) * categoryPagination.itemsPerPage;
+
       switch (action) {
         case 'add':
           result = await loading.withLoading(addType(data))
@@ -200,6 +206,7 @@ export default function TypeCategoryAdmin() {
             showError(result.error)
             return
           }
+          handleLoadTypes(currentOffset, pagination.itemsPerPage, search.debouncedSearchTerm)
           showSuccess('Type added successfully')
           break
 
@@ -209,6 +216,7 @@ export default function TypeCategoryAdmin() {
             showError(result.error)
             return
           }
+          handleLoadTypes(currentOffset, pagination.itemsPerPage, search.debouncedSearchTerm)
           showSuccess('Type updated successfully')
           break
 
@@ -218,6 +226,7 @@ export default function TypeCategoryAdmin() {
             showError(result.error)
             return
           }
+          handleLoadTypes(currentOffset, pagination.itemsPerPage, search.debouncedSearchTerm)
           showSuccess('Type deleted successfully')
           break
 
@@ -229,6 +238,7 @@ export default function TypeCategoryAdmin() {
             showError(result.error)
             return
           }
+          handleLoadTypes(currentOffset, pagination.itemsPerPage, search.debouncedSearchTerm)
           showSuccess('Categories updated successfully')
           break
 
@@ -242,12 +252,13 @@ export default function TypeCategoryAdmin() {
             showError(result.error.message || 'Failed to add category')
             return
           }
+          handleLoadTypes(currentOffset, pagination.itemsPerPage, search.debouncedSearchTerm)
           showSuccess('Category added successfully')
           // Refresh categories with current pagination
           const addResult = await loadCategories(
-            (categoryPagination.currentPage - 1) * pagination.itemsPerPage,
-            pagination.itemsPerPage,
-            categorySearch.searchTerm
+            currentCategoryOffset,
+            categoryPagination.itemsPerPage,
+            categorySearch.debouncedSearchTerm
           )
           if (addResult.data) {
             setCategories(addResult.data)
@@ -265,12 +276,13 @@ export default function TypeCategoryAdmin() {
               : 'Failed to update category')
             return
           }
+          handleLoadTypes(currentOffset, pagination.itemsPerPage, search.debouncedSearchTerm)
           showSuccess('Category updated successfully')
           // Refresh categories with current pagination
           const editResult = await loadCategories(
-            (categoryPagination.currentPage - 1) * pagination.itemsPerPage,
-            pagination.itemsPerPage,
-            categorySearch.searchTerm
+            currentCategoryOffset,
+            categoryPagination.itemsPerPage,
+            categorySearch.debouncedSearchTerm
           )
           if (editResult.data) {
             setCategories(editResult.data)
@@ -288,12 +300,13 @@ export default function TypeCategoryAdmin() {
               : 'Failed to delete category')
             return
           }
+          handleLoadTypes(currentOffset, pagination.itemsPerPage, search.debouncedSearchTerm)
           showSuccess('Category deleted successfully')
           // Refresh categories with current pagination
           const deleteResult = await loadCategories(
-            (categoryPagination.currentPage - 1) * pagination.itemsPerPage,
-            pagination.itemsPerPage,
-            categorySearch.searchTerm
+            currentCategoryOffset,
+            categoryPagination.itemsPerPage,
+            categorySearch.debouncedSearchTerm
           )
           if (deleteResult.data) {
             setCategories(deleteResult.data)
@@ -303,9 +316,10 @@ export default function TypeCategoryAdmin() {
           }
           break
       }
+
       handleModalClose()
     } catch (error) {
-      console.error('Error in handleModalAction:', error)
+      console.error('Error in modal action:', error)
       showError('An unexpected error occurred')
     }
   }
@@ -392,7 +406,7 @@ export default function TypeCategoryAdmin() {
               handleTypeSelect(type)
               handleDeleteClick(type)
             }}
-            loading={loading.isLoading}
+            loading={isLoading || loading.isLoading}
             headerSubText="Manage mini types"
             headerItalicText="* Click on a type to manage its categories"
             searchProps={{
@@ -416,10 +430,7 @@ export default function TypeCategoryAdmin() {
               currentPage: pagination.currentPage,
               totalItems: totalCount,
               itemsPerPage: pagination.itemsPerPage,
-              onPageChange: (page) => {
-                pagination.handlePageChange(page)
-                setSelectedType(null)
-              }
+              onPageChange: handlePageChange
             }}
             getItemName={(item) => item.name}
           />
@@ -431,7 +442,9 @@ export default function TypeCategoryAdmin() {
             title="Type » Categories"
             icon={FaShareAltSquare}
             iconColor="text-blue-700"
-            items={categories.filter(cat => selectedTypeCategories.includes(cat.id))}
+            items={allCategories.filter(cat => 
+              selectedTypeCategories.includes(cat.id)
+            )}
             selectedItem={null}
             onAdd={() => setModalState({ type: 'categories', isOpen: true })}
             onDelete={async (category) => {
@@ -474,7 +487,7 @@ export default function TypeCategoryAdmin() {
                 data: category
               })
             }}
-            loading={loading.isLoading}
+            loading={isLoading || loading.isLoading}
             headerSubText="Manage all categories"
             headerItalicText="* Add/Edit/Delete categories"
             searchProps={{
@@ -485,7 +498,7 @@ export default function TypeCategoryAdmin() {
               currentPage: categoryPagination.currentPage,
               totalItems: totalCategories,
               itemsPerPage: categoryPagination.itemsPerPage,
-              onPageChange: categoryPagination.handlePageChange
+              onPageChange: handleCategoryPageChange
             }}
             getItemName={(item) => item.name}
           />

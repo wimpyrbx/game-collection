@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../lib/supabaseMonitor'
 
 interface PaintedBy {
   id: number
@@ -43,130 +43,206 @@ interface MiniType {
   categories: Category[]
 }
 
+// Add singleton store
+interface ReferenceDataStore {
+  paintedByOptions: PaintedBy[]
+  baseSizeOptions: BaseSize[]
+  companies: Company[]
+  productLines: ProductLine[]
+  productSets: ProductSet[]
+  miniTypes: MiniType[]
+  loading: boolean
+  error: string | null
+  lastFetch: number
+}
+
+let store: ReferenceDataStore = {
+  paintedByOptions: [],
+  baseSizeOptions: [],
+  companies: [],
+  productLines: [],
+  productSets: [],
+  miniTypes: [],
+  loading: true,
+  error: null,
+  lastFetch: 0
+}
+
+let storePromise: Promise<void> | null = null
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+
+async function loadReferenceData() {
+  try {
+    store.loading = true
+    store.error = null
+
+    // Load all data in parallel
+    const [
+      { data: paintedBy, error: paintedByError },
+      { data: baseSizes, error: baseSizesError },
+      { data: companiesData, error: companiesError },
+      { data: productLinesData, error: productLinesError },
+      { data: productSetsData, error: productSetsError },
+      { data: types, error: typesError }
+    ] = await Promise.all([
+      supabase.from('painted_by').select('*').order('painted_by_name'),
+      supabase.from('base_sizes').select('*').order('base_size_name'),
+      supabase.from('product_companies').select('*').order('name'),
+      supabase.from('product_lines').select('*').order('name'),
+      supabase.from('product_sets').select('*').order('name'),
+      supabase.from('mini_types')
+        .select(`
+          id,
+          name,
+          categories:type_to_categories(
+            category:mini_categories(
+              id,
+              name
+            )
+          )
+        `)
+        .order('id')
+    ])
+
+    if (paintedByError) throw paintedByError
+    if (baseSizesError) throw baseSizesError
+    if (companiesError) throw companiesError
+    if (productLinesError) throw productLinesError
+    if (productSetsError) throw productSetsError
+    if (typesError) throw typesError
+
+    const transformedTypes: MiniType[] = (types || []).map(type => ({
+      id: type.id,
+      name: type.name,
+      categories: type.categories
+        .filter((cat): cat is TypeCategory => Boolean(cat?.category))
+        .map(cat => ({
+          id: cat.category!.id,
+          name: cat.category!.name
+        }))
+    }))
+
+    // Update store
+    store = {
+      paintedByOptions: paintedBy || [],
+      baseSizeOptions: baseSizes || [],
+      companies: companiesData || [],
+      productLines: productLinesData || [],
+      productSets: productSetsData || [],
+      miniTypes: transformedTypes,
+      loading: false,
+      error: null,
+      lastFetch: Date.now()
+    }
+  } catch (err) {
+    store.error = err instanceof Error ? err.message : 'An error occurred'
+    store.loading = false
+    throw err
+  }
+}
+
 export function useMiniatureReferenceData() {
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [paintedByOptions, setPaintedByOptions] = useState<PaintedBy[]>([])
-  const [baseSizeOptions, setBaseSizeOptions] = useState<BaseSize[]>([])
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [productLines, setProductLines] = useState<ProductLine[]>([])
-  const [productSets, setProductSets] = useState<ProductSet[]>([])
-  const [miniTypes, setMiniTypes] = useState<MiniType[]>([])
+  const [state, setState] = useState<ReferenceDataStore>(store)
 
   useEffect(() => {
     const loadData = async () => {
-      try {
-        // Load all other data first
-        const [
-          { data: paintedBy, error: paintedByError },
-          { data: baseSizes, error: baseSizesError },
-          { data: companiesData, error: companiesError },
-          { data: productLinesData, error: productLinesError },
-          { data: productSetsData, error: productSetsError }
-        ] = await Promise.all([
-          supabase.from('painted_by').select('*').order('painted_by_name'),
-          supabase.from('base_sizes').select('*').order('base_size_name'),
-          supabase.from('product_companies').select('*').order('name'),
-          supabase.from('product_lines').select('*').order('name'),
-          supabase.from('product_sets').select('*').order('name')
-        ])
+      // Check if we need to refresh the data
+      const now = Date.now()
+      const needsRefresh = now - store.lastFetch > CACHE_DURATION
 
-        if (paintedByError) throw paintedByError
-        if (baseSizesError) throw baseSizesError
-        if (companiesError) throw companiesError
-        if (productLinesError) throw productLinesError
-        if (productSetsError) throw productSetsError
-
-        setPaintedByOptions(paintedBy || [])
-        setBaseSizeOptions(baseSizes || [])
-        setCompanies(companiesData || [])
-        setProductLines(productLinesData || [])
-        setProductSets(productSetsData || [])
-
-        // Load all mini types with their categories
-        const loadAllTypes = async () => {
-          const allTypes = []
-          let lastId = 0
-          let hasMore = true
-
-          while (hasMore) {
-            const { data: types, error: typesError } = await supabase
-              .from('mini_types')
-              .select(`
-                id,
-                name,
-                categories:type_to_categories(
-                  category:mini_categories(
-                    id,
-                    name
-                  )
-                )
-              `)
-              .order('id')
-              .gt('id', lastId)
-              .limit(1000)
-              .returns<Array<{
-                id: number;
-                name: string;
-                categories: Array<{
-                  category: {
-                    id: number;
-                    name: string;
-                  } | null;
-                }>;
-              }>>()
-
-            if (typesError) {
-              throw typesError
-            }
-            if (!types || types.length === 0) {
-              hasMore = false
-              break
-            }
-
-            allTypes.push(...types)
-            lastId = types[types.length - 1].id
-          }
-
-          const transformedTypes: MiniType[] = allTypes.map(type => {
-            const transformed = {
-              id: type.id,
-              name: type.name,
-              categories: type.categories
-                .filter((cat): cat is TypeCategory => Boolean(cat?.category))
-                .map(cat => ({
-                  id: cat.category!.id,
-                  name: cat.category!.name
-                }))
-            }
-            return transformed
+      if (needsRefresh || store.error || store.loading) {
+        // If there's already a load in progress, wait for it
+        if (!storePromise) {
+          storePromise = loadReferenceData().finally(() => {
+            storePromise = null
           })
-
-          setMiniTypes(transformedTypes)
         }
 
-        await loadAllTypes()
-      } catch (err) {
-        console.error('Error loading reference data:', err)
-        setError(err instanceof Error ? err.message : 'An error occurred')
-      } finally {
-        setLoading(false)
+        try {
+          await storePromise
+          setState({ ...store })
+        } catch (err) {
+          console.error('Error loading reference data:', err)
+        }
       }
     }
 
     loadData()
+
+    // Subscribe to real-time changes
+    const subscription = supabase
+      .channel('reference_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'mini_types'
+        },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'painted_by'
+        },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'base_sizes'
+        },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'product_companies'
+        },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'product_lines'
+        },
+        () => loadData()
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'product_sets'
+        },
+        () => loadData()
+      )
+      .subscribe()
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   return {
-    loading,
-    error,
-    paintedByOptions,
-    baseSizeOptions,
-    companies,
-    miniTypes,
+    loading: state.loading,
+    error: state.error,
+    paintedByOptions: state.paintedByOptions,
+    baseSizeOptions: state.baseSizeOptions,
+    companies: state.companies,
+    miniTypes: state.miniTypes,
     getProductLinesByCompany: (companyId: number) => 
-      productLines.filter(pl => pl.company_id === companyId),
+      state.productLines.filter(pl => pl.company_id === companyId),
     getProductSetsByProductLine: (productLineId: number) =>
-      productSets.filter(ps => ps.product_line_id === productLineId)
+      state.productSets.filter(ps => ps.product_line_id === productLineId)
   }
 } 

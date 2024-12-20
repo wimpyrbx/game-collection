@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build && cp -r public/phpscripts dist/",
+    "build": "(tsc -b && vite build && cp -r public/phpscripts dist/) 2>&1 | tee build.log",
     "lint": "eslint .",
     "preview": "vite preview"
   },
