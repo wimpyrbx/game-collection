@@ -12,8 +12,7 @@ import { useNotifications } from '../contexts/NotificationContext'
 import { deleteMiniature, getMiniature, updateMiniatureInUse } from '../services/miniatureService'
 import { Switch } from '../components/ui'
 import { useMiniatureReferenceData } from '../hooks/useMiniatureReferenceData'
-
-type ViewMode = 'table' | 'cards'
+import { useViewMode, ViewMode } from '../hooks/useViewMode'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -24,7 +23,7 @@ const preloadImages = (minis: Mini[]) => {
 }
 
 export default function MiniatureOverview() {
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const { viewMode, setViewMode, isLoading: viewModeLoading } = useViewMode()
   const miniSearch = useAdminSearch({ searchFields: ['name'] })
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
@@ -461,6 +460,15 @@ export default function MiniatureOverview() {
   const hasPreviousMini = selectedMiniIndex > 0
   const hasNextMini = selectedMiniIndex < allMinis.length - 1
   const selectedMiniId = selectedMini?.id
+
+  // Early return while loading view mode to prevent flash
+  if (viewModeLoading || !viewMode) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <UI.LoadingSpinner message="Loading view preferences..." />
+      </div>
+    )
+  }
 
   if (error) {
     return <div className="p-4 text-red-500">Error: {error}</div>
