@@ -69,6 +69,7 @@ export function MiniatureOverviewModal({
   hasNext = true,
   onImageUpload,
 }: MiniatureOverviewModalProps) {
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -333,99 +334,97 @@ export function MiniatureOverviewModal({
       }
 
       let imageUploaded = false;
+      let newMiniId: number | undefined;
 
-      // Handle image upload if there's a new image
-      if (imageFile) {
-        console.log('Starting image upload for miniId:', miniData?.id || 'new');
-        const formData = new FormData()
-        formData.append('image', imageFile)
-        formData.append('miniId', (miniData?.id || '').toString())
-        
-        try {
-          const response = await fetch('/miniatures/phpscripts/uploadImage.php', {
-            method: 'POST',
-            body: formData
-          })
-          
-          const responseData = await response.json();
-          console.log('Image upload response:', responseData);
-          
-          if (!response.ok) {
-            console.error('Image upload failed:', responseData);
-            throw new Error(responseData.error || 'Failed to upload image');
+      try {
+        // Save miniature data first before handling image upload
+        if (isEditMode && miniData?.id) {
+          await updateMiniature(miniData.id, miniatureData)
+        } else {
+          const newMini = await createMiniature(miniatureData)
+          if (newMini?.id) {
+            newMiniId = newMini.id;
+            // console.log('New miniature created with ID:', newMiniId);
+          } else {
+            throw new Error('Failed to get ID for new miniature');
           }
+        }
 
-          imageUploaded = true;
+        // Handle image upload if there's a new image
+        if (imageFile) {
+          // console.log('Starting image upload for miniId:', newMiniId || miniData?.id || 'new');
+          const formData = new FormData()
+          formData.append('image', imageFile)
+          formData.append('miniId', (newMiniId || miniData?.id || '').toString())
+          
+          try {
+            const response = await fetch('/miniatures/phpscripts/uploadImage.php', {
+              method: 'POST',
+              body: formData
+            })
+            
+            const responseData = await response.json();
+            // console.log('Image upload response:', responseData);
+            
+            if (!response.ok) {
+              console.error('Image upload failed:', responseData);
+              throw new Error(responseData.error || 'Failed to upload image');
+            }
 
-          // Force a re-render of the image by updating the image existence state
-          setImageExists(false);  // Reset first
-          setTimeout(() => {
-            setImageExists(true);
-            // If we're in edit mode and have a miniId, verify the image exists
-            if (miniData?.id) {
+            imageUploaded = true;
+
+            // Force a re-render of the image by updating the image existence state
+            setImageExists(false);  // Reset first
+            setTimeout(() => {
+              setImageExists(true);
+              // Verify the image exists
               const img = new Image();
               img.onload = () => {
-                console.log('New image loaded successfully after upload');
+                // console.log('New image loaded successfully after upload');
                 setImageExists(true);
               };
               img.onerror = () => {
                 console.error('Failed to load new image after upload');
                 setImageExists(false);
               };
-              img.src = getMiniImagePath(miniData.id, 'original');
-            }
-          }, 100);  // Then set true after a brief delay
-        } catch (error) {
-          console.error('Error uploading image:', error);
-          showError(error instanceof Error ? error.message : 'Failed to upload image');
-          return;
+              img.src = getMiniImagePath(newMiniId || miniData?.id || 0, 'original');
+            }, 100);
+          } catch (error) {
+            console.error('Error uploading image:', error);
+            showError(error instanceof Error ? error.message : 'Failed to upload image');
+            // Don't return here, we still want to save the miniature data
+          }
         }
-      }
 
-      // Save miniature data first before handling image refresh
-      if (isEditMode && miniData?.id) {
-        await updateMiniature(miniData.id, miniatureData)
-      } else {
-        const newMini = await createMiniature(miniatureData)
-        // If this is a new miniature and we uploaded an image, verify it exists
-        if (imageUploaded && newMini?.id) {
-          setTimeout(() => {
-            const img = new Image();
-            img.onload = () => {
-              console.log('New image loaded successfully for new miniature');
-              setImageExists(true);
-            };
-            img.onerror = () => {
-              console.error('Failed to load new image for new miniature');
-              setImageExists(false);
-            };
-            img.src = getMiniImagePath(newMini.id, 'original');
-          }, 500); // Give a bit more time for new miniatures
-        }
-      }
-
-      setPendingTags([])
-      // Transform tags to match expected type before saving
-      const transformedMiniatureData = {
-        ...miniatureData,
-        tags: miniatureData.tags.map(t => ({
-          id: t.id,
-          tag: {
+        setPendingTags([])
+        // Transform tags to match expected type before saving
+        const transformedMiniatureData = {
+          ...miniatureData,
+          tags: miniatureData.tags.map(t => ({
             id: t.id,
-            name: t.name
-          }
-        }))
-      }
-      await onSave(transformedMiniatureData)
+            tag: {
+              id: t.id,
+              name: t.name
+            }
+          }))
+        }
+        await onSave(transformedMiniatureData)
 
-      // If we uploaded an image, notify the parent to refresh
-      if (imageUploaded) {
-        // Give a small delay to ensure the image is processed
-        setTimeout(() => {
-          if (onImageUpload) {
-            onImageUpload();
-          }
-        }, 200);
+        // If we uploaded an image, notify the parent to refresh
+        if (imageUploaded) {
+          // Give a small delay to ensure the image is processed
+          setTimeout(() => {
+            if (onImageUpload) {
+              onImageUpload();
+            }
+          }, 200);
+        }
+
+      } catch (error) {
+        console.error('Error saving miniature:', error)
+        if (error instanceof Error) {
+          showError(error.message)
+        }
       }
 
     } catch (error) {
@@ -903,11 +902,11 @@ export function MiniatureOverviewModal({
     // Check if new miniature has an image
     if (miniData?.id) {
       const imagePath = getMiniImagePath(miniData.id, 'original');
-      console.log('Checking for image:', {
-        miniId: miniData.id,
-        imagePath,
-        timestamp: new Date().getTime()
-      });
+      // console.log('Checking for image:', {
+      //   miniId: miniData.id,
+      //   imagePath,
+      //   timestamp: new Date().getTime()
+      // });
 
       const img = new Image();
       img.onload = () => {
@@ -1076,6 +1075,10 @@ export function MiniatureOverviewModal({
                     <motion.div 
                       key={`image-${miniData?.id || previewUrl}`}
                       className="absolute inset-0 flex items-center justify-center bg-gray-900/50"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
                     >
                       <motion.img
                         initial={{ opacity: 0, scale: 0.3, y: 50 }}
@@ -1095,16 +1098,15 @@ export function MiniatureOverviewModal({
                             path: e.currentTarget.src,
                             timestamp: new Date().getTime()
                           });
-                          const target = e.currentTarget;
-                          target.style.display = 'none';
                           setImageExists(false);
                         }}
                         onLoad={(e) => {
-                          console.log('Image displayed successfully:', {
-                            miniId: miniData?.id,
-                            path: e.currentTarget.src,
-                            timestamp: new Date().getTime()
-                          });
+                          // Only log and update state if the image source matches what we expect
+                          const currentSrc = e.currentTarget.src;
+                          const expectedSrc = previewUrl || (miniData?.id ? getMiniImagePath(miniData.id, 'original') : '');
+                          if (currentSrc.includes(expectedSrc)) {
+                            setImageExists(true);
+                          }
                         }}
                       />
                     </motion.div>
@@ -1113,9 +1115,10 @@ export function MiniatureOverviewModal({
                       key="placeholder"
                       data-placeholder
                       className="absolute inset-0 flex flex-col items-center justify-center text-gray-500"
-                      initial={{ opacity: 1 }}
+                      initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
                     >
                       <FaDiceD20 className="w-12 h-12 mb-2" />
                       <span className="text-sm">Drop image here or click to select</span>
@@ -1187,30 +1190,7 @@ export function MiniatureOverviewModal({
                 ))}
               </div>
 
-              {/* Company Logo with animation */}
-              <div className="h-32 flex items-start justify-center">
-                <AnimatePresence mode="wait">
-                  {companyLogo && (
-                    <motion.img 
-                      key={companyLogo}
-                      src={companyLogo} 
-                      alt="Company Logo" 
-                      className="h-24 w-auto object-contain"
-                      initial={{ opacity: 0, scale: 0.3, y: 50 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      transition={{ 
-                        type: "spring",
-                        stiffness: 300,
-                        damping: 20,
-                        mass: 0.8
-                      }}
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                      }}
-                    />
-                  )}
-                </AnimatePresence>
-              </div>
+              
             </div>
 
             {/* Right Column - Types, Tags, and moved fields */}
@@ -1250,58 +1230,85 @@ export function MiniatureOverviewModal({
               </div>
 
               {/* Product Set */}
-              <div className="relative">
-                <UI.SearchInput
-                  value={selectedProductDisplay || productSearchTerm}
-                  onChange={(e) => {
-                    const newValue = e.target.value
-                    setProductSearchTerm(newValue)
-                    setShowProductDropdown(true)
-                    if (formData.product_set_id) {
-                      setFormData(prev => ({ ...prev, product_set_id: null }))
-                    }
-                    setIsInvalidProductSet(newValue !== '' && !filteredProducts.some(p => 
-                      `${p.company} → ${p.line} → ${p.set}`.toLowerCase().includes(newValue.toLowerCase())
-                    ))
-                  }}
-                  placeholder="Product Set"
-                />
-                {/* Clear button */}
-                {(selectedProductDisplay || productSearchTerm) && (
-                  <button
-                    type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 transition-colors"
-                    onClick={() => {
-                      setProductSearchTerm('')
-                      setFormData(prev => ({ ...prev, product_set_id: null }))
-                      setShowProductDropdown(false)
+              <div className="grid grid-cols-12 gap-2 items-center">
+                <div className="relative col-span-10">
+                  <UI.SearchInput
+                    value={selectedProductDisplay || productSearchTerm}
+                    onChange={(e) => {
+                      const newValue = e.target.value
+                      setProductSearchTerm(newValue)
+                      setShowProductDropdown(true)
+                      if (formData.product_set_id) {
+                        setFormData(prev => ({ ...prev, product_set_id: null }))
+                      }
+                      setIsInvalidProductSet(newValue !== '' && !filteredProducts.some(p => 
+                        `${p.company} → ${p.line} → ${p.set}`.toLowerCase().includes(newValue.toLowerCase())
+                      ))
                     }}
-                  >
-                    <FaTimesCircle className="w-4 h-4" />
-                  </button>
-                )}
-                {showProductDropdown && (productSearchTerm || formData.product_set_id) && (
-                  <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-                    {filteredProducts.map(product => (
-                      <button
-                        key={product.id}
-                        type="button"
-                        className={`w-full text-left px-3 py-2 hover:bg-gray-700 text-sm ${
-                          formData.product_set_id === product.id ? 'bg-gray-700' : ''
-                        }`}
-                        onClick={() => {
-                          setFormData(prev => ({ ...prev, product_set_id: product.id }))
-                          setProductSearchTerm('')
-                          setShowProductDropdown(false)
-                        }}
-                      >
-                        {`${product.company} → ${product.line} → ${product.set}`}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                    placeholder="Product Set"
+                  />
+                  {/* Clear button */}
+                  {(selectedProductDisplay || productSearchTerm) && (
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 transition-colors"
+                      onClick={() => {
+                        setProductSearchTerm('')
+                        setFormData(prev => ({ ...prev, product_set_id: null }))
+                        setShowProductDropdown(false)
+                      }}
+                    >
+                      <FaTimesCircle className="w-4 h-4" />
+                    </button>
+                  )}
+                  {showProductDropdown && (productSearchTerm || formData.product_set_id) && (
+                    <div className="absolute left-0 right-0 z-10 mt-1 max-h-32 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                      {filteredProducts.map(product => (
+                        <button
+                          key={product.id}
+                          type="button"
+                          className={`w-full text-left px-3 py-2 hover:bg-gray-700 text-sm ${
+                            formData.product_set_id === product.id ? 'bg-gray-700' : ''
+                          }`}
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, product_set_id: product.id }))
+                            setProductSearchTerm('')
+                            setShowProductDropdown(false)
+                          }}
+                        >
+                          {`${product.company} → ${product.line} → ${product.set}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
+                {/* Company Logo with animation */}
+                <div className="col-span-2 flex items-center justify-center h-10 relative">
+                  <AnimatePresence mode="wait">
+                    {companyLogo && (
+                      <motion.img 
+                        key={companyLogo}
+                        src={companyLogo} 
+                        alt="Company Logo" 
+                        className="max-h-full w-auto object-contain absolute"
+                        initial={{ opacity: 0, scale: 0.3, y: 50 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        transition={{ 
+                          type: "spring",
+                          stiffness: 300,
+                          damping: 20,
+                          mass: 0.8
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    )}
+                  </AnimatePresence>
+                </div>              
+              </div>
+              
               {/* Types and Tags grid */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Types Card */}

@@ -33,12 +33,6 @@ CREATE TABLE IF NOT EXISTS "tags" (
 	UNIQUE("name"),
 	PRIMARY KEY("id" AUTOINCREMENT)
 );
-CREATE TABLE IF NOT EXISTS "settings" (
-	"settings_id"	INTEGER,
-	"setting_name"	TEXT NOT NULL UNIQUE,
-	"setting_value"	TEXT NOT NULL,
-	PRIMARY KEY("settings_id" AUTOINCREMENT)
-);
 CREATE TABLE IF NOT EXISTS "base_sizes" (
 	"id"	INTEGER,
 	"base_size_name"	TEXT NOT NULL,
@@ -231,10 +225,6 @@ INSERT INTO "tags" VALUES (76,'tag3');
 INSERT INTO "tags" VALUES (77,'purple');
 INSERT INTO "tags" VALUES (78,'dragon');
 INSERT INTO "tags" VALUES (79,'asdf');
-INSERT INTO "settings" VALUES (208,'collection_viewtype','table');
-INSERT INTO "settings" VALUES (259,'minisadmin_entries_per_page','10');
-INSERT INTO "settings" VALUES (286,'collection_show_entries_per_page','10');
-INSERT INTO "settings" VALUES (287,'productadmin_entries_per_page','10');
 INSERT INTO "base_sizes" VALUES (1,'tiny');
 INSERT INTO "base_sizes" VALUES (2,'small');
 INSERT INTO "base_sizes" VALUES (3,'medium');

@@ -1,19 +1,19 @@
 import { useState, useEffect } from 'react'
-import { FaTable, FaExpand, FaDiceD6, FaThLarge, FaShareAltSquare, FaDiceD20, FaPlusSquare, FaMinusSquare, FaAngleDown, FaAngleUp, FaEye, FaEyeSlash } from 'react-icons/fa'
+import { FaTable, FaDiceD6, FaThLarge, FaShareAltSquare, FaDiceD20 } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
 import { ShowItems } from '../components/ShowItems'
 import type { Mini } from '../types/mini'
 import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
-import { getMiniImagePath } from '../utils/imageUtils'
+import { getMiniImagePath, getCompanyLogoPath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 import { useNotifications } from '../contexts/NotificationContext'
 import { deleteMiniature, getMiniature, updateMiniatureInUse } from '../services/miniatureService'
 import { Switch } from '../components/ui'
 import { useMiniatureReferenceData } from '../hooks/useMiniatureReferenceData'
 
-type ViewMode = 'table' | 'cards' | 'banner'
+type ViewMode = 'table' | 'cards'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -31,7 +31,7 @@ export default function MiniatureOverview() {
   const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
   const [allMinis, setAllMinis] = useState<Mini[]>([])
   const [imageTimestamp, setImageTimestamp] = useState(() => Date.now())
-  const itemsPerPage = 10
+  const itemsPerPage = 12
 
   const {
     paintedByOptions,
@@ -441,151 +441,6 @@ export default function MiniatureOverview() {
     }
   }
 
-  const renderCardView = () => {
-    return (
-      <div className="grid grid-cols-4 gap-6">
-        {minis.map((mini, index) => {
-          const thumbPath = `${getMiniImagePath(mini.id, 'thumb')}?t=${imageTimestamp}`
-          const company = mini.product_sets?.product_line?.company?.name || 'No company'
-          const productLine = mini.product_sets?.product_line?.name || 'No product line'
-          const productSet = mini.product_sets?.name || 'No set'
-          const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
-          const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
-          const quantity = mini.quantity || 0
-
-          return (
-            <div 
-              key={mini.id} 
-              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02] hover:rotate-1"
-              onClick={() => handleEdit(mini, index)}
-            >
-              <div className="relative aspect-square bg-gray-800 overflow-hidden">
-                <img
-                  src={thumbPath}
-                  alt={mini.name}
-                  className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null
-                    e.currentTarget.style.display = 'none'
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                  }}
-                />
-                <FaDiceD20 className="absolute inset-0 m-auto w-12 h-12 text-gray-600 hidden" />
-                <div className="absolute top-1 right-1 bg-gray-900/60 px-2 py-1 rounded text-xs text-gray-100">
-                  QTY: {quantity}
-                </div>
-              </div>
-              <div className="p-4">
-                <h3 className="font-bold text-gray-100 mb-2 truncate">{mini.name}</h3>
-                <div className="space-y-1 text-sm text-gray-400">
-                  <p className="truncate"><span className="text-gray-500">Company:</span> {company}</p>
-                  <p className="truncate"><span className="text-gray-500">Line:</span> {productLine}</p>
-                  <p className="truncate"><span className="text-gray-500">Set:</span> {productSet}</p>
-                  <p className="truncate"><span className="text-gray-500">Base:</span> {baseSize}</p>
-                  <p className="truncate"><span className="text-gray-500">Painted by:</span> {paintedBy}</p>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
-  const renderBannerView = () => {
-    return (
-      <div className="grid grid-cols-4 gap-6 h-[calc(90vh-20rem)]">
-        {minis.map((mini, index) => {
-          const thumbPath = `${getMiniImagePath(mini.id, 'thumb')}?t=${imageTimestamp}`
-          const company = mini.product_sets?.product_line?.company?.name || 'No company'
-          const productLine = mini.product_sets?.product_line?.name || 'No product line'
-          const productSet = mini.product_sets?.name || 'No set'
-          const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
-          const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
-          const quantity = mini.quantity || 0
-          const typeNames = mini.types?.map(t => t.type.name) || []
-
-          return (
-            <div 
-              key={mini.id} 
-              className="group bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:rotate-1 hover:-translate-y-1 flex"
-              onClick={() => handleEdit(mini, index)}
-            >
-              <div className="relative w-1/3 bg-gray-800 overflow-hidden">
-                <img
-                  src={thumbPath}
-                  alt={mini.name}
-                  className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null
-                    e.currentTarget.style.display = 'none'
-                    e.currentTarget.nextElementSibling?.classList.remove('hidden')
-                  }}
-                />
-                <FaDiceD20 className="absolute inset-0 m-auto w-12 h-12 text-gray-600 hidden" />
-                <div className="absolute top-1 right-1 bg-gray-900/60 px-2 py-1 rounded text-xs text-gray-100">
-                  QTY: {quantity}
-                </div>
-              </div>
-              <div className="flex-1 p-6">
-                <h3 className="font-bold text-xl text-gray-100 mb-4">{mini.name}</h3>
-                <div className="space-y-2 text-sm">
-                  <p>
-                    <span className="text-gray-500">Types (eye - right):</span>{' '}
-                    <ShowItems 
-                      items={typeNames} 
-                      displayType="text" 
-                      textColor="text-gray-200"
-                      toggle={{
-                        type: 'icon',
-                        more: <FaEye className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />,
-                        less: <FaEyeSlash className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />
-                      }}
-                      togglePlacement="right"
-                    />
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Types (plus/minus - start):</span>{' '}
-                    <ShowItems 
-                      items={typeNames} 
-                      displayType="text" 
-                      textColor="text-gray-200"
-                      toggle={{
-                        type: 'icon',
-                        more: <FaPlusSquare className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />,
-                        less: <FaMinusSquare className="w-3 h-3 inline opacity-75 hover:opacity-100 transition-opacity duration-200" />
-                      }}
-                      togglePlacement="start"
-                    />
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Types (angle - top):</span>{' '}
-                    <ShowItems 
-                      items={typeNames} 
-                      displayType="text" 
-                      textColor="text-gray-200"
-                      toggle={{
-                        type: 'icon',
-                        more: <FaAngleDown className="w-4 h-4 inline opacity-75 hover:opacity-100 transition-transform duration-200" />,
-                        less: <FaAngleUp className="w-4 h-4 inline opacity-75 hover:opacity-100 transition-transform duration-200" />
-                      }}
-                      togglePlacement="top"
-                    />
-                  </p>
-                  <p><span className="text-gray-500">Company:</span> <span className="text-gray-300">{company}</span></p>
-                  <p><span className="text-gray-500">Line:</span> <span className="text-gray-300">{productLine}</span></p>
-                  <p><span className="text-gray-500">Set:</span> <span className="text-gray-300">{productSet}</span></p>
-                  <p><span className="text-gray-500">Base:</span> <span className="text-gray-300">{baseSize}</span></p>
-                  <p><span className="text-gray-500">Painted by:</span> <span className="text-gray-300">{paintedBy}</span></p>
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
-
   const handleCloseModal = () => {
     setIsModalOpen(false)
     setSelectedMini(undefined)
@@ -670,14 +525,6 @@ export default function MiniatureOverview() {
                     >
                       <FaThLarge className="w-4 h-4" />
                     </button>
-                    <button
-                      className={`p-2 rounded focus:outline-none ${viewMode === 'banner' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                      onClick={() => setViewMode('banner')}
-                      title="Banner View"
-                      tabIndex={-1}
-                    >
-                      <FaExpand className="w-4 h-4" />
-                    </button>
                   </div>
                   <UI.Button 
                     variant="btnSuccess"
@@ -707,9 +554,9 @@ export default function MiniatureOverview() {
                 {minis.length === 0 ? (
                   <UI.EmptyTableState icon={<FaDiceD6 />} message="No miniatures found" />
                 ) : viewMode === 'table' ? (
-                  <div className="overflow-x-auto">
+                  <div className="overflow-x-auto overflow-y-auto">
                     <table className="w-full divide-y divide-[#333333]">
-                      <thead>
+                      <thead className="sticky top-0 z-10">
                         <tr>
                           {columnHeaders.map((header, index) => (
                             <th
@@ -747,10 +594,156 @@ export default function MiniatureOverview() {
                     </table>
                   </div>
                 ) : viewMode === 'cards' ? (
-                  renderCardView()
-                ) : (
-                  renderBannerView()
-                )}
+                  <div className="grid grid-cols-4 auto-rows-fr gap-2 h-[calc(92vh-22rem)] overflow-y-auto p-5">
+                    {minis.map((mini, index) => {
+                      const originalPath = `${getMiniImagePath(mini.id, 'original')}?t=${imageTimestamp}`
+                      const company = mini.product_sets?.product_line?.company?.name || 'No company'
+                      const productLine = mini.product_sets?.product_line?.name || 'No product line'
+                      const productSet = mini.product_sets?.name || 'No set'
+                      const baseSize = mini.base_sizes?.base_size_name || 'Unknown size'
+                      const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
+                      const quantity = mini.quantity || 0
+
+                      const rotation = (Math.sin(mini.id * 0.7) + Math.cos(mini.id * 1.3)) > 0 ? 
+                        1 + Math.abs(Math.sin(mini.id)) : 
+                        -2 + Math.abs(Math.sin(mini.id));
+
+                      return (
+                        <div 
+                          key={mini.id} 
+                          className="group relative w-full h-full bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]"
+                          style={{ 
+                            transform: `rotate(0deg)`,
+                            '--card-rotation': `${rotation}deg`
+                          } as React.CSSProperties}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.transform = `rotate(${rotation}deg)`;
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.transform = 'rotate(0deg)';
+                          }}
+                          onClick={() => handleEdit(mini, index)}
+                        >
+                          {/* Image Container with Overlay */}
+                          <div className="absolute inset-0 bg-gray-800">
+                            <img
+                              src={originalPath}
+                              alt={mini.name}
+                              className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110 opacity-80 group-hover:opacity-90"
+                              onError={(e) => {
+                                e.currentTarget.onerror = null
+                                e.currentTarget.style.display = 'none'
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden')
+                              }}
+                              onLoad={(e) => {
+                                e.currentTarget.style.display = 'block'
+                                e.currentTarget.nextElementSibling?.classList.add('hidden')
+                              }}
+                            />
+                            <FaDiceD20 className="absolute inset-0 m-auto w-12 h-12 text-gray-600 hidden" />
+                            {/* Vignette Effect */}
+                            <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.6)_70%,rgba(0,0,0,0.8)_100%)]" />
+                          </div>
+
+                          {/* Content Overlay */}
+                          <div className="absolute inset-0 p-3 flex flex-col min-h-0">
+                            {/* Top Row - Fixed height */}
+                            <div className="flex-none flex justify-between items-start gap-2">
+                              <div className="flex flex-col gap-1.5 max-w-[70%]">
+                                <h3 className="font-bold text-gray-100 text-base leading-tight line-clamp-2">
+                                  {mini.name} <span className="text-gray-400 text-xs">({rotation.toFixed(2)}°)</span>
+                                </h3>
+                                {mini.types?.find(t => !t.proxy_type) && (
+                                  <div className="flex items-center">
+                                    <ShowItems 
+                                      items={[{
+                                        id: mini.types.find(t => !t.proxy_type)?.type_id || 0,
+                                        label: mini.types.find(t => !t.proxy_type)?.type.name || ''
+                                      }]}
+                                      displayType="pills"
+                                      scaleAnimation={true}
+                                      shadowEnabled={true}
+                                      selectedItem={mini.types.find(t => !t.proxy_type)?.type_id}
+                                      selectedStyle={{
+                                        text: 'text-gray-200',
+                                        bg: 'bg-orange-900',
+                                        border: '',
+                                        hover: 'hover:bg-orange-800',
+                                        indicator: <div className="w-2 h-2 rounded-full bg-green-500" />
+                                      }}
+                                      itemStyle={{
+                                        text: 'text-gray-200',
+                                        bg: 'bg-orange-900',
+                                        size: 'xs',
+                                        border: 'border border-orange-800/50',
+                                        hover: 'hover:bg-orange-800'
+                                      }}
+                                      maxVisible={1}
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex-none bg-blue-900/80 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs text-gray-100 border border-blue-700/50">
+                                QTY: {quantity}
+                              </div>
+                            </div>
+
+                            {/* Middle Content - Scrollable if needed */}
+                            <div className="flex-1 min-h-0 mt-2">
+                              {company && (
+                                <div className="flex flex-col items-start gap-1 mb-1.5">
+                                  <img
+                                    src={getCompanyLogoPath(company)}
+                                    alt={company}
+                                    className="h-5 w-auto object-contain opacity-90 mb-0.5"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                  <p className="text-blue-400 text-sm">{company}</p>
+                                </div>
+                              )}
+                              {productLine && productSet && (
+                                productLine.toLowerCase() === productSet.toLowerCase() ? (
+                                  <p className="text-gray-300 text-xs truncate">
+                                    {productSet}
+                                  </p>
+                                ) : (
+                                  <>
+                                    <p className="text-gray-300 text-xs truncate">
+                                      {productLine}
+                                    </p>
+                                    <p className="text-gray-400 text-xs truncate">
+                                      {productSet}
+                                    </p>
+                                  </>
+                                )
+                              )}
+                            </div>
+
+                            {/* Bottom Row - Fixed height */}
+                            <div className="flex-none flex justify-between items-end mt-1.5">
+                              <div className="space-y-0.5">
+                                <p className="text-xs text-gray-400">
+                                  <span className="text-gray-500">Base:</span> {baseSize.charAt(0).toUpperCase() + baseSize.slice(1).toLowerCase()}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  <span className="text-gray-500">By:</span> {paintedBy.charAt(0).toUpperCase() + paintedBy.slice(1).toLowerCase()}
+                                </p>
+                              </div>
+                              {mini.in_use && (
+                                <div className="bg-red-900/80 backdrop-blur-sm px-2 py-0.5 pb-1 rounded-lg text-xs text-gray-200 border border-red-700/50 flex items-center gap-1">
+                                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                                  <span className="ml-1">In Use</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : null}
               </div>
             </UI.CardBody>
           </UI.Card>
