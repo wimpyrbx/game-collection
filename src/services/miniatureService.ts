@@ -250,4 +250,25 @@ export async function updateMiniatureInUse(miniId: number, inUse: boolean) {
     throw error
   }
 }
+
+export async function deleteImage(miniId: number) {
+  try {
+    const formData = new FormData()
+    formData.append('id', miniId.toString())
+    
+    const imageResponse = await fetch('/miniatures/phpscripts/deleteImage.php', {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (!imageResponse.ok) {
+      throw new Error(await imageResponse.text())
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting image:', error)
+    throw error
+  }
+}
  

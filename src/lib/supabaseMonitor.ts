@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient'
+import { supabase } from './supabase'
 
 const isDevelopment = import.meta.env.DEV
 
@@ -37,69 +37,77 @@ if (isDevelopment) {
     let operations: string[] = []
     let currentArgs: unknown[] = []
 
-    // Create a proxy for the query builder
-    return new Proxy(originalResult, {
-      get(target: any, prop: string | symbol) {
-        const value = target[prop]
-        
-        if (typeof value === 'function') {
-          return (...args: unknown[]) => {
-            const result = value.apply(target, args)
-            operations.push(prop.toString())
-            currentArgs.push(args)
+    const createProxy = (target: any): any => {
+      return new Proxy(target, {
+        get(obj, prop: string | symbol) {
+          const value = obj[prop]
+          
+          if (typeof value === 'function') {
+            return (...args: unknown[]) => {
+              const result = value.apply(obj, args)
+              operations.push(prop.toString())
+              currentArgs.push(args)
 
-            const stack = new Error().stack
-              ?.split('\n')
-              .slice(2)
-              .find(line => line.includes('/src/'))
-              ?.trim()
-              ?.replace(/^at /, '')
+              const stack = new Error().stack
+                ?.split('\n')
+                .slice(2)
+                .find(line => line.includes('/src/'))
+                ?.trim()
+                ?.replace(/^at /, '')
 
-            if (result instanceof Promise) {
-              return result.then((data: any) => {
-                const duration = Date.now() - startTime
-                const dataSize = getObjectSize(data?.data)
-                
-                const logEntry: QueryLogEntry = {
-                  table,
-                  timestamp: new Date().toISOString(),
-                  operation: operations.join('.'),
-                  duration,
-                  dataSize,
-                  args: currentArgs,
-                  trace: stack ? `Called from: ${stack}` : 'Unknown location',
-                  result: {
-                    status: data?.status || 200,
-                    statusText: data?.statusText || 'OK',
-                    count: data?.data ? (Array.isArray(data.data) ? data.data.length : 1) : 0,
-                    error: data?.error
-                  }
-                }
-                
-                queryCount++
-                queryLog.push(logEntry)
-                
-                if (data?.error) {
-                  console.error('[Supabase Query Error]', {
+              if (result instanceof Promise) {
+                return result.then((data: any) => {
+                  const duration = Date.now() - startTime
+                  const dataSize = getObjectSize(data?.data)
+                  
+                  const logEntry: QueryLogEntry = {
                     table,
-                    operations,
-                    error: data.error,
-                    args: currentArgs
-                  })
-                } else {
-                  console.log('[Supabase Query]', logEntry)
-                }
-                return data
-              })
-            }
+                    timestamp: new Date().toISOString(),
+                    operation: operations.join('.'),
+                    duration,
+                    dataSize,
+                    args: currentArgs,
+                    trace: stack ? `Called from: ${stack}` : 'Unknown location',
+                    result: {
+                      status: data?.status || 200,
+                      statusText: data?.statusText || 'OK',
+                      count: data?.data ? (Array.isArray(data.data) ? data.data.length : 1) : 0,
+                      error: data?.error
+                    }
+                  }
+                  
+                  queryCount++
+                  queryLog.push(logEntry)
+                  
+                  if (data?.error) {
+                    console.error('[Supabase Query Error]', {
+                      table,
+                      operations,
+                      error: data.error,
+                      args: currentArgs
+                    })
+                  } else {
+                    console.log('[Supabase Query]', logEntry)
+                  }
+                  return data
+                })
+              }
 
-            return result
+              // If the result is a query builder, wrap it in a proxy
+              if (result && typeof result === 'object' && 'then' in result === false) {
+                return createProxy(result)
+              }
+
+              return result
+            }
           }
+          
+          return value
         }
-        
-        return value
-      }
-    })
+      })
+    }
+
+    return createProxy(originalResult)
   }
 }
 

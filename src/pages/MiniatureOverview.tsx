@@ -330,10 +330,18 @@ export default function MiniatureOverview() {
             try {
               if (mini.id) {
                 await updateMiniatureInUse(mini.id, checked);
-                const updatedMinis = await getPageMinis(currentPage);
-                if (updatedMinis) {
-                  setMinis(updatedMinis);
-                }
+                
+                // Invalidate cache to force fresh data
+                invalidateCache();
+                
+                // Refresh all data in a single batch
+                const [updatedMinis] = await Promise.all([
+                  getPageMinis(currentPage),
+                  getTotalQuantity()
+                ]);
+                
+                // Update states
+                setMinis(updatedMinis);
               }
             } catch (error) {
               console.error('Error updating in_use status:', error);
@@ -688,7 +696,7 @@ export default function MiniatureOverview() {
                             <img
                               src={originalPath}
                               alt={mini.name}
-                              className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-110 opacity-80 group-hover:opacity-90"
+                              className="w-full h-full object-cover object-[center_25%] transition-transform duration-300 ease-in-out group-hover:scale-110 opacity-80 group-hover:opacity-90"
                               onError={(e) => {
                                 e.currentTarget.onerror = null
                                 e.currentTarget.style.display = 'none'

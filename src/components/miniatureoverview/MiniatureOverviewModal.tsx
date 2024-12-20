@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle } from 'react-icons/fa'
+import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaTrashAlt } from 'react-icons/fa'
 import { HiOutlineArrowSmallLeft, HiOutlineArrowSmallRight } from 'react-icons/hi2'
 import type { Mini } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath, getCompanyLogoPath } from '../../utils/imageUtils'
-import { createMiniature, updateMiniature } from '../../services/miniatureService'
+import { createMiniature, updateMiniature, deleteImage } from '../../services/miniatureService'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { supabase } from '../../lib/supabase'
 import { TagInput } from '../ui/input/TagInput'
@@ -122,7 +122,7 @@ export function MiniatureOverviewModal({
   const baseSizeSelectRef = useRef<HTMLSelectElement>(null)
   const quantityInputRef = useRef<HTMLInputElement>(null)
 
-  const { showError } = useNotifications()
+  const { showError, showSuccess } = useNotifications()
 
   // Add validation function
   const validateForm = () => {
@@ -374,6 +374,7 @@ export function MiniatureOverviewModal({
             }
 
             imageUploaded = true;
+            showSuccess('Image uploaded successfully');
 
             // Force a re-render of the image by updating the image existence state
             setImageExists(false);  // Reset first
@@ -1123,12 +1124,38 @@ export function MiniatureOverviewModal({
                   {(previewUrl || (miniData?.id && imageExists)) ? (
                     <motion.div 
                       key={`image-${miniData?.id || previewUrl}`}
-                      className="absolute inset-0 flex items-center justify-center bg-gray-900/50"
+                      className="absolute inset-0 flex items-center justify-center bg-gray-900/50 group"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.2 }}
                     >
+                      {/* Add delete button */}
+                      {miniData?.id && imageExists && !previewUrl && (
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              if (miniData.id) {
+                                await deleteImage(miniData.id);
+                                setImageExists(false);
+                                if (onImageUpload) {
+                                  onImageUpload();
+                                }
+                                showSuccess('Image deleted successfully');
+                              }
+                            } catch (error) {
+                              console.error('Error deleting image:', error);
+                              showError('Failed to delete image');
+                            }
+                          }}
+                          className="absolute top-2 right-2 p-2 bg-red-900/80 hover:bg-red-800 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                          title="Delete image"
+                        >
+                          <FaTrashAlt className="w-4 h-4" />
+                        </button>
+                      )}
                       <motion.img
                         initial={{ opacity: 0, scale: 0.3, y: 50 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
