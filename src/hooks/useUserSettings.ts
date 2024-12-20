@@ -41,7 +41,9 @@ async function loadSettings() {
     if (error) throw error
 
     // Update store
-    store.settings = new Map(data?.map(setting => [setting.setting_name, setting.setting_value]) || [])
+    store.settings = new Map(data?.map((setting: { setting_name: string; setting_value: string }) => 
+      [setting.setting_name, setting.setting_value]
+    ) || [])
     store.loading = false
     store.lastFetch = Date.now()
   } catch (err) {

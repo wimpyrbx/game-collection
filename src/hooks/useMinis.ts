@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseMonitor'
 import type { Mini } from '../types/mini'
 import debounce from 'lodash/debounce'
+import { deleteMiniature } from '../services/miniatureService'
 
 interface SupabaseMiniType {
   mini_id: number
@@ -108,8 +109,62 @@ const transformMini = (item: SupabaseMini): Mini => ({
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 const SEARCH_DEBOUNCE = 500 // 500ms debounce for search
 
+const MINIATURE_QUERY = `
+  id,
+  name,
+  description,
+  quantity,
+  location,
+  created_at,
+  updated_at,
+  painted_by_id,
+  base_size_id,
+  product_set_id,
+  in_use,
+  types:mini_to_types(
+    mini_id,
+    type_id,
+    proxy_type,
+    type:mini_types(
+      id,
+      name,
+      categories:type_to_categories(
+        category:mini_categories(
+          id,
+          name
+        )
+      )
+    )
+  ),
+  painted_by(
+    id, 
+    painted_by_name
+  ),
+  base_sizes:base_size_id(
+    id,
+    base_size_name
+  ),
+  product_sets:product_set_id(
+    id,
+    name,
+    product_line:product_line_id(
+      id,
+      name,
+      company:company_id(
+        id,
+        name
+      )
+    )
+  ),
+  tags:mini_to_tags(
+    tag:tags(
+      id,
+      name
+    )
+  )
+`
+
 let globalCache: Cache | null = null
-let globalCachePromise: Promise<any> | null = null
 
 export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   const [minis, setMinis] = useState<Mini[]>([])
@@ -144,78 +199,33 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
   const fetchAllData = useCallback(async () => {
     try {
+      type SupabaseResponse = {
+        data: SupabaseMini[] | null
+        error: any
+      }
+
       // Always fetch fresh data for pagination changes
-      const { data, error } = await supabase
+      const result = await (supabase
         .from('minis')
-        .select(`
-          id,
-          name,
-          description,
-          quantity,
-          location,
-          created_at,
-          updated_at,
-          painted_by_id,
-          base_size_id,
-          product_set_id,
-          in_use,
-          types:mini_to_types(
-            mini_id,
-            type_id,
-            proxy_type,
-            type:mini_types(
-              id,
-              name,
-              categories:type_to_categories(
-                category:mini_categories(
-                  id,
-                  name
-                )
-              )
-            )
-          ),
-          painted_by(
-            id, 
-            painted_by_name
-          ),
-          base_sizes:base_size_id(
-            id,
-            base_size_name
-          ),
-          product_sets:product_set_id(
-            id,
-            name,
-            product_line:product_line_id(
-              id,
-              name,
-              company:company_id(
-                id,
-                name
-              )
-            )
-          ),
-          tags:mini_to_tags(
-            tag:tags(
-              id,
-              name
-            )
-          )
-        `)
-        .returns<Array<SupabaseMini>>()
-        .order('name')
+        .select(MINIATURE_QUERY)
+        .order('name') as unknown as Promise<SupabaseResponse>)
+
+      const { data, error } = await result
 
       if (error) throw error
 
       // Filter data if there's a search term
       let filteredData = data || []
       if (internalSearchTerm) {
-        filteredData = filteredData.filter(mini => 
+        filteredData = filteredData.filter((mini: { name: string }) => 
           mini.name.toLowerCase().includes(internalSearchTerm.toLowerCase())
         )
       }
 
       // Calculate total quantity
-      const totalQuantitySum = filteredData.reduce((acc, curr) => acc + (curr.quantity || 0), 0)
+      const totalQuantitySum = filteredData.reduce((acc: number, curr: { quantity: number }) => 
+        acc + (curr.quantity || 0), 0
+      )
 
       // Update global cache
       globalCache = {
@@ -236,21 +246,6 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       throw error
     }
   }, [internalSearchTerm])
-
-  // Add updateFromCache function
-  const updateFromCache = useCallback((page: number) => {
-    if (!globalCache) return false
-
-    const startIndex = (page - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    const pageData = globalCache.minis.slice(startIndex, endIndex)
-
-    // Update state with cached data
-    setMinis(pageData.map(mini => transformMini(mini)))
-    setTotalMinis(globalCache.minis.length)
-    setTotalQuantity(globalCache.totalQuantity)
-    return true
-  }, [pageSize])
 
   // Add loadData function
   const loadData = useCallback(async () => {
@@ -299,7 +294,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       console.log(`Page data for page ${currentPage}: startIndex=${startIndex}, endIndex=${endIndex}, length=${pageData.length}`)
       
       // Update minis for current page
-      const transformedMinis = pageData.map(mini => transformMini(mini))
+      const transformedMinis = pageData.map((mini: SupabaseMini) => transformMini(mini))
       console.log('Transformed minis length:', transformedMinis.length)
       setMinis(transformedMinis)
       setLoading(false)
@@ -345,7 +340,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         const endIndex = startIndex + pageSize
         const pageData = data.slice(startIndex, endIndex)
         
-        setMinis(pageData.map(mini => transformMini(mini)))
+        setMinis(pageData.map((mini: SupabaseMini) => transformMini(mini)))
         setTotalMinis(totalCount)
         setTotalQuantity(totalQuantity)
       } catch (err) {
@@ -365,9 +360,10 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
   // Setup real-time subscription
   useEffect(() => {
-    // Setup subscription to minis table
+    if (subscriptionRef.current) return
+
     const subscription = supabase
-      .channel('minis_changes')
+      .channel('minis-changes')
       .on(
         'postgres_changes',
         {
@@ -375,145 +371,59 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
           schema: 'public',
           table: 'minis'
         },
-        async (payload) => {
-          // Skip updates if we're not using the cache
-          if (!isCacheValid()) return;
+        async (payload: { eventType: string; new: any; old: any }) => {
+          // Clear cache on any change
+          globalCache = null
 
-          // For updates, only process if the data actually changed
-          if (payload.eventType === 'UPDATE') {
-            const existingMini = globalCache?.minis.find(m => m.id === payload.new.id);
-            if (existingMini && JSON.stringify(existingMini) === JSON.stringify(payload.new)) {
-              return;
-            }
+          // Debounce updates to prevent rapid re-renders
+          if (updateTimeoutRef.current) {
+            clearTimeout(updateTimeoutRef.current)
           }
 
-          // Batch updates using debounce
-          const processUpdate = debounce(async () => {
+          updateTimeoutRef.current = setTimeout(async () => {
             try {
-              if (!isCacheValid()) return;
+              const { data: updatedMini } = await (supabase
+                .from('minis')
+                .select(MINIATURE_QUERY)
+                .eq('id', payload.new.id) as unknown as Promise<{ 
+                  data: SupabaseMini | null 
+                  error: any 
+                }>)
 
-              switch (payload.eventType) {
-                case 'INSERT':
-                case 'UPDATE': {
-                  const { data: updatedMini } = await supabase
-                    .from('minis')
-                    .select(`
-                      id,
-                      name,
-                      description,
-                      quantity,
-                      location,
-                      created_at,
-                      updated_at,
-                      painted_by_id,
-                      base_size_id,
-                      product_set_id,
-                      in_use,
-                      types:mini_to_types(
-                        mini_id,
-                        type_id,
-                        proxy_type,
-                        type:mini_types(
-                          id,
-                          name,
-                          categories:type_to_categories(
-                            category:mini_categories(
-                              id,
-                              name
-                            )
-                          )
-                        )
-                      ),
-                      painted_by(
-                        id, 
-                        painted_by_name
-                      ),
-                      base_sizes:base_size_id(
-                        id,
-                        base_size_name
-                      ),
-                      product_sets:product_set_id(
-                        id,
-                        name,
-                        product_line:product_line_id(
-                          id,
-                          name,
-                          company:company_id(
-                            id,
-                            name
-                          )
-                        )
-                      ),
-                      tags:mini_to_tags(
-                        tag:tags(
-                          id,
-                          name
-                        )
-                      )
-                    `)
-                    .eq('id', payload.new.id)
-                    .returns<SupabaseMini>()
-                    .single()
-
-                  if (updatedMini) {
-                    if (payload.eventType === 'INSERT') {
-                      const newMinis = [...globalCache!.minis, updatedMini].sort((a, b) => 
-                        a.name.localeCompare(b.name)
-                      ) as SupabaseMini[]
-
-                      globalCache = {
-                        ...globalCache!,
-                        minis: newMinis,
-                        timestamp: Date.now()
-                      }
-                    } else {
-                      const updatedMinis = globalCache!.minis.map(mini => 
-                        mini.id === payload.new.id ? updatedMini : mini
-                      ) as SupabaseMini[]
-
-                      globalCache = {
-                        ...globalCache!,
-                        minis: updatedMinis,
-                        timestamp: Date.now()
-                      }
-                    }
-                  }
-                  break;
-                }
-
-                case 'DELETE':
-                  globalCache = {
-                    ...globalCache!,
-                    minis: globalCache!.minis.filter(mini => 
-                      mini.id !== payload.old.id
-                    ),
-                    timestamp: Date.now()
-                  }
-                  break;
+              if (updatedMini) {
+                // Update the UI optimistically
+                setMinis(prev => {
+                  const index = prev.findIndex(m => m.id === updatedMini.id)
+                  if (index === -1) return prev
+                  const newMinis = [...prev]
+                  newMinis[index] = transformMini(updatedMini)
+                  return newMinis
+                })
               }
 
-              // Only update if we're still on the same page
-              if (currentPageRef.current === currentPage) {
-                updateFromCache(currentPage)
-              }
-            } catch (error) {
-              console.error('Error processing real-time update:', error)
+              // Refresh total quantity
+              const { totalQuantity: newTotal } = await fetchAllData()
+              setTotalQuantity(newTotal)
+            } catch (err) {
+              console.error('Error handling real-time update:', err)
             }
           }, 100)
-
-          processUpdate()
         }
       )
       .subscribe()
 
     subscriptionRef.current = () => {
       subscription.unsubscribe()
+      subscriptionRef.current = null
     }
 
     return () => {
       subscriptionRef.current?.()
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current)
+      }
     }
-  }, [currentPage, isCacheValid, updateFromCache])
+  }, [])
 
   // Modify getPageMinis to use global cache
   const getPageMinis = async (pageNum: number): Promise<Mini[]> => {
@@ -532,7 +442,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       const endIndex = startIndex + pageSize
       return (data || [])
         .slice(startIndex, endIndex)
-        .map(mini => transformMini(mini))
+        .map((mini: SupabaseMini) => transformMini(mini))
     } catch (error) {
       console.error('Error in getPageMinis:', error)
       return []
@@ -547,7 +457,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       }
 
       const { data } = await fetchAllData()
-      return (data || []).map(mini => transformMini(mini))
+      return (data || []).map((mini: SupabaseMini) => transformMini(mini))
     } catch (error) {
       console.error('Error in getAllMinis:', error)
       return []
@@ -558,7 +468,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   const getTotalQuantity = useCallback(async () => {
     try {
       const { data } = await fetchAllData()
-      const totalQuantitySum = data?.reduce((acc, curr) => acc + (curr.quantity || 0), 0) || 0
+      const totalQuantitySum = data?.reduce((acc: any, curr: { quantity: any }) => acc + (curr.quantity || 0), 0) || 0
       setTotalQuantity(totalQuantitySum)
       return totalQuantitySum
     } catch (error) {
@@ -638,3 +548,17 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     handleDelete
   }
 } 
+
+function refreshImages() {
+  throw new Error('Function not implemented.')
+}
+
+
+function showSuccess(_arg0: string) {
+  throw new Error('Function not implemented.')
+}
+
+
+function showError(_arg0: string) {
+  throw new Error('Function not implemented.')
+}

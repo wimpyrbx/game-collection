@@ -33,9 +33,7 @@ interface Category {
   name: string
 }
 
-interface TypeCategory {
-  category: Category
-}
+
 
 interface MiniType {
   id: number
@@ -111,14 +109,14 @@ async function loadReferenceData() {
     if (productSetsError) throw productSetsError
     if (typesError) throw typesError
 
-    const transformedTypes: MiniType[] = (types || []).map(type => ({
+    const transformedTypes: MiniType[] = (types || []).map((type: any) => ({
       id: type.id,
       name: type.name,
       categories: type.categories
-        .filter((cat): cat is TypeCategory => Boolean(cat?.category))
-        .map(cat => ({
-          id: cat.category!.id,
-          name: cat.category!.name
+        .filter((cat: any) => cat?.category)
+        .map((cat: any) => ({
+          id: cat.category.id,
+          name: cat.category.name
         }))
     }))
 

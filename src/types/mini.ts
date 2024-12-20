@@ -1,5 +1,5 @@
 export interface Mini {
-  id: number
+  id?: number
   name: string
   description: string | null
   location: string
@@ -58,12 +58,12 @@ export interface Mini {
 export interface MiniType {
   id: number
   name: string
-  categories: {
+  categories: Array<{
     category: {
       id: number
       name: string
-    }[]
-  }[]
+    }
+  }>
 }
 
 export interface MiniCategory {

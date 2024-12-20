@@ -27,6 +27,7 @@ interface MiniatureOverviewModalProps {
   hasPrevious?: boolean
   hasNext?: boolean
   onImageUpload?: () => void
+  children?: React.ReactNode
 }
 
 interface SelectedType {
@@ -68,6 +69,7 @@ export function MiniatureOverviewModal({
   hasPrevious = true,
   hasNext = true,
   onImageUpload,
+  children,
 }: MiniatureOverviewModalProps) {
 
   const [formData, setFormData] = useState({
@@ -989,15 +991,11 @@ export function MiniatureOverviewModal({
                   <FaDiceD6 />
                 </div>
                 <h2 className="text-xl font-semibold">
-                  Add New Miniature
+                  Add New Miniatureasd
                 </h2>
               </div>
             </div>
           </UI.ModalHeader>
-
-          <UI.ModalBody className="flex-1">
-            {/* ... existing form content ... */}
-          </UI.ModalBody>
 
           <UI.ModalFooter>
             <div className="flex gap-2 ml-auto">
@@ -1110,6 +1108,7 @@ export function MiniatureOverviewModal({
         </UI.ModalHeader>
 
         <UI.ModalBody className="flex-1">
+          {children}
           <div className="grid grid-cols-[250px_1fr] gap-6">
             {/* Left Column - Image and remaining form fields */}
             <div className="space-y-3">

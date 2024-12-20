@@ -60,25 +60,6 @@ class ProductCache {
     this.loadPromise = null
   }
 
-  private async fetchAllPages<T>(
-    query: (page: number) => Promise<{ data: T[] | null; error: any }>,
-    pageSize: number = 1000
-  ): Promise<T[]> {
-    let allData: T[] = []
-    let page = 0
-    
-    while (true) {
-      const { data, error } = await query(page)
-      if (error) throw error
-      if (!data || data.length === 0) break
-      
-      allData = [...allData, ...data]
-      if (data.length < pageSize) break
-      page++
-    }
-    
-    return allData
-  }
 
   async loadData(): Promise<Cache> {
     // If we're already loading, return the existing promise
@@ -116,7 +97,7 @@ class ProductCache {
       const productLines: ProductLine[] = []
       const productSets: ProductSet[] = []
 
-      data?.forEach(company => {
+      data?.forEach((company: { id: any; name: any; product_lines: any }) => {
         companies.push({ id: company.id, name: company.name })
         
         // Sort product lines for this company
@@ -461,13 +442,13 @@ export function useProductAdmin() {
       inUseBy: data?.length ? { minis: true } : null
     }
   }
-
   const deleteCompany = async (id: number) => {
-    const { canDelete, error: checkError } = await checkCompanyUsage(id)
+    const { canDelete, inUseBy } = await checkCompanyUsage(id)
     
-    if (checkError) {
-      setError(checkError)
-      return { error: checkError }
+    if (inUseBy) {
+      const errorMessage = 'Cannot delete company because it has product lines'
+      setError(errorMessage)
+      return { error: errorMessage }
     }
 
     if (!canDelete) {
@@ -489,13 +470,13 @@ export function useProductAdmin() {
     invalidateCache()
     return { error: null }
   }
-
   const deleteProductLine = async (id: number) => {
-    const { canDelete, error: checkError } = await checkLineUsage(id)
+    const { canDelete, inUseBy } = await checkLineUsage(id)
     
-    if (checkError) {
-      setError(checkError)
-      return { error: checkError }
+    if (inUseBy) {
+      const errorMessage = 'Cannot delete product line because it has product sets'
+      setError(errorMessage)
+      return { error: errorMessage }
     }
 
     if (!canDelete) {

@@ -98,14 +98,53 @@ interface ReferenceData {
   }>
 }
 
+
+const transformData = (rawItem: any): Mini => ({
+  id: rawItem.id,
+  name: rawItem.name,
+  description: rawItem.description,
+  location: rawItem.location,
+  quantity: rawItem.quantity,
+  created_at: rawItem.created_at,
+  updated_at: rawItem.updated_at,
+  painted_by_id: rawItem.painted_by.id,
+  base_size_id: rawItem.base_size.id,
+  product_set_id: rawItem.product_set?.id || null,
+  in_use: rawItem.in_use,
+  painted_by: rawItem.painted_by,
+  base_sizes: rawItem.base_size,
+  product_sets: rawItem.product_set,
+  types: rawItem.types.map((t: any) => ({
+    mini_id: t.mini_id,
+    type_id: t.type_id,
+    proxy_type: t.proxy_type,
+    type: {
+      id: t.type.id,
+      name: t.type.name,
+      categories: t.type.categories.map((c: any) => c.category)
+    }
+  })),
+  tags: (rawItem.tags || []).map((t: any) => ({ tag: t.tag }))
+})
+
+// Add development mode check
+const isDevelopment = import.meta.env.DEV
+
+// Update error logging to only show in development
+const logError = (message: string, error: unknown) => {
+  if (isDevelopment) {
+    console.error(message, error)
+  }
+}
+
 export function useMiniatureOverview(pageSize: number = 10) {
   const [minis, setMinis] = useState<Mini[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [loading] = useState(true)
+  const [error] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [searchTerm, setSearchTerm] = useState<string | null>(null)
-  const [referenceData, setReferenceData] = useState<ReferenceData | null>(null)
+  const [referenceData] = useState<ReferenceData | null>(null)
   const [modalData, setModalData] = useState<{
     selectedMini: Mini | null
     windowedData: Mini[]
@@ -115,63 +154,6 @@ export function useMiniatureOverview(pageSize: number = 10) {
   const referenceDataTimestamp = useRef<number>(0)
 
   // Load reference data
-  const loadReferenceData = useCallback(async () => {
-    try {
-      const now = Date.now()
-      if (now - referenceDataTimestamp.current < CACHE_DURATION && referenceData) {
-        return referenceData
-      }
-
-      const [
-        { data: paintedBy },
-        { data: baseSizes },
-        { data: companies },
-        { data: productLines },
-        { data: productSets },
-        { data: types }
-      ] = await Promise.all([
-        supabase.from('painted_by').select('*').order('painted_by_name'),
-        supabase.from('base_sizes').select('*').order('base_size_name'),
-        supabase.from('product_companies').select('*').order('name'),
-        supabase.from('product_lines').select('*').order('name'),
-        supabase.from('product_sets').select('*').order('name'),
-        supabase.from('mini_types')
-          .select(`
-            id,
-            name,
-            categories:type_to_categories(
-              category:mini_categories(id, name)
-            )
-          `)
-          .order('name')
-      ])
-
-      const newReferenceData = {
-        paintedByOptions: paintedBy || [],
-        baseSizeOptions: baseSizes || [],
-        companies: companies || [],
-        productLines: productLines || [],
-        productSets: productSets || [],
-        miniTypes: (types || []).map(type => ({
-          id: type.id,
-          name: type.name,
-          categories: type.categories
-            .filter(cat => cat?.category)
-            .map(cat => ({
-              id: cat.category.id,
-              name: cat.category.name
-            }))
-        }))
-      }
-
-      referenceDataTimestamp.current = now
-      setReferenceData(newReferenceData)
-      return newReferenceData
-    } catch (err) {
-      console.error('Error loading reference data:', err)
-      throw err
-    }
-  }, [referenceData])
 
   // Load page data with caching
   const loadPageData = useCallback(async (
@@ -198,21 +180,59 @@ export function useMiniatureOverview(pageSize: number = 10) {
       const to = from + pageSize - 1
       query = query.range(from, to)
 
-      const { data, count, error } = await query
+      const { data, count, error } = await query as unknown as {
+        data: Array<{
+          id: number
+          name: string
+          description: string | null
+          location: string
+          quantity: number
+          created_at: string
+          updated_at: string
+          in_use: string | null
+          painted_by: { id: number; painted_by_name: string }
+          base_size: { id: number; base_size_name: string }
+          product_set?: {
+            id: number
+            name: string
+            product_line?: {
+              id: number
+              name: string
+              company?: {
+                id: number
+                name: string
+              }
+            }
+          }
+          types: Array<{
+            mini_id: number
+            type_id: number
+            proxy_type: boolean
+            type: {
+              id: number
+              name: string
+              categories: Array<{
+                category: {
+                  id: number
+                  name: string
+                }
+              }>
+            }
+          }>
+          tags?: Array<{
+            tag: {
+              id: number
+              name: string
+            }
+          }>
+        }>
+        count: number
+        error: any
+      }
 
       if (error) throw error
 
-      const transformedData = data?.map(item => ({
-        ...item,
-        types: item.types?.map(t => ({
-          ...t,
-          type: {
-            ...t.type,
-            categories: t.type.categories?.map(c => c.category) || []
-          }
-        })) || []
-      })) || []
-
+      const transformedData = (data || []).map(transformData)
       miniCache.current.set(page, search, transformedData, count || 0)
 
       return {
@@ -222,7 +242,7 @@ export function useMiniatureOverview(pageSize: number = 10) {
         searchTerm: search
       }
     } catch (err) {
-      console.error('Error loading page data:', err)
+      logError('Error loading page data:', err)
       throw err
     }
   }, [pageSize])
@@ -266,13 +286,13 @@ export function useMiniatureOverview(pageSize: number = 10) {
         )
 
       setModalData({
-        selectedMini,
-        windowedData: windowedData || []
+        selectedMini: selectedMini ? transformData(selectedMini) : null,
+        windowedData: (windowedData || []).map(transformData)
       })
 
       return { selectedMini, windowedData }
     } catch (err) {
-      console.error('Error loading modal data:', err)
+      logError('Error loading modal data:', err)
       throw err
     }
   }, [])
@@ -289,69 +309,34 @@ export function useMiniatureOverview(pageSize: number = 10) {
 
   // Effect to load initial data and set up subscriptions
   useEffect(() => {
-    let mounted = true
-    let subscription: any
-
-    const initialize = async () => {
-      try {
-        setLoading(true)
-        await loadReferenceData()
-        const { data, totalCount } = await loadPageData(currentPage, searchTerm)
-        
-        if (mounted) {
-          setMinis(data)
-          setTotalCount(totalCount)
-          setError(null)
-          
-          // Set up real-time subscription for changes
-          subscription = supabase
-            .channel('miniature_changes')
-            .on(
-              'postgres_changes',
-              { event: '*', schema: 'public', table: 'minis' },
-              async (payload) => {
-                // Immediately clear cache on any change
-                miniCache.current.clear()
-
-                if (payload.eventType === 'DELETE') {
-                  // For deletions, update the UI immediately
-                  setMinis(prev => prev.filter(mini => mini.id !== payload.old.id))
-                  setTotalCount(prev => Math.max(0, prev - 1))
-                } else {
-                  // For other changes, reload the current page
-                  try {
-                    const { data: newData, totalCount: newTotal } = await loadPageData(currentPage, searchTerm, true)
-                    if (mounted) {
-                      setMinis(newData)
-                      setTotalCount(newTotal)
-                    }
-                  } catch (err) {
-                    console.error('Error reloading after change:', err)
-                  }
-                }
-              }
-            )
-            .subscribe()
+    const channel = supabase
+      .channel('minis-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'minis'
+        },
+        () => {
+          // Invalidate cache and refresh data
+          miniCache.current.clear()
+          loadPageData(currentPage, searchTerm, true)
+            .then(({ data, totalCount }) => {
+              setMinis(data)
+              setTotalCount(totalCount)
+            })
+            .catch(err => {
+              logError('Error refreshing data after change:', err)
+            })
         }
-      } catch (err) {
-        if (mounted) {
-          setError(err instanceof Error ? err.message : 'An error occurred')
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false)
-        }
-      }
-    }
+      )
+      .subscribe()
 
-    initialize()
-    
     return () => {
-      mounted = false
-      subscription?.unsubscribe()
-      debouncedSearch.cancel()
+      channel.unsubscribe()
     }
-  }, [currentPage, searchTerm, loadPageData, loadReferenceData, debouncedSearch])
+  }, [currentPage, searchTerm, loadPageData])
 
   // Preload adjacent pages when current page changes
   useEffect(() => {

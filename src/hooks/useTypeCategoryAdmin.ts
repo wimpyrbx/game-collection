@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabaseMonitor'
 import type { MiniType, MiniCategory } from '../types/mini'
 
@@ -7,8 +7,25 @@ interface TypeCategoryRelation {
   category_id: number
 }
 
+interface DbType {
+  id: number
+  name: string
+  type_to_categories?: Array<{
+    category_id: number
+  }>
+}
+
 interface Cache {
-  types: MiniType[]
+  types: Array<{
+    id: number
+    name: string
+    categories: Array<{
+      category: {
+        id: number
+        name: string
+      }
+    }>
+  }>
   categories: MiniCategory[]
   typeCategoryRelations: TypeCategoryRelation[]
   timestamp: number
@@ -49,25 +66,6 @@ class TypeCategoryCache {
     this.loadPromise = null
   }
 
-  private async fetchAllPages<T>(
-    query: (page: number) => Promise<{ data: T[] | null; error: any }>,
-    pageSize: number = 1000
-  ): Promise<T[]> {
-    let allData: T[] = []
-    let page = 0
-    
-    while (true) {
-      const { data, error } = await query(page)
-      if (error) throw error
-      if (!data || data.length === 0) break
-      
-      allData = [...allData, ...data]
-      if (data.length < pageSize) break
-      page++
-    }
-    
-    return allData
-  }
 
   async loadData(): Promise<Cache> {
     // If we're already loading, return the existing promise
@@ -103,24 +101,29 @@ class TypeCategoryCache {
 
       // Count types without categories
       const typesWithoutCategories = typesData.filter(
-        type => !type.type_to_categories?.length
+        (type: DbType) => !type.type_to_categories?.length
       ).length
 
       // Transform the data
-      const types = typesData.map(type => ({
+      const types = typesData.map((type: DbType) => ({
         id: type.id,
-        name: type.name
+        name: type.name,
+        categories: type.type_to_categories?.map(() => ({
+          category: []
+        })) || []
       }))
 
-      const typeCategoryRelations = typesData.flatMap(type => 
-        (type.type_to_categories || []).map(rel => ({
+      const typeCategoryRelations = typesData.flatMap((type: DbType) => 
+        (type.type_to_categories || []).map((rel: { category_id: number }) => ({
           type_id: type.id,
           category_id: rel.category_id
         }))
       )
-
       const newCache: Cache = {
-        types,
+        types: types.map((type: { id: number; name: string; categories: any[] }) => ({
+          ...type,
+          categories: [] // Add required categories property
+        })),
         categories: categoriesData,
         typeCategoryRelations,
         timestamp: Date.now(),
@@ -164,8 +167,8 @@ export function useTypeCategoryAdmin() {
     cache.invalidate()
   }, [])
 
-  const filterAndPaginateData = useCallback((
-    data: MiniType[] | MiniCategory[],
+  const filterAndPaginateData = useCallback(<T extends { name: string }>(
+    data: T[],
     offset: number,
     limit: number,
     searchTerm: string
@@ -198,13 +201,18 @@ export function useTypeCategoryAdmin() {
         ''
       )
       
-      setMiniTypes(pageTypes)
+      const typesWithCategories = pageTypes.map(type => ({
+        ...type,
+        categories: type.categories || []
+      }))
+      
+      setMiniTypes(typesWithCategories)
       setCategories(cacheData.categories)
       setTotalCount(filteredCount)
       setTotalCategories(cacheData.categories.length)
       
       return {
-        data: pageTypes,
+        data: typesWithCategories,
         count: filteredCount,
         typesWithoutCategories: cacheData.typesWithoutCategories
       }
@@ -230,7 +238,7 @@ export function useTypeCategoryAdmin() {
         const endIndex = offset + limit
         const pageTypes = cacheData.types.slice(startIndex, endIndex)
         
-        setMiniTypes(pageTypes)
+        setMiniTypes(pageTypes as MiniType[])
         if (totalCount !== cacheData.types.length) {
           setTotalCount(cacheData.types.length)
         }
@@ -249,11 +257,10 @@ export function useTypeCategoryAdmin() {
         search
       )
       
-      setMiniTypes(pageTypes)
+      setMiniTypes(pageTypes as MiniType[])
       if (totalCount !== filteredCount) {
         setTotalCount(filteredCount)
       }
-      
       return {
         data: pageTypes,
         count: filteredCount,

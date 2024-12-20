@@ -12,13 +12,15 @@ import { useNotifications } from '../contexts/NotificationContext'
 import { deleteMiniature, getMiniature, updateMiniatureInUse } from '../services/miniatureService'
 import { Switch } from '../components/ui'
 import { useMiniatureReferenceData } from '../hooks/useMiniatureReferenceData'
-import { useViewMode, ViewMode } from '../hooks/useViewMode'
+import { useViewMode } from '../hooks/useViewMode'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
   minis.forEach(mini => {
-    const img = new Image()
-    img.src = getMiniImagePath(mini.id, 'thumb')
+    if (mini.id) { // Add null check for mini.id
+      const img = new Image()
+      img.src = getMiniImagePath(mini.id, 'thumb')
+    }
   })
 }
 
@@ -231,7 +233,7 @@ export default function MiniatureOverview() {
       <div key="name" className="flex items-center gap-4">
         <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-800 flex items-center justify-center">
           <img
-            src={`${getMiniImagePath(mini.id, 'thumb')}?t=${imageTimestamp}`}
+            src={`${getMiniImagePath(mini.id ?? 0, 'thumb')}?t=${imageTimestamp}`}
             alt={mini.name}
             loading="lazy"
             className="w-full h-full object-cover"
@@ -326,10 +328,12 @@ export default function MiniatureOverview() {
           checked={!!mini.in_use}
           onChange={async (checked) => {
             try {
-              await updateMiniatureInUse(mini.id, checked);
-              const updatedMinis = await getPageMinis(currentPage);
-              if (updatedMinis) {
-                setMinis(updatedMinis);
+              if (mini.id) {
+                await updateMiniatureInUse(mini.id, checked);
+                const updatedMinis = await getPageMinis(currentPage);
+                if (updatedMinis) {
+                  setMinis(updatedMinis);
+                }
               }
             } catch (error) {
               console.error('Error updating in_use status:', error);
@@ -366,7 +370,6 @@ export default function MiniatureOverview() {
 
     // Initialize with empty miniature data for new entries
     const newMini: Mini = {
-      id: 0,
       name: '',
       description: '',
       location: '',
@@ -397,11 +400,11 @@ export default function MiniatureOverview() {
 
   const loadMiniature = async (mini: Mini, index: number) => {
     try {
+      if (!mini.id) return;
       const completeData = await getMiniature(mini.id)
       if (completeData) {
         setSelectedMini(completeData)
         setSelectedMiniIndex(index)
-        
         // Update the current page to match the mini's position
         const newPage = Math.floor(index / itemsPerPage) + 1
         if (newPage !== currentPage) {
@@ -434,7 +437,7 @@ export default function MiniatureOverview() {
       invalidateCache();
 
       // Refresh all data in a single batch
-      const [updatedMinis, newTotalQuantity] = await Promise.all([
+      const [updatedMinis] = await Promise.all([
         getPageMinis(currentPage),
         getTotalQuantity()
       ]);
@@ -465,16 +468,20 @@ export default function MiniatureOverview() {
     try {
       await deleteMiniature(miniId)
       
-      // Refresh the minis list
-      const updatedMinis = await getPageMinis(currentPage)
-      if (updatedMinis) {
-        // Force a re-render by updating the state
-        setMinis(updatedMinis)
-        // Update total quantity
-        await getTotalQuantity()
-        // Force refresh of images
-        refreshImages()
-      }
+      // Invalidate the cache to force a fresh fetch
+      invalidateCache()
+      
+      // Refresh all data in a single batch
+      const [updatedMinis] = await Promise.all([
+        getPageMinis(currentPage),
+        getTotalQuantity()
+      ])
+
+      // Update states
+      setMinis(updatedMinis)
+      
+      // Force refresh of images
+      refreshImages()
       
       showSuccess('Miniature deleted successfully')
     } catch (error) {
@@ -514,7 +521,8 @@ export default function MiniatureOverview() {
   }
 
   if (error) {
-    return <div className="p-4 text-red-500">Error: {error}</div>
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    return <div className="p-4 text-red-500">Error: {errorMessage}</div>
   }
 
   return (
@@ -569,8 +577,8 @@ export default function MiniatureOverview() {
                       <FaTable className="w-4 h-4" />
                     </button>
                     <button
-                      className={`p-2 rounded focus:outline-none ${viewMode === 'cards' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                      onClick={() => setViewMode('cards')}
+                      className={`p-2 rounded focus:outline-none ${viewMode === 'grid' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                      onClick={() => setViewMode('grid')}
                       title="Card View"
                       tabIndex={-1}
                     >
@@ -644,10 +652,10 @@ export default function MiniatureOverview() {
                       </tbody>
                     </table>
                   </div>
-                ) : viewMode === 'cards' ? (
+                ) : viewMode === 'grid' ? (
                   <div className="grid grid-cols-4 auto-rows-fr gap-2 h-[calc(92vh-22rem)] overflow-y-auto p-5">
                     {minis.map((mini, index) => {
-                      const originalPath = `${getMiniImagePath(mini.id, 'original')}?t=${imageTimestamp}`
+                      const originalPath = `${getMiniImagePath(mini.id ?? 0, 'original')}?t=${imageTimestamp}`
                       const company = mini.product_sets?.product_line?.company?.name
                       const productLine = mini.product_sets?.product_line?.name
                       const productSet = mini.product_sets?.name
@@ -655,9 +663,9 @@ export default function MiniatureOverview() {
                       const paintedBy = mini.painted_by?.painted_by_name || 'Unknown'
                       const quantity = mini.quantity || 0
 
-                      const rotation = (Math.sin(mini.id * 0.7) + Math.cos(mini.id * 1.3)) > 0 ? 
-                        1 + Math.abs(Math.sin(mini.id)) : 
-                        -2 + Math.abs(Math.sin(mini.id));
+                      const rotation = (Math.sin((mini.id ?? 0) * 0.7) + Math.cos((mini.id ?? 0) * 1.3)) > 0 ? 
+                        1 + Math.abs(Math.sin(mini.id ?? 0)) : 
+                        -2 + Math.abs(Math.sin(mini.id ?? 0));
 
                       return (
                         <div 
@@ -702,7 +710,7 @@ export default function MiniatureOverview() {
                             <div className="flex-none flex justify-between items-start gap-2">
                               <div className="flex flex-col gap-1.5 max-w-[70%]">
                                 <h3 className="font-bold text-gray-100 text-base leading-tight line-clamp-2">
-                                  {mini.name} <span className="text-gray-400 text-xs">({rotation.toFixed(2)}°)</span>
+                                  {mini.name}
                                 </h3>
                                 {mini.types?.find(t => !t.proxy_type) && (
                                   <div className="flex items-center">
