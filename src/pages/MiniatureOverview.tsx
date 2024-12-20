@@ -11,6 +11,7 @@ import { MiniatureOverviewModal } from '../components/miniatureoverview/Miniatur
 import { useNotifications } from '../contexts/NotificationContext'
 import { deleteMiniature, getMiniature, updateMiniatureInUse } from '../services/miniatureService'
 import { Switch } from '../components/ui'
+import { useMiniatureReferenceData } from '../hooks/useMiniatureReferenceData'
 
 type ViewMode = 'table' | 'cards' | 'banner'
 
@@ -29,7 +30,13 @@ export default function MiniatureOverview() {
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
   const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
   const [allMinis, setAllMinis] = useState<Mini[]>([])
+  const [imageTimestamp, setImageTimestamp] = useState(() => Date.now())
   const itemsPerPage = 10
+
+  const {
+    paintedByOptions,
+    baseSizeOptions,
+  } = useMiniatureReferenceData()
 
   const {
     minis, 
@@ -153,6 +160,8 @@ export default function MiniatureOverview() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [currentPage, totalMinis, isModalOpen, selectedMiniIndex, allMinis.length, handlePrevious, handleNext])
 
+  const refreshImages = () => setImageTimestamp(Date.now())
+
   const getItemColumns = (mini: Mini) => {
     const typeNames = mini.types?.map(t => ({
       id: t.type_id,
@@ -184,7 +193,7 @@ export default function MiniatureOverview() {
       <div key="name" className="flex items-center gap-4">
         <div className="relative w-12 h-12 rounded overflow-hidden bg-gray-800 flex items-center justify-center">
           <img
-            src={getMiniImagePath(mini.id, 'thumb')}
+            src={`${getMiniImagePath(mini.id, 'thumb')}?t=${imageTimestamp}`}
             alt={mini.name}
             loading="lazy"
             className="w-full h-full object-cover"
@@ -192,6 +201,10 @@ export default function MiniatureOverview() {
               e.currentTarget.onerror = null
               e.currentTarget.style.display = 'none'
               e.currentTarget.nextElementSibling?.classList.remove('hidden')
+            }}
+            onLoad={(e) => {
+              e.currentTarget.style.display = 'block'
+              e.currentTarget.nextElementSibling?.classList.add('hidden')
             }}
           />
           <FaDiceD20 className="absolute w-6 h-6 text-gray-600 hidden" />
@@ -301,9 +314,48 @@ export default function MiniatureOverview() {
   ]
 
   const handleAdd = () => {
-    setSelectedMini(undefined)
-    setIsModalOpen(true)
-  }
+    // Find default IDs for prepainted and medium base size
+    const prepaintedId = paintedByOptions.find(p => 
+      p.painted_by_name.toLowerCase() === 'prepainted'
+    )?.id || 0;
+    
+    const mediumId = baseSizeOptions.find(b => 
+      b.base_size_name.toLowerCase() === 'medium'
+    )?.id || 0;
+
+    const defaultPaintedBy = paintedByOptions.find(p => p.id === prepaintedId);
+    const defaultBaseSize = baseSizeOptions.find(b => b.id === mediumId);
+
+    // Initialize with empty miniature data for new entries
+    const newMini: Mini = {
+      id: 0,
+      name: '',
+      description: '',
+      location: '',
+      quantity: 1,
+      painted_by_id: prepaintedId,
+      base_size_id: mediumId,
+      product_set_id: null,
+      types: [],
+      tags: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      in_use: null,
+      painted_by: defaultPaintedBy || {
+        id: prepaintedId,
+        painted_by_name: 'Prepainted'
+      },
+      base_sizes: defaultBaseSize || {
+        id: mediumId,
+        base_size_name: 'Medium'
+      },
+      product_sets: undefined
+    };
+
+    setSelectedMini(newMini);
+    setSelectedMiniIndex(-1); // Reset index for new entry
+    setIsModalOpen(true);
+  };
 
   const loadMiniature = async (mini: Mini, index: number) => {
     try {
@@ -345,6 +397,9 @@ export default function MiniatureOverview() {
       setMinis(updatedMinis);
       await getTotalQuantity();
       
+      // Force refresh of images
+      refreshImages();
+      
       // If we were editing a miniature, update the selected miniature with the new data
       if (selectedMini?.id) {
         const updatedMini = updatedMinis.find(mini => mini.id === selectedMini.id);
@@ -375,6 +430,8 @@ export default function MiniatureOverview() {
         setMinis(updatedMinis)
         // Update total quantity
         await getTotalQuantity()
+        // Force refresh of images
+        refreshImages()
       }
       
       showSuccess('Miniature deleted successfully')
@@ -386,9 +443,9 @@ export default function MiniatureOverview() {
 
   const renderCardView = () => {
     return (
-      <div className="grid grid-cols-5 gap-4 h-[calc(90vh-20rem)]">
+      <div className="grid grid-cols-4 gap-6">
         {minis.map((mini, index) => {
-          const thumbPath = getMiniImagePath(mini.id, 'thumb')
+          const thumbPath = `${getMiniImagePath(mini.id, 'thumb')}?t=${imageTimestamp}`
           const company = mini.product_sets?.product_line?.company?.name || 'No company'
           const productLine = mini.product_sets?.product_line?.name || 'No product line'
           const productSet = mini.product_sets?.name || 'No set'
@@ -439,7 +496,7 @@ export default function MiniatureOverview() {
     return (
       <div className="grid grid-cols-4 gap-6 h-[calc(90vh-20rem)]">
         {minis.map((mini, index) => {
-          const thumbPath = getMiniImagePath(mini.id, 'thumb')
+          const thumbPath = `${getMiniImagePath(mini.id, 'thumb')}?t=${imageTimestamp}`
           const company = mini.product_sets?.product_line?.company?.name || 'No company'
           const productLine = mini.product_sets?.product_line?.name || 'No product line'
           const productSet = mini.product_sets?.name || 'No set'
@@ -726,6 +783,7 @@ export default function MiniatureOverview() {
         onNext={handleNextMini}
         hasPrevious={hasPreviousMini}
         hasNext={hasNextMini}
+        onImageUpload={refreshImages}
       />
     </>
   )

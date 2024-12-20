@@ -5,9 +5,14 @@
  * @returns The path to the image
  */
 export function getMiniImagePath(id: number, type: 'thumb' | 'full' | 'original' = 'full') {
-  const lastDigits = id.toString().slice(-2)
-  const [secondToLast, last] = lastDigits.padStart(2, '0').split('')
-  return `/miniatures/images/miniatures/${type}/${secondToLast}/${last}/${id}.webp`
+  // Convert ID to string and pad with leading zeros if needed
+  const idStr = id.toString()
+  // First digit is always the first character
+  const firstDigit = idStr[0]
+  // Second digit is the second character or '0' if not present
+  const secondDigit = idStr.length > 1 ? idStr[1] : '0'
+  const timestamp = new Date().getTime()
+  return `/miniatures/images/miniatures/${type}/${firstDigit}/${secondDigit}/${id}.webp?t=${timestamp}`
 }
 
 export function getCompanyLogoPath(companyName: string | undefined | null): string {

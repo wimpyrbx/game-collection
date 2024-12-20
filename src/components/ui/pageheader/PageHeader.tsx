@@ -28,7 +28,7 @@ export function PageHeader({
   )
 
   return (
-    <div className={`flex items-center gap-2 mb-6 mt-0 px-6 py-0 pl-0 pr-0 pb-0 ${backgroundClass} rounded-lg shadow-md ${className}`}>
+    <div className={`flex items-center gap-2 mb-6 mt-0 px-6 py-0 pl-0 pr-0 pb-0 ${backgroundClass} rounded-lg ${className}`}>
       <div className="flex items-center gap-2">
         {otherContent}
       </div>

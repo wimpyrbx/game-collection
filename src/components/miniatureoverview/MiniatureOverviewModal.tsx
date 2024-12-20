@@ -26,6 +26,7 @@ interface MiniatureOverviewModalProps {
   onNext?: () => void
   hasPrevious?: boolean
   hasNext?: boolean
+  onImageUpload?: () => void
 }
 
 interface SelectedType {
@@ -66,6 +67,7 @@ export function MiniatureOverviewModal({
   onNext,
   hasPrevious = true,
   hasNext = true,
+  onImageUpload,
 }: MiniatureOverviewModalProps) {
   const [formData, setFormData] = useState({
     name: '',
@@ -89,7 +91,7 @@ export function MiniatureOverviewModal({
   const [showProductDropdown, setShowProductDropdown] = useState(false)
 
   // State for drag & drop
-  const [, setImage] = useState<File | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
 
   const {
@@ -236,7 +238,7 @@ export function MiniatureOverviewModal({
       setSelectedTypes([])
       setSelectedTags([])
       setPendingTags([])
-      setImage(null)
+      setImageFile(null)
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl)
         setPreviewUrl(null)
@@ -251,10 +253,10 @@ export function MiniatureOverviewModal({
   useEffect(() => {
     if (!miniData && isOpen) {
       const prepaintedId = paintedByOptions.find(p => 
-        p.painted_by_name.toLowerCase() === 'Prepainted'.toLowerCase()
+        p.painted_by_name.toLowerCase() === 'prepainted'
       )?.id || 0
       const mediumId = baseSizeOptions.find(b => 
-        b.base_size_name.toLowerCase() === 'Medium'.toLowerCase()
+        b.base_size_name.toLowerCase() === 'medium'
       )?.id || 0
 
       setFormData(prev => ({
@@ -268,7 +270,7 @@ export function MiniatureOverviewModal({
   // Add state for pending new tags
   const [pendingTags, setPendingTags] = useState<string[]>([])
 
-  // Modify handleSubmit to ensure tags are saved
+  // Modify handleSubmit to include image refresh
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -330,13 +332,78 @@ export function MiniatureOverviewModal({
         }))
       }
 
-      // console.log('Submitting miniature data:', miniatureData)
+      let imageUploaded = false;
 
+      // Handle image upload if there's a new image
+      if (imageFile) {
+        console.log('Starting image upload for miniId:', miniData?.id || 'new');
+        const formData = new FormData()
+        formData.append('image', imageFile)
+        formData.append('miniId', (miniData?.id || '').toString())
+        
+        try {
+          const response = await fetch('/miniatures/phpscripts/uploadImage.php', {
+            method: 'POST',
+            body: formData
+          })
+          
+          const responseData = await response.json();
+          console.log('Image upload response:', responseData);
+          
+          if (!response.ok) {
+            console.error('Image upload failed:', responseData);
+            throw new Error(responseData.error || 'Failed to upload image');
+          }
+
+          imageUploaded = true;
+
+          // Force a re-render of the image by updating the image existence state
+          setImageExists(false);  // Reset first
+          setTimeout(() => {
+            setImageExists(true);
+            // If we're in edit mode and have a miniId, verify the image exists
+            if (miniData?.id) {
+              const img = new Image();
+              img.onload = () => {
+                console.log('New image loaded successfully after upload');
+                setImageExists(true);
+              };
+              img.onerror = () => {
+                console.error('Failed to load new image after upload');
+                setImageExists(false);
+              };
+              img.src = getMiniImagePath(miniData.id, 'original');
+            }
+          }, 100);  // Then set true after a brief delay
+        } catch (error) {
+          console.error('Error uploading image:', error);
+          showError(error instanceof Error ? error.message : 'Failed to upload image');
+          return;
+        }
+      }
+
+      // Save miniature data first before handling image refresh
       if (isEditMode && miniData?.id) {
         await updateMiniature(miniData.id, miniatureData)
       } else {
-        await createMiniature(miniatureData)
+        const newMini = await createMiniature(miniatureData)
+        // If this is a new miniature and we uploaded an image, verify it exists
+        if (imageUploaded && newMini?.id) {
+          setTimeout(() => {
+            const img = new Image();
+            img.onload = () => {
+              console.log('New image loaded successfully for new miniature');
+              setImageExists(true);
+            };
+            img.onerror = () => {
+              console.error('Failed to load new image for new miniature');
+              setImageExists(false);
+            };
+            img.src = getMiniImagePath(newMini.id, 'original');
+          }, 500); // Give a bit more time for new miniatures
+        }
       }
+
       setPendingTags([])
       // Transform tags to match expected type before saving
       const transformedMiniatureData = {
@@ -351,6 +418,16 @@ export function MiniatureOverviewModal({
       }
       await onSave(transformedMiniatureData)
 
+      // If we uploaded an image, notify the parent to refresh
+      if (imageUploaded) {
+        // Give a small delay to ensure the image is processed
+        setTimeout(() => {
+          if (onImageUpload) {
+            onImageUpload();
+          }
+        }, 200);
+      }
+
     } catch (error) {
       console.error('Error saving miniature:', error)
       if (error instanceof Error) {
@@ -363,8 +440,9 @@ export function MiniatureOverviewModal({
     e.preventDefault()
     const file = e.dataTransfer.files[0]
     if (file && file.type.startsWith('image/')) {
-      setImage(file)
-      setPreviewUrl(URL.createObjectURL(file))
+      setImageFile(file)
+      const url = URL.createObjectURL(file)
+      setPreviewUrl(url)
     }
   }
 
@@ -375,8 +453,9 @@ export function MiniatureOverviewModal({
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
-        setImage(file)
-        setPreviewUrl(URL.createObjectURL(file))
+        setImageFile(file)
+        const url = URL.createObjectURL(file)
+        setPreviewUrl(url)
       }
     }
     input.click()
@@ -675,7 +754,7 @@ export function MiniatureOverviewModal({
         types: [],
         tags: []
       })
-      setImage(null)
+      setImageFile(null)
       setPreviewUrl(null)
       setSelectedTypes([])
       setSelectedTags([])
@@ -809,30 +888,45 @@ export function MiniatureOverviewModal({
     }
   }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine, isOpen])
 
-  // Update the image initialization effect
+  // Add state for image existence
+  const [imageExists, setImageExists] = useState(false);
+
+  // Add effect to check if image exists when modal opens or miniData changes
   useEffect(() => {
-    let mounted = true;
-
-    if (isOpen && miniData?.id) {
-      // Small delay to ensure modal transition is complete
-      const timer = setTimeout(() => {
-        if (mounted) {
-          // Preload the image
-          const img = new Image();
-          img.src = getMiniImagePath(miniData.id, 'original');
-        }
-      }, 100);
-
-      return () => {
-        mounted = false;
-        clearTimeout(timer);
-      };
+    // Reset image states when miniature changes
+    setImageFile(null);
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
     }
 
-    return () => {
-      mounted = false;
-    };
-  }, [isOpen, miniData?.id]);
+    // Check if new miniature has an image
+    if (miniData?.id) {
+      const imagePath = getMiniImagePath(miniData.id, 'original');
+      console.log('Checking for image:', {
+        miniId: miniData.id,
+        imagePath,
+        timestamp: new Date().getTime()
+      });
+
+      const img = new Image();
+      img.onload = () => {
+        console.log('Image loaded successfully:', imagePath);
+        setImageExists(true);
+      };
+      img.onerror = (e) => {
+        console.error('Image failed to load:', {
+          path: imagePath,
+          error: e,
+          timestamp: new Date().getTime()
+        });
+        setImageExists(false);
+      };
+      img.src = imagePath;
+    } else {
+      setImageExists(false);
+    }
+  }, [miniData?.id]);
 
   // Add useEffect to clean up preview URL when component unmounts
   useEffect(() => {
@@ -849,6 +943,27 @@ export function MiniatureOverviewModal({
       onClose();
     }
   }, [isOpen, miniData, onClose]);
+
+  // Add cleanup function
+  const cleanupImageState = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+    setImageFile(null);
+    setImageExists(false);
+  };
+
+  // Update the navigation handlers
+  const handlePrevious = () => {
+    cleanupImageState();
+    onPrevious?.();
+  };
+
+  const handleNext = () => {
+    cleanupImageState();
+    onNext?.();
+  };
 
   if (isOpen && !miniData) {
     return (
@@ -878,10 +993,10 @@ export function MiniatureOverviewModal({
 
   return (
     <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
-      {/* Add navigation buttons */}
+      {/* Update navigation buttons */}
       {onPrevious && (
         <button
-          onClick={onPrevious}
+          onClick={handlePrevious}
           disabled={!hasPrevious}
           className="absolute left-[-75px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed bg-blue-950/90 hover:bg-blue-900 rounded-xl shadow-2xl shadow-black/50 border border-blue-800/50 hover:border-blue-700 transition-all duration-300 hover:scale-105 hover:-translate-x-1 group disabled:hover:scale-100 disabled:hover:translate-x-0"
           title="Previous miniature"
@@ -892,7 +1007,7 @@ export function MiniatureOverviewModal({
       
       {onNext && (
         <button
-          onClick={onNext}
+          onClick={handleNext}
           disabled={!hasNext}
           className="absolute right-[-75px] top-1/2 transform -translate-y-1/2 p-4 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed bg-blue-950/90 hover:bg-blue-900 rounded-xl shadow-2xl shadow-black/50 border border-blue-800/50 hover:border-blue-700 transition-all duration-300 hover:scale-105 hover:translate-x-1 group disabled:hover:scale-100 disabled:hover:translate-x-0"
           title="Next miniature"
@@ -956,15 +1071,11 @@ export function MiniatureOverviewModal({
                 onDragOver={(e) => e.preventDefault()}
                 onClick={handleImageClick}
               >
-                <div className="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
-                  <FaDiceD20 className="w-12 h-12 mb-2" />
-                  <span className="text-sm">Drop image here or click to select</span>
-                </div>
                 <AnimatePresence mode="wait">
-                  {(miniData?.id || previewUrl) && (
+                  {(previewUrl || (miniData?.id && imageExists)) ? (
                     <motion.div 
                       key={`image-${miniData?.id || previewUrl}`}
-                      className="absolute inset-0 flex items-center justify-center bg-gray-900/50 z-10"
+                      className="absolute inset-0 flex items-center justify-center bg-gray-900/50"
                     >
                       <motion.img
                         initial={{ opacity: 0, scale: 0.3, y: 50 }}
@@ -975,13 +1086,39 @@ export function MiniatureOverviewModal({
                           damping: 20,
                           mass: 0.8
                         }}
-                        src={miniData?.id ? getMiniImagePath(miniData.id, 'original') : previewUrl || ''}
+                        src={previewUrl || (miniData?.id ? getMiniImagePath(miniData.id, 'original') : '')}
                         alt={miniData?.name || "Preview"}
                         className="w-full h-full object-contain"
                         onError={(e) => {
-                          e.currentTarget.parentElement?.classList.add('hidden');
+                          console.error('Image display error:', {
+                            miniId: miniData?.id,
+                            path: e.currentTarget.src,
+                            timestamp: new Date().getTime()
+                          });
+                          const target = e.currentTarget;
+                          target.style.display = 'none';
+                          setImageExists(false);
+                        }}
+                        onLoad={(e) => {
+                          console.log('Image displayed successfully:', {
+                            miniId: miniData?.id,
+                            path: e.currentTarget.src,
+                            timestamp: new Date().getTime()
+                          });
                         }}
                       />
+                    </motion.div>
+                  ) : (
+                    <motion.div 
+                      key="placeholder"
+                      data-placeholder
+                      className="absolute inset-0 flex flex-col items-center justify-center text-gray-500"
+                      initial={{ opacity: 1 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      <FaDiceD20 className="w-12 h-12 mb-2" />
+                      <span className="text-sm">Drop image here or click to select</span>
                     </motion.div>
                   )}
                 </AnimatePresence>
@@ -1018,7 +1155,6 @@ export function MiniatureOverviewModal({
                   validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
                 } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
               >
-                <option value={0} disabled>Base Size</option>
                 {baseSizeOptions.map(size => (
                   <option key={size.id} value={size.id}>
                     {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
@@ -1027,8 +1163,8 @@ export function MiniatureOverviewModal({
               </select>
 
               {/* Painted By Boxes */}
-              <div className="grid grid-cols-3 gap-2">
-                {paintedByOptions.slice(0, 3).map(painter => (
+              <div className="flex gap-2">
+                {paintedByOptions.map(painter => (
                   <button
                     key={painter.id}
                     type="button"

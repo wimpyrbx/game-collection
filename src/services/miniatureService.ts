@@ -157,7 +157,7 @@ export async function deleteMiniature(miniId: number) {
     const formData = new FormData()
     formData.append('id', miniId.toString())
     
-    const imageResponse = await fetch('/phpscripts/deleteImage.php', {
+    const imageResponse = await fetch('/miniatures/phpscripts/deleteImage.php', {
       method: 'POST',
       body: formData
     })
