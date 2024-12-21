@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseMonitor'
-import type { AuditLog, AuditActionType, AuditLogChanges, FieldChange } from '../types/audit'
+import type { AuditLogChanges, FieldChange } from '../types/audit'
 
 export class AuditService {
     /**
@@ -78,7 +78,7 @@ export class AuditService {
         for (const field of fieldsToCheck) {
             const change = this.compareValues(oldState[field], newState[field], field)
             if (change) {
-                changes[field] = change
+                changes[field as keyof AuditLogChanges] = change
                 hasChanges = true
             }
         }

@@ -50,7 +50,7 @@ export function Pagination({
       disabled={isDisabled || disabled}
       className={`
         px-2 py-1 rounded
-        ${isCurrent ? 'bg-blue-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}
+        ${isCurrent ? 'bg-green-600 text-white' : 'bg-gray-700 hover:bg-gray-600'}
         disabled:opacity-50 disabled:cursor-not-allowed
       `}
     >

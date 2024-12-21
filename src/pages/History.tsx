@@ -1,7 +1,7 @@
-import React, { Fragment, useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import * as UI from '../components/ui'
-import { FaHistory, FaArrowRight } from 'react-icons/fa'
+import { FaHistory, FaDiceD20 } from 'react-icons/fa'
 import { useLocation } from 'react-router-dom'
 import type { AuditLog } from '../types/audit'
 import { getMiniImagePath } from '../utils/imageUtils'
@@ -12,18 +12,7 @@ interface ReferenceData {
   productSets: { id: number; name: string }[];
 }
 
-const renderField = (name: string) => `<td class="py-1 w-16 min-w-[100px] font-bold">${name}</td>`
-const renderValue = (value: any, color: string) => 
-  value ? `<td class="py-1 w-24 min-w-[100px] text-${color}-400">${value}</td>` : `<td class="py-1 w-24 min-w-[100px] text-gray-500">-</td>`
 
-const renderListValue = (items: string[], color: string) => {
-  if (!items.length) return `<td class="py-1 w-24 min-w-[100px] text-gray-500">-</td>`
-  return `<td class="py-1 w-24 min-w-[100px]">
-    <ul class="list-none space-y-1">
-      ${items.sort().map(item => `<li class="text-${color}-400">· ${item}</li>`).join('')}
-    </ul>
-  </td>`
-}
 
 interface TagItem {
   tag?: { name: string };
@@ -259,62 +248,8 @@ function formatAction(action: string, changes: any, referenceData: ReferenceData
   }
 }
 
-interface Change {
-  from: any;
-  to: any;
-}
 
-function hasRemovedItems(changes: any) {
-  if (!changes) return false
-  return Object.entries(changes).some(([field, change]: [string, any]) => {
-    if (field === 'tags') {
-      const oldTags = change.from?.map((t: TagItem) => t.tag?.name || t.name) || []
-      const newTags = change.to?.map((t: TagItem) => t.tag?.name || t.name) || []
-      return oldTags.some((tag: string) => !newTags.includes(tag))
-    }
-    if (field === 'types') {
-      const oldTypes = change.from?.map((t: TypeItem) => ({
-        name: t.type?.name || t.name || '',
-        isMain: !t.proxy_type
-      })) || []
-      const newTypes = change.to?.map((t: TypeItem) => ({
-        name: t.type?.name || t.name || '',
-        isMain: !t.proxy_type
-      })) || []
-      const oldMainType = oldTypes.find((t: { name: string; isMain: boolean }) => t.isMain)
-      const newMainType = newTypes.find((t: { name: string; isMain: boolean }) => t.isMain)
-      return oldTypes.some((type: { name: string }) => !newTypes.some((t: { name: string }) => t.name === type.name)) ||
-        (oldMainType?.name !== newMainType?.name && oldMainType)
-    }
-    return change.from
-  })
-}
 
-function hasAddedItems(changes: any) {
-  if (!changes) return false
-  return Object.entries(changes).some(([field, change]: [string, any]) => {
-    if (field === 'tags') {
-      const oldTags = change.from?.map((t: TagItem) => t.tag?.name || t.name) || []
-      const newTags = change.to?.map((t: TagItem) => t.tag?.name || t.name) || []
-      return newTags.some((tag: string) => !oldTags.includes(tag))
-    }
-    if (field === 'types') {
-      const oldTypes = change.from?.map((t: TypeItem) => ({
-        name: t.type?.name || t.name || '',
-        isMain: !t.proxy_type
-      })) || []
-      const newTypes = change.to?.map((t: TypeItem) => ({
-        name: t.type?.name || t.name || '',
-        isMain: !t.proxy_type
-      })) || []
-      const oldMainType = oldTypes.find((t: { name: string; isMain: boolean }) => t.isMain)
-      const newMainType = newTypes.find((t: { name: string; isMain: boolean }) => t.isMain)
-      return newTypes.some((type: { name: string }) => !oldTypes.some((t: { name: string }) => t.name === type.name)) ||
-        (oldMainType?.name !== newMainType?.name && newMainType)
-    }
-    return change.to
-  })
-}
 
 export default function History() {
   const [logs, setLogs] = useState<AuditLog[]>([])
@@ -487,7 +422,7 @@ export default function History() {
                           </svg>
                         </div>
                       ) : log.miniature?.id ? (
-                        <div className="w-full h-full bg-black/30">
+                        <div className="w-full h-full bg-black/30 flex items-center justify-center">
                           <img 
                             key={`mini-${log.miniature.id}`}
                             src={getMiniImagePath(log.miniature.id, 'thumb')}
@@ -497,8 +432,17 @@ export default function History() {
                             onError={(e) => {
                               const target = e.target as HTMLImageElement
                               target.style.display = 'none'
+                              const fallback = target.nextElementSibling as HTMLElement
+                              if (fallback) fallback.classList.remove('hidden')
+                            }}
+                            onLoad={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.style.display = 'block'
+                              const fallback = target.nextElementSibling as HTMLElement
+                              if (fallback) fallback.classList.add('hidden')
                             }}
                           />
+                          <FaDiceD20 className="absolute w-8 h-8 text-gray-600 hidden" />
                         </div>
                       ) : null}
                     </div>
