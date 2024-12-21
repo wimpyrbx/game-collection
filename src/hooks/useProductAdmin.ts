@@ -55,7 +55,7 @@ class ProductCache {
   }
 
   invalidate(): void {
-    console.log('Invalidating product cache')
+    // console.log('Invalidating product cache')
     this.cache = null
     this.loadPromise = null
   }
@@ -69,7 +69,7 @@ class ProductCache {
 
     // Start new load
     this.loadPromise = (async () => {
-      console.log('Fetching fresh product data')
+     // console.log('Fetching fresh product data')
       
       // Single query to fetch all related data, sorted at each level
       const { data, error } = await supabase

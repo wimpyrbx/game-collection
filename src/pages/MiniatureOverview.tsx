@@ -13,6 +13,8 @@ import { deleteMiniature, getMiniature, updateMiniatureInUse } from '../services
 import { Switch } from '../components/ui'
 import { useMiniatureReferenceData } from '../hooks/useMiniatureReferenceData'
 import { useViewMode } from '../hooks/useViewMode'
+import { AuditService } from '../services/auditService'
+import { useAuth } from '../contexts/AuthContext'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -34,6 +36,7 @@ export default function MiniatureOverview() {
   const [imageTimestamp, setImageTimestamp] = useState(() => Date.now())
   const itemsPerPage = 12
   const initialLoadRef = useRef(true)
+  const { user } = useAuth()
 
   const {
     paintedByOptions,
@@ -342,7 +345,24 @@ export default function MiniatureOverview() {
           onChange={async (checked) => {
             try {
               if (mini.id) {
+                // Get the miniature data before update for logging
+                const oldMiniature = await getMiniature(mini.id);
+                
+                // Update the in_use status
                 await updateMiniatureInUse(mini.id, checked);
+                
+                // Get the updated miniature data for logging
+                const newMiniature = await getMiniature(mini.id);
+                
+                // Log the change if we have a user
+                if (user?.id && oldMiniature && newMiniature) {
+                  await AuditService.logMiniatureUpdate(
+                    user.id,
+                    mini.id,
+                    oldMiniature,
+                    newMiniature
+                  );
+                }
                 
                 // Invalidate cache to force fresh data
                 invalidateCache();
@@ -487,6 +507,19 @@ export default function MiniatureOverview() {
 
   const handleDelete = async (miniId: number) => {
     try {
+      // Get the miniature data before deletion for logging
+      const miniatureData = await getMiniature(miniId)
+      
+      // Log the deletion first if there's a user
+      if (user?.id && miniatureData) {
+        await AuditService.logMiniatureDelete(
+          user.id,
+          miniId,
+          miniatureData
+        )
+      }
+
+      // Then delete the miniature
       await deleteMiniature(miniId)
       
       // Invalidate the cache to force a fresh fetch

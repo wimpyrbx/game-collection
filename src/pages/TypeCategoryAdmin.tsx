@@ -91,7 +91,7 @@ export default function TypeCategoryAdmin() {
           setCategories(catResult.data)
         }
         if (catResult.count !== undefined && catResult.count !== null) {
-          console.log('Setting initial total categories to:', catResult.count)
+          // console.log('Setting initial total categories to:', catResult.count)
           setTotalCategories(catResult.count)
         }
         

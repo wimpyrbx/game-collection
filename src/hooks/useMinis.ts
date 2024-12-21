@@ -268,13 +268,13 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   // Add loadData function
   const loadData = useCallback(async () => {
     try {
-      console.log('Loading data for page:', currentPage, 'pageSize:', pageSize)
+      // console.log('Loading data for page:', currentPage, 'pageSize:', pageSize)
       setLoading(true)
       setError(null)
 
       // Try to use cache first
       if (isCacheValid()) {
-        console.log('Using cache')
+        // console.log('Using cache')
         const startIndex = (currentPage - 1) * pageSize
         const endIndex = Math.min(startIndex + pageSize, globalCache!.minis.length)
         const pageData = globalCache!.minis.slice(startIndex, endIndex)
@@ -286,12 +286,12 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         return
       }
 
-      console.log('Cache invalid, fetching fresh data')
+      // console.log('Cache invalid, fetching fresh data')
       const { data, totalQuantity, totalCount } = await fetchAllData()
 
       // Ensure we have valid data
       if (!data || data.length === 0) {
-        console.log('No data found')
+        // console.log('No data found')
         setMinis([])
         setTotalMinis(0)
         setTotalQuantity(0)
@@ -299,7 +299,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         return
       }
 
-      console.log('Total minis:', totalCount)
+      // console.log('Total minis:', totalCount)
       // Update total counts
       setTotalMinis(totalCount)
       setTotalQuantity(totalQuantity)
@@ -309,11 +309,11 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       const endIndex = Math.min(startIndex + pageSize, totalCount)
       const pageData = data.slice(startIndex, endIndex)
 
-      console.log(`Page data for page ${currentPage}: startIndex=${startIndex}, endIndex=${endIndex}, length=${pageData.length}`)
+      // console.log(`Page data for page ${currentPage}: startIndex=${startIndex}, endIndex=${endIndex}, length=${pageData.length}`)
       
       // Update minis for current page
       const transformedMinis = pageData.map((mini: SupabaseMini) => transformMini(mini))
-      console.log('Transformed minis length:', transformedMinis.length)
+      // console.log('Transformed minis length:', transformedMinis.length)
       setMinis(transformedMinis)
       setLoading(false)
 
@@ -326,7 +326,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
   // Add invalidateCache function
   const invalidateCache = useCallback(() => {
-    console.log('Invalidating cache')
+    // console.log('Invalidating cache')
     globalCache = null
   }, [])
 

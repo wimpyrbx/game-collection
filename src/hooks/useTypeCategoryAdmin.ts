@@ -62,7 +62,7 @@ class TypeCategoryCache {
   }
 
   invalidate(): void {
-    console.log('Invalidating type/category cache')
+    //console.log('Invalidating type/category cache')
     this.cache = null
     this.loadPromise = null
   }
@@ -76,7 +76,7 @@ class TypeCategoryCache {
 
     // Start new load
     this.loadPromise = (async () => {
-      console.log('Fetching fresh type/category data')
+      //console.log('Fetching fresh type/category data')
       
       // First get total count of categories
       const { count: totalCategoryCount, error: countError } = await supabase
@@ -90,7 +90,7 @@ class TypeCategoryCache {
         throw new Error('Failed to get total category count')
       }
 
-      console.log('Total categories count:', totalCategoryCount)
+      //console.log('Total categories count:', totalCategoryCount)
       
       // Get all categories using range-based pagination
       let allCategories: any[] = []
@@ -376,7 +376,7 @@ export function useTypeCategoryAdmin() {
       
       // Set total categories from the exact count in cache
       setTotalCategories(cacheData.totalCategories)
-      console.log('Setting total categories to:', cacheData.totalCategories)
+      // console.log('Setting total categories to:', cacheData.totalCategories)
 
       // Skip filtering if no search term
       if (!searchTerm?.trim()) {

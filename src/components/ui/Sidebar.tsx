@@ -1,4 +1,4 @@
-import { FaDiceD6, FaBoxes, FaSignOutAlt, FaTags, FaHome } from 'react-icons/fa'
+import { FaDiceD6, FaBoxes, FaSignOutAlt, FaTags, FaHome, FaHistory } from 'react-icons/fa'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -7,11 +7,14 @@ export function Sidebar() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
 
-  const menuItems = [
-    { path: '/', label: 'Home', icon: FaHome },
-    { path: '/miniature-overview', label: 'Miniatures', icon: FaDiceD6 },
-    { path: '/type-category-admin', label: 'Categories', icon: FaTags },
-    { path: '/product-admin', label: 'Products', icon: FaBoxes },
+  const isActive = (path: string) => location.pathname === path
+
+  const links = [
+    { to: '/', icon: FaHome, text: 'Home' },
+    { to: '/miniature-overview', icon: FaDiceD6, text: 'Miniatures' },
+    { to: '/type-category-admin', icon: FaTags, text: 'Types & Categories' },
+    { to: '/product-admin', icon: FaBoxes, text: 'Products' },
+    { to: '/history', icon: FaHistory, text: 'History' }
   ]
 
   const handleSignOut = async () => {
@@ -22,8 +25,6 @@ export function Sidebar() {
       console.error('Error signing out:', error)
     }
   }
-
-  const isActive = (path: string) => location.pathname === path
 
   return (
     <div className="fixed left-0 top-0 h-full w-[200px] bg-gray-800/80 backdrop-blur-sm shadow-xl z-10">
@@ -36,18 +37,18 @@ export function Sidebar() {
         {/* Navigation */}
         <nav className="flex-1 p-4">
           <ul className="space-y-2">
-            {menuItems.map((item) => (
-              <li key={item.path}>
+            {links.map((link) => (
+              <li key={link.to}>
                 <Link
-                  to={item.path}
+                  to={link.to}
                   className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-colors ${
-                    isActive(item.path)
+                    isActive(link.to)
                       ? 'bg-cyan-900 text-white shadow-lg border border-cyan-700'
                       : 'text-gray-300 hover:text-white hover:bg-gray-900'
                   }`}
                 >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.label}</span>
+                  <link.icon className="w-5 h-5" />
+                  <span>{link.text}</span>
                 </Link>
               </li>
             ))}

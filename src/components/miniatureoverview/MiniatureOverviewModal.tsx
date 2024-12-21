@@ -13,6 +13,8 @@ import { TagInput } from '../ui/input/TagInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShowItems } from '../ShowItems'
 import { sortByKey } from '../../utils/generalUtils'
+import { useAuth } from '../../contexts/AuthContext'
+import { AuditService } from '../../services/auditService'
 
 interface MiniatureOverviewModalProps {
   isOpen: boolean
@@ -112,6 +114,8 @@ export function MiniatureOverviewModal({
   onImageUpload,
   children,
 }: MiniatureOverviewModalProps) {
+  const { user } = useAuth()
+  const { showSuccess, showError } = useNotifications()
   // Tags state
   const [selectedTags, setSelectedTags] = useState<Array<{ id: number; name: string }>>([])
   const [tagInput, setTagInput] = useState('')
@@ -229,8 +233,6 @@ export function MiniatureOverviewModal({
   const locationInputRef = useRef<HTMLInputElement>(null)
   const baseSizeSelectRef = useRef<HTMLSelectElement>(null)
   const quantityInputRef = useRef<HTMLInputElement>(null)
-
-  const { showError, showSuccess } = useNotifications()
 
   // Add validation function
   const validateForm = () => {
@@ -436,20 +438,39 @@ export function MiniatureOverviewModal({
       try {
         // Save miniature data first before handling image upload
         if (isEditMode && miniData?.id) {
+          // Store old state before update
+          const oldState = {
+            ...miniData,
+            types: miniData.types || [],
+            tags: miniData.tags || []
+          }
+          
           await updateMiniature(miniData.id, miniatureData)
+          
+          // Log the update if there's a user
+          if (user?.id) {
+            await AuditService.logMiniatureUpdate(
+              user.id,
+              miniData.id,
+              oldState,
+              miniatureData
+            )
+          }
         } else {
           const newMini = await createMiniature(miniatureData)
           if (newMini?.id) {
-            newMiniId = newMini.id;
-            // console.log('New miniature created with ID:', newMiniId);
+            newMiniId = newMini.id
+            // Log the creation if there's a user
+            if (user?.id) {
+              await AuditService.logMiniatureCreate(user.id, newMini)
+            }
           } else {
-            throw new Error('Failed to get ID for new miniature');
+            throw new Error('Failed to get ID for new miniature')
           }
         }
 
         // Handle image upload if there's a new image
         if (imageFile) {
-          // console.log('Starting image upload for miniId:', newMiniId || miniData?.id || 'new');
           const formData = new FormData()
           formData.append('image', imageFile)
           formData.append('miniId', (newMiniId || miniData?.id || '').toString())
@@ -460,37 +481,48 @@ export function MiniatureOverviewModal({
               body: formData
             })
             
-            const responseData = await response.json();
-            // console.log('Image upload response:', responseData);
+            const responseData = await response.json()
             
             if (!response.ok) {
-              console.error('Image upload failed:', responseData);
-              throw new Error(responseData.error || 'Failed to upload image');
+              console.error('Image upload failed:', responseData)
+              throw new Error(responseData.error || 'Failed to upload image')
             }
 
-            imageUploaded = true;
-            showSuccess('Image uploaded successfully');
+            imageUploaded = true
+            showSuccess('Image uploaded successfully')
+
+            // Log the image operation if there's a user
+            if (user?.id) {
+              const miniId = newMiniId || miniData?.id
+              if (miniId) {
+                await AuditService.logImageOperation(
+                  user.id,
+                  miniId,
+                  imageExists ? 'IMAGE_REPLACE' : 'IMAGE_UPLOAD',
+                  getMiniImagePath(miniId, 'original'),
+                  imageExists ? getMiniImagePath(miniId, 'original') : undefined
+                )
+              }
+            }
 
             // Force a re-render of the image by updating the image existence state
-            setImageExists(false);  // Reset first
+            setImageExists(false)  // Reset first
             setTimeout(() => {
-              setImageExists(true);
+              setImageExists(true)
               // Verify the image exists
-              const img = new Image();
+              const img = new Image()
               img.onload = () => {
-                // console.log('New image loaded successfully after upload');
-                setImageExists(true);
-              };
+                setImageExists(true)
+              }
               img.onerror = () => {
-                console.error('Failed to load new image after upload');
-                setImageExists(false);
-              };
-              img.src = getMiniImagePath(newMiniId || miniData?.id || 0, 'original');
-            }, 100);
+                console.error('Failed to load new image after upload')
+                setImageExists(false)
+              }
+              img.src = getMiniImagePath(newMiniId || miniData?.id || 0, 'original')
+            }, 100)
           } catch (error) {
-            console.error('Error uploading image:', error);
-            showError(error instanceof Error ? error.message : 'Failed to upload image');
-            // Don't return here, we still want to save the miniature data
+            console.error('Error uploading image:', error)
+            showError(error instanceof Error ? error.message : 'Failed to upload image')
           }
         }
 
@@ -1178,19 +1210,31 @@ export function MiniatureOverviewModal({
                         <button
                           type="button"
                           onClick={async (e) => {
-                            e.stopPropagation();
+                            e.stopPropagation()
                             try {
                               if (miniData.id) {
-                                await deleteImage(miniData.id);
-                                setImageExists(false);
+                                const oldImageUrl = getMiniImagePath(miniData.id, 'original')
+                                await deleteImage(miniData.id)
+                                setImageExists(false)
                                 if (onImageUpload) {
-                                  onImageUpload();
+                                  onImageUpload()
                                 }
-                                showSuccess('Image deleted successfully');
+                                showSuccess('Image deleted successfully')
+                                
+                                // Log the image deletion if there's a user
+                                if (user?.id) {
+                                  await AuditService.logImageOperation(
+                                    user.id,
+                                    miniData.id,
+                                    'IMAGE_DELETE',
+                                    undefined,
+                                    oldImageUrl
+                                  )
+                                }
                               }
                             } catch (error) {
-                              console.error('Error deleting image:', error);
-                              showError('Failed to delete image');
+                              console.error('Error deleting image:', error)
+                              showError('Failed to delete image')
                             }
                           }}
                           className="absolute top-2 right-2 p-2 bg-red-900/80 hover:bg-red-800 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
