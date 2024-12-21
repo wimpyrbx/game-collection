@@ -84,14 +84,15 @@ export default function TypeCategoryAdmin() {
         if (result?.typesWithoutCategories !== undefined) {
           setTypesWithoutCategoriesCount(result.typesWithoutCategories)
         }
-        if (result?.count !== undefined) {
-          setTotalCategories(result.count)
-        }
         
         // Load initial categories
         const catResult = await loadCategories(0, categoryPagination.itemsPerPage, '')
         if (catResult.data) {
           setCategories(catResult.data)
+        }
+        if (catResult.count !== undefined && catResult.count !== null) {
+          console.log('Setting initial total categories to:', catResult.count)
+          setTotalCategories(catResult.count)
         }
         
         // Load all categories for the type-categories section
@@ -115,7 +116,9 @@ export default function TypeCategoryAdmin() {
     if (result.data) {
       setCategories(result.data)
     }
-    if (result.count !== undefined && result.count !== null) {
+    // Only update total categories count if it's not a search result
+    if (!searchTerm && result.count !== undefined && result.count !== null) {
+      console.log('Updating total categories to:', result.count)
       setTotalCategories(result.count)
     }
     return result

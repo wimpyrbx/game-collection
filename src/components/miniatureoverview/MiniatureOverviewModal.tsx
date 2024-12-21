@@ -56,6 +56,47 @@ interface ValidationErrors {
 }
 
 // Add this utility function at the top of the file
+function createGetOrCreateTag(setAvailableTags: React.Dispatch<React.SetStateAction<Array<{ id: number; name: string }>>>) {
+  return async function getOrCreateTag(tagName: string) {
+    try {
+      // First try to find the existing tag
+      const { data: existingTags, error: searchError } = await supabase
+        .from('tags')
+        .select('*')
+        .ilike('name', tagName)
+        .limit(1)
+
+      if (searchError) throw searchError
+
+      // If tag exists, return it
+      if (existingTags && existingTags.length > 0) {
+        return existingTags[0]
+      }
+
+      // If tag doesn't exist, create it
+      const { data: newTag, error: createError } = await supabase
+        .from('tags')
+        .insert({ name: tagName })
+        .select()
+        .single()
+
+      if (createError) throw createError
+
+      // Update available tags immediately
+      setAvailableTags(prev => {
+        const newTags = [...prev, newTag]
+        // Sort by name
+        return newTags.sort((a, b) => a.name.localeCompare(b.name))
+      })
+
+      return newTag
+
+    } catch (error) {
+      console.error('Error in getOrCreateTag:', error)
+      throw error
+    }
+  }
+}
 
 export function MiniatureOverviewModal({ 
   isOpen, 
@@ -71,7 +112,64 @@ export function MiniatureOverviewModal({
   onImageUpload,
   children,
 }: MiniatureOverviewModalProps) {
+  // Tags state
+  const [selectedTags, setSelectedTags] = useState<Array<{ id: number; name: string }>>([])
+  const [tagInput, setTagInput] = useState('')
+  const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([])
+  const [pendingTags, setPendingTags] = useState<string[]>([])
+  const [tagDropdownStyle, setTagDropdownStyle] = useState({
+    width: 0,
+    left: 0,
+    top: 0
+  })
 
+  // Create the getOrCreateTag function with access to setAvailableTags
+  const getOrCreateTag = useMemo(() => createGetOrCreateTag(setAvailableTags), [])
+
+  // Update useEffect to fetch tags to include cache invalidation
+  useEffect(() => {
+    let mounted = true
+
+    const fetchTags = async () => {
+      const { data: tags, error } = await supabase
+        .from('tags')
+        .select('*')
+        .order('name')
+      
+      if (error) {
+        console.error('Error fetching tags:', error)
+        return
+      }
+      
+      if (mounted) {
+        setAvailableTags(tags || [])
+      }
+    }
+    
+    fetchTags()
+
+    // Subscribe to changes in the tags table
+    const subscription = supabase
+      .channel('tags_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'tags' 
+        }, 
+        () => {
+          fetchTags() // Refresh tags when any change occurs
+        }
+      )
+      .subscribe()
+
+    return () => {
+      mounted = false
+      subscription.unsubscribe()
+    }
+  }, [])
+
+  // Form data state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -84,18 +182,31 @@ export function MiniatureOverviewModal({
     tags: [] as { id: number }[]
   })
 
-  // State for selected types table
+  // Types state
   const [selectedTypes, setSelectedTypes] = useState<SelectedType[]>([])
   const [typeSearchTerm, setTypeSearchTerm] = useState('')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
 
-  // State for product set search
+  // Product set state
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
 
-  // State for drag & drop
+  // Image state
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [imageExists, setImageExists] = useState(false)
+
+  // UI state
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [, setIsInvalidProductSet] = useState(false)
+  const [companyLogo, setCompanyLogo] = useState<string>('')
+  const [dropdownStyle, setDropdownStyle] = useState({
+    width: 0,
+    left: 0,
+    top: 0
+  })
 
   const {
     loading: loadingRef,
@@ -112,9 +223,6 @@ export function MiniatureOverviewModal({
 
   // Add ref for type search input
   const typeSearchInputRef = useRef<HTMLInputElement>(null)
-
-  // Add new state for validation errors
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
 
   // Add refs for each required field
   const nameInputRef = useRef<HTMLInputElement>(null)
@@ -270,10 +378,6 @@ export function MiniatureOverviewModal({
     }
   }, [paintedByOptions, baseSizeOptions, miniData, isOpen])
 
-  // Add state for pending new tags
-  const [pendingTags, setPendingTags] = useState<string[]>([])
-
-  // Modify handleSubmit to include image refresh
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -285,17 +389,8 @@ export function MiniatureOverviewModal({
       // Create any pending tags first
       const newTagIds = await Promise.all(
         pendingTags.map(async (tagName) => {
-          const { data, error } = await supabase
-            .from('tags')
-            .insert({ name: tagName })
-            .select()
-            .single()
-          
-          if (error) {
-            console.error('Error creating tag:', error)
-            throw error
-          }
-          return data
+          const tag = await getOrCreateTag(tagName)
+          return tag
         })
       )
 
@@ -638,12 +733,6 @@ export function MiniatureOverviewModal({
     return ''
   }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine])
 
-  // Add state for invalid product set
-  const [, setIsInvalidProductSet] = useState(false)
-
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
-
   const handleDelete = async () => {
     if (!miniData?.id || !onDelete) return
     
@@ -661,32 +750,6 @@ export function MiniatureOverviewModal({
       setIsDeleting(false)
     }
   }
-
-  // State for tags
-  const [selectedTags, setSelectedTags] = useState<Array<{ id: number; name: string }>>([])
-  const [tagInput, setTagInput] = useState('')
-
-  // Add state for available tags
-  const [availableTags, setAvailableTags] = useState<{ id: number; name: string }[]>([])
-
-  // Add useEffect to fetch tags
-  useEffect(() => {
-    const fetchTags = async () => {
-      const { data: tags, error } = await supabase
-        .from('tags')
-        .select('*')
-        .order('name')
-      
-      if (error) {
-        console.error('Error fetching tags:', error)
-        return
-      }
-      
-      setAvailableTags(tags || [])
-    }
-    
-    fetchTags()
-  }, [])
 
   // Add this handler
   const handleTagAdd = async (tagName: string) => {
@@ -780,13 +843,6 @@ export function MiniatureOverviewModal({
   // Add this with your other refs
   const searchContainerRef = useRef<HTMLDivElement>(null)
 
-  // Add this state for dropdown positioning
-  const [dropdownStyle, setDropdownStyle] = useState({
-    width: 0,
-    left: 0,
-    top: 0
-  })
-
   // Add this effect to update dropdown position
   useEffect(() => {
     let mounted = true;
@@ -807,13 +863,6 @@ export function MiniatureOverviewModal({
 
   // Add this with your other refs
   const tagSearchContainerRef = useRef<HTMLDivElement>(null)
-
-  // Add this state for tag dropdown positioning
-  const [tagDropdownStyle, setTagDropdownStyle] = useState({
-    width: 0,
-    left: 0,
-    top: 0
-  })
 
   // Add this effect to update tag dropdown position
   useEffect(() => {
@@ -882,9 +931,6 @@ export function MiniatureOverviewModal({
     label: tag.name
   }));
 
-  // Add state for company logo
-  const [companyLogo, setCompanyLogo] = useState<string>('');
-
   // Update company logo when product set changes or modal opens
   useEffect(() => {
     if (!isOpen) {
@@ -909,9 +955,6 @@ export function MiniatureOverviewModal({
       setCompanyLogo('');
     }
   }, [formData.product_set_id, companies, getProductLinesByCompany, getProductSetsByProductLine, isOpen])
-
-  // Add state for image existence
-  const [imageExists, setImageExists] = useState(false);
 
   // Add effect to check if image exists when modal opens or miniData changes
   useEffect(() => {

@@ -203,12 +203,25 @@ export default function MiniatureOverview() {
   const refreshImages = () => setImageTimestamp(Date.now())
 
   const getItemColumns = (mini: Mini) => {
-    const typeNames = mini.types?.map(t => ({
-      id: t.type_id,
-      label: t.type.name,
-      proxy_type: t.proxy_type
-    })) || []
-    const mainTypeId = mini.types?.find(t => !t.proxy_type)?.type_id
+    // Get the main type (proxy_type = false)
+    const mainType = mini.types?.find(t => !t.proxy_type)
+    // Get proxy types (proxy_type = true)
+    const proxyTypes = mini.types?.filter(t => t.proxy_type) || []
+
+    // Create type items array with all types
+    const typeItems = [
+      // Main type first
+      ...(mainType ? [{
+        id: mainType.type_id,
+        label: mainType.type.name
+      }] : []),
+      // Then proxy types
+      ...proxyTypes.map(t => ({
+        id: t.type_id,
+        label: t.type.name
+      }))
+    ]
+
     const tagNames = mini.tags?.map(t => t.tag?.name).filter(Boolean) || []
     
     const categoryNames = mini.types?.flatMap(t => 
@@ -270,12 +283,12 @@ export default function MiniatureOverview() {
       </div>,
       <div key="types" className="min-w-[150px] relative overflow-visible">
         <ShowItems 
-          items={typeNames} 
+          items={typeItems} 
           displayType="pills"
           scaleAnimation={true}
           shadowEnabled={true}
-          showTooltip={true}
-          tooltipTitle="Types"
+          showTooltip={proxyTypes.length > 0}
+          tooltipTitle={proxyTypes.length > 0 ? `Proxy Types: ${proxyTypes.map(t => t.type.name).join(', ')}` : undefined}
           itemStyle={{
             text: 'text-gray-200',
             bg: 'bg-orange-900',
@@ -283,7 +296,7 @@ export default function MiniatureOverview() {
             border: '',
             hover: 'hover:bg-orange-800'
           }}
-          selectedItem={mainTypeId}
+          selectedItem={mainType?.type_id}
           selectedStyle={{
             text: 'text-gray-200',
             bg: 'bg-orange-900',
@@ -291,7 +304,7 @@ export default function MiniatureOverview() {
             hover: 'hover:bg-orange-800',
             indicator: <div className="w-2 h-2 rounded-full bg-green-500" />
           }}
-          maxVisible={3}
+          maxVisible={1}
           emptyMessage="-"
         />
       </div>,
@@ -610,7 +623,10 @@ export default function MiniatureOverview() {
                   value={miniSearch.searchTerm}
                   onChange={(e) => {
                     miniSearch.handleSearch(e.target.value)
-                    setCurrentPage(1)
+                    // Only update page when the debounced search term changes
+                    if (miniSearch.debouncedSearchTerm !== e.target.value) {
+                      setCurrentPage(1)
+                    }
                   }}
                   placeholder="Search miniatures..."
                   className="w-full"
@@ -720,16 +736,33 @@ export default function MiniatureOverview() {
                                 <h3 className="font-bold text-gray-100 text-base leading-tight line-clamp-2">
                                   {mini.name}
                                 </h3>
-                                {mini.types?.find(t => !t.proxy_type) && (
+                                {mini.types && (
                                   <div className="flex items-center">
                                     <ShowItems 
-                                      items={[{
-                                        id: mini.types.find(t => !t.proxy_type)?.type_id || 0,
-                                        label: mini.types.find(t => !t.proxy_type)?.type.name || ''
-                                      }]}
+                                      items={[
+                                        // Main type first
+                                        ...(mini.types.find(t => !t.proxy_type) ? [{
+                                          id: mini.types.find(t => !t.proxy_type)!.type_id,
+                                          label: mini.types.find(t => !t.proxy_type)!.type.name
+                                        }] : []),
+                                        // Then proxy types
+                                        ...mini.types.filter(t => t.proxy_type).map(t => ({
+                                          id: t.type_id,
+                                          label: t.type.name
+                                        }))
+                                      ]}
                                       displayType="pills"
                                       scaleAnimation={true}
                                       shadowEnabled={true}
+                                      showTooltip={true}
+                                      tooltipTitle="Types:"
+                                      itemStyle={{
+                                        text: 'text-gray-200',
+                                        bg: 'bg-orange-900',
+                                        size: 'xs',
+                                        border: '',
+                                        hover: 'hover:bg-orange-800'
+                                      }}
                                       selectedItem={mini.types.find(t => !t.proxy_type)?.type_id}
                                       selectedStyle={{
                                         text: 'text-gray-200',
@@ -738,14 +771,8 @@ export default function MiniatureOverview() {
                                         hover: 'hover:bg-orange-800',
                                         indicator: <div className="w-2 h-2 rounded-full bg-green-500" />
                                       }}
-                                      itemStyle={{
-                                        text: 'text-gray-200',
-                                        bg: 'bg-orange-900',
-                                        size: 'xs',
-                                        border: 'border border-orange-800/50',
-                                        hover: 'hover:bg-orange-800'
-                                      }}
                                       maxVisible={1}
+                                      emptyMessage=""
                                     />
                                   </div>
                                 )}

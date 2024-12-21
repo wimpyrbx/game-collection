@@ -23,7 +23,7 @@ interface UseAdminSearchReturn {
 export function useAdminSearch({
   defaultSearchTerm = '',
   searchFields = ['name'],
-  debounceMs = 300,
+  debounceMs = 500,
   onSearch
 }: UseAdminSearchProps = {}): UseAdminSearchReturn {
   const [searchTerm, setSearchTerm] = useState(defaultSearchTerm)
@@ -32,7 +32,9 @@ export function useAdminSearch({
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm)
-      onSearch?.(searchTerm)
+      if (onSearch) {
+        onSearch(searchTerm)
+      }
     }, debounceMs)
 
     return () => {
@@ -47,11 +49,11 @@ export function useAdminSearch({
   const filterItems = useCallback(<T extends Record<string, any>>(items: T[]): T[] => {
     if (!debouncedSearchTerm) return items
 
-    const lowerSearchTerm = debouncedSearchTerm.toLowerCase()
-    return items.filter(item => 
+    const searchTermLower = debouncedSearchTerm.toLowerCase()
+    return items.filter(item =>
       searchFields.some(field => {
         const value = item[field]
-        return value && value.toString().toLowerCase().includes(lowerSearchTerm)
+        return value && value.toString().toLowerCase().includes(searchTermLower)
       })
     )
   }, [debouncedSearchTerm, searchFields])

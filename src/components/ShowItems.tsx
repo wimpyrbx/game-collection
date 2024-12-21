@@ -162,13 +162,13 @@ export function ShowItems({
 
   // Render tooltip icon and content
   const tooltipContent = showTooltip && !showAll && items.length > maxVisible && (
-    <div className="relative inline-block ml-1">
+    <div className="relative inline-block">
       <div
         className="text-gray-400 hover:text-gray-300 cursor-help"
         onMouseEnter={() => setIsTooltipVisible(true)}
         onMouseLeave={() => setIsTooltipVisible(false)}
       >
-        <FaQuestionCircle className="w-4 h-7" />
+        <FaQuestionCircle className="w-4 h-5 pt-1 text-yellow-500" />
       </div>
       {isTooltipVisible && (
         <motion.div 

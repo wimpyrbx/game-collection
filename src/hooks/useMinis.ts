@@ -174,6 +174,24 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   const [totalMinis, setTotalMinis] = useState(0)
   const [totalQuantity, setTotalQuantity] = useState(0)
   const [internalSearchTerm, setInternalSearchTerm] = useState<string | null>(searchTerm || null)
+  const searchTimeoutRef = useRef<NodeJS.Timeout>()
+
+  // Update search term with debounce
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      setInternalSearchTerm(searchTerm || null)
+    }, SEARCH_DEBOUNCE)
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [searchTerm])
 
   // Add refs for tracking state and timeouts
   const currentPageRef = useRef(currentPage)

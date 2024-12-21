@@ -31,6 +31,7 @@ interface Cache {
   timestamp: number
   searchTerm: string
   typesWithoutCategories: number
+  totalCategories: number
 }
 
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
@@ -77,35 +78,85 @@ class TypeCategoryCache {
     this.loadPromise = (async () => {
       console.log('Fetching fresh type/category data')
       
-      // Get all categories first in a single query
-      const { data: categoriesData, error: categoriesError } = await supabase
+      // First get total count of categories
+      const { count: totalCategoryCount, error: countError } = await supabase
         .from('mini_categories')
-        .select('*')
-        .order('name')
+        .select('*', { count: 'exact', head: true })
+        .throwOnError()
 
-      if (categoriesError) throw categoriesError
+      if (countError) throw countError
+      
+      if (totalCategoryCount === null) {
+        throw new Error('Failed to get total category count')
+      }
 
-      // Then get all types with their category relationships in a single query
-      const { data: typesData, error: typesError } = await supabase
-        .from('mini_types')
-        .select(`
-          id,
-          name,
-          type_to_categories!type_id(
-            category_id
-          )
-        `)
-        .order('name')
+      console.log('Total categories count:', totalCategoryCount)
+      
+      // Get all categories using range-based pagination
+      let allCategories: any[] = []
+      let hasMoreCategories = true
+      let categoryStart = 0
+      
+      while (hasMoreCategories) {
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('mini_categories')
+          .select('*')
+          .range(categoryStart, categoryStart + 999)
+          .order('name')
 
-      if (typesError) throw typesError
+        if (categoriesError) throw categoriesError
+        
+        if (categoriesData) {
+          allCategories = [...allCategories, ...categoriesData]
+          if (categoriesData.length < 1000) {
+            hasMoreCategories = false
+          } else {
+            categoryStart += 1000
+          }
+        } else {
+          hasMoreCategories = false
+        }
+      }
+
+      // Get all types with their category relationships using range-based pagination
+      let allTypes: any[] = []
+      let hasMoreTypes = true
+      let typeStart = 0
+      
+      while (hasMoreTypes) {
+        const { data: typesData, error: typesError } = await supabase
+          .from('mini_types')
+          .select(`
+            id,
+            name,
+            type_to_categories!type_id(
+              category_id
+            )
+          `)
+          .range(typeStart, typeStart + 999)
+          .order('name')
+
+        if (typesError) throw typesError
+        
+        if (typesData) {
+          allTypes = [...allTypes, ...typesData]
+          if (typesData.length < 1000) {
+            hasMoreTypes = false
+          } else {
+            typeStart += 1000
+          }
+        } else {
+          hasMoreTypes = false
+        }
+      }
 
       // Count types without categories
-      const typesWithoutCategories = typesData.filter(
+      const typesWithoutCategories = allTypes.filter(
         (type: DbType) => !type.type_to_categories?.length
       ).length
 
       // Transform the data
-      const types = typesData.map((type: DbType) => ({
+      const types = allTypes.map((type: DbType) => ({
         id: type.id,
         name: type.name,
         categories: type.type_to_categories?.map(() => ({
@@ -113,22 +164,24 @@ class TypeCategoryCache {
         })) || []
       }))
 
-      const typeCategoryRelations = typesData.flatMap((type: DbType) => 
+      const typeCategoryRelations = allTypes.flatMap((type: DbType) => 
         (type.type_to_categories || []).map((rel: { category_id: number }) => ({
           type_id: type.id,
           category_id: rel.category_id
         }))
       )
+
       const newCache: Cache = {
         types: types.map((type: { id: number; name: string; categories: any[] }) => ({
           ...type,
           categories: [] // Add required categories property
         })),
-        categories: categoriesData,
+        categories: allCategories,
         typeCategoryRelations,
         timestamp: Date.now(),
         searchTerm: '',
-        typesWithoutCategories
+        typesWithoutCategories,
+        totalCategories: totalCategoryCount || 0
       }
 
       this.cache = newCache
@@ -180,6 +233,14 @@ export function useTypeCategoryAdmin() {
         )
       : data
 
+    // If limit is 0, return all items
+    if (limit === 0) {
+      return {
+        items: filtered,
+        totalCount: filtered.length
+      }
+    }
+
     const startIndex = offset
     const endIndex = offset + limit
     const pageItems = filtered.slice(startIndex, endIndex)
@@ -193,6 +254,25 @@ export function useTypeCategoryAdmin() {
   async function initializeData(offset: number = 0, limit: number = 10) {
     try {
       const cacheData = await cache.loadData()
+      
+      // If limit is 0, return all types
+      if (limit === 0) {
+        const typesWithCategories = cacheData.types.map(type => ({
+          ...type,
+          categories: type.categories || []
+        }))
+        
+        setMiniTypes(typesWithCategories)
+        setCategories(cacheData.categories)
+        setTotalCount(cacheData.types.length)
+        setTotalCategories(cacheData.totalCategories)
+        
+        return {
+          data: typesWithCategories,
+          count: cacheData.types.length,
+          typesWithoutCategories: cacheData.typesWithoutCategories
+        }
+      }
       
       const { items: pageTypes, totalCount: filteredCount } = filterAndPaginateData(
         cacheData.types,
@@ -208,8 +288,8 @@ export function useTypeCategoryAdmin() {
       
       setMiniTypes(typesWithCategories)
       setCategories(cacheData.categories)
-      setTotalCount(filteredCount)
-      setTotalCategories(cacheData.categories.length)
+      setTotalCount(cacheData.types.length)
+      setTotalCategories(cacheData.totalCategories)
       
       return {
         data: typesWithCategories,
@@ -232,16 +312,26 @@ export function useTypeCategoryAdmin() {
 
       const cacheData = cache.data!
       
-      // Skip filtering if no search term
+      // Always set the total counts to the full dataset size
+      setTotalCount(cacheData.types.length)
+      // Do not set totalCategories here as it should be managed by loadCategories
+      
+      // Skip filtering if no search term and return all items if limit is 0
       if (!search.trim()) {
+        if (limit === 0) {
+          setMiniTypes(cacheData.types as MiniType[])
+          return {
+            data: cacheData.types,
+            count: cacheData.types.length,
+            typesWithoutCategories: cacheData.typesWithoutCategories
+          }
+        }
+
         const startIndex = offset
         const endIndex = offset + limit
         const pageTypes = cacheData.types.slice(startIndex, endIndex)
         
         setMiniTypes(pageTypes as MiniType[])
-        if (totalCount !== cacheData.types.length) {
-          setTotalCount(cacheData.types.length)
-        }
         
         return {
           data: pageTypes,
@@ -258,9 +348,7 @@ export function useTypeCategoryAdmin() {
       )
       
       setMiniTypes(pageTypes as MiniType[])
-      if (totalCount !== filteredCount) {
-        setTotalCount(filteredCount)
-      }
+      
       return {
         data: pageTypes,
         count: filteredCount,
@@ -285,20 +373,20 @@ export function useTypeCategoryAdmin() {
       }
 
       const cacheData = cache.data!
+      
+      // Set total categories from the exact count in cache
+      setTotalCategories(cacheData.totalCategories)
+      console.log('Setting total categories to:', cacheData.totalCategories)
 
       // Skip filtering if no search term
       if (!searchTerm?.trim()) {
         const startIndex = offset
         const endIndex = offset + limit
         const pageCategories = cacheData.categories.slice(startIndex, endIndex)
-        
-        if (totalCategories !== cacheData.categories.length) {
-          setTotalCategories(cacheData.categories.length)
-        }
 
         return { 
           data: pageCategories, 
-          count: cacheData.categories.length 
+          count: cacheData.totalCategories // Use the exact count for total
         }
       }
 
@@ -309,15 +397,12 @@ export function useTypeCategoryAdmin() {
         searchTerm
       )
 
-      if (totalCategories !== filteredCount) {
-        setTotalCategories(filteredCount)
-      }
-
       return { 
         data: pageCategories, 
-        count: filteredCount 
+        count: filteredCount // This is for pagination of filtered results
       }
     } catch (error) {
+      console.error('Error in loadCategories:', error)
       return { data: null, error, count: 0 }
     }
   }
@@ -628,6 +713,7 @@ export function useTypeCategoryAdmin() {
     categories,
     selectedTypeCategories,
     totalCount,
+    totalCategories,
     error,
     loadData,
     addType,
