@@ -757,7 +757,36 @@ export default function MiniatureOverview() {
                     {/* Pre-defined fields for new miniature */}
                     <div className="flex items-center gap-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
                       <button
-                        onClick={() => setShowPreDefinedFields(!showPreDefinedFields)}
+                        onClick={() => {
+                          setShowPreDefinedFields(!showPreDefinedFields);
+                          // If we're closing, reset all values
+                          if (showPreDefinedFields) {
+                            // Reset product set
+                            setDefaultProductSetId(null);
+                            setProductSearchTerm('');
+                            setShowProductDropdown(false);
+                            
+                            // Reset location
+                            setDefaultLocation('');
+                            
+                            // Reset base size to "medium"
+                            const mediumId = baseSizeOptions.find(b => 
+                              b.base_size_name.toLowerCase() === 'medium'
+                            )?.id || null;
+                            setDefaultBaseSizeId(mediumId);
+                            
+                            // Reset painted by to "prepainted"
+                            const prepaintedId = paintedByOptions.find(p => 
+                              p.painted_by_name.toLowerCase() === 'prepainted'
+                            )?.id || null;
+                            setDefaultPaintedById(prepaintedId);
+                            
+                            // Reset type
+                            setDefaultTypeId(null);
+                            setTypeSearchTerm('');
+                            setShowTypeDropdown(false);
+                          }
+                        }}
                         className="text-gray-400 hover:text-gray-300 focus:outline-none"
                       >
                         {showPreDefinedFields ? (
