@@ -313,16 +313,19 @@ export default function History() {
           .from('audit_logs')
           .select('*', { count: 'exact', head: true })
 
-        if (count) {
-          setTotalPages(Math.ceil(count / logsPerPage))
-        }
+        // Then get paginated logs, starting from the most recent entries
+        const totalCount = count || 0
+        const maxPages = 10
+        const calculatedPages = Math.ceil(totalCount / logsPerPage)
+        setTotalPages(Math.min(calculatedPages, maxPages))
 
-        // Then get paginated logs
+        const startIndex = Math.max(0, totalCount - (10 * logsPerPage)) // Only show last 100 entries
+        const offset = (currentPage - 1) * logsPerPage
         const { data, error } = await supabase
           .from('audit_logs')
           .select('*')
           .order('created_at', { ascending: false })
-          .range((currentPage - 1) * logsPerPage, currentPage * logsPerPage - 1)
+          .range(startIndex + offset, startIndex + offset + logsPerPage - 1)
 
         if (error) throw error
 
@@ -389,6 +392,7 @@ export default function History() {
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-2 h-[88vh]">
       <UI.PageHeader bgColor="none">
         <UI.PageHeaderTextGroup>
           <UI.PageHeaderText>
@@ -398,7 +402,7 @@ export default function History() {
             </div>
           </UI.PageHeaderText>
           <UI.PageHeaderSubText>
-            View changes made to miniatures
+            View changes made to miniatures. Showing last 100 entries only.
           </UI.PageHeaderSubText>
         </UI.PageHeaderTextGroup>
       </UI.PageHeader>
@@ -491,7 +495,8 @@ export default function History() {
               </tr>
             ))}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
 
       {totalPages > 1 && (
