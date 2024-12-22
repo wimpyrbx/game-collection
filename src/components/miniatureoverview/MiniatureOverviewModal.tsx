@@ -594,7 +594,7 @@ export function MiniatureOverviewModal({
   }
 
   const handleTypeSelect = (typeId: number) => {
-    const selectedType = miniTypes.find(t => t.id === typeId)
+    const selectedType = typeCategoryAdmin.miniTypes.find(t => t.id === typeId)
     if (selectedType && !selectedTypes.some(t => t.id === typeId)) {
       const isFirstType = selectedTypes.length === 0
       const newType: SelectedType = {
@@ -606,8 +606,8 @@ export function MiniatureOverviewModal({
           name: selectedType.name,
           categories: selectedType.categories?.map(cat => ({
             category: {
-              id: cat.id,
-              name: cat.name
+              id: cat.category.id,
+              name: cat.category.name
             }
           })) || []
         }
