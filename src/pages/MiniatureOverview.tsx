@@ -205,6 +205,18 @@ export default function MiniatureOverview() {
 
   const refreshImages = () => setImageTimestamp(Date.now())
 
+  const columnHeaders = [
+    'Name',
+    'Types',
+    'Tags',
+    'Product Set',
+    'Base Size',
+    'Painted By',
+    'Location',
+    { title: 'QTY', className: 'text-center w-20' },
+    { title: 'In Use', className: 'text-center w-20' }
+  ]
+
   const getItemColumns = (mini: Mini) => {
     // Get the main type (proxy_type = false)
     const mainType = mini.types?.find(t => !t.proxy_type)
@@ -226,12 +238,6 @@ export default function MiniatureOverview() {
     ]
 
     const tagNames = mini.tags?.map(t => t.tag?.name).filter(Boolean) || []
-    
-    const categoryNames = mini.types?.flatMap(t => 
-      t.type.categories?.map(category => category.name) || []
-    ).filter((name, index, self) => 
-      name && self.indexOf(name) === index
-    ) || []
 
     const company = mini.product_sets?.product_line?.company?.name
     const productLine = mini.product_sets?.product_line?.name
@@ -266,23 +272,6 @@ export default function MiniatureOverview() {
           <FaDiceD20 className="absolute w-6 h-6 text-gray-600 hidden" />
         </div>
         <span>{mini.name}</span>
-      </div>,
-      <div key="categories" className="min-w-[150px]">
-        <ShowItems 
-          items={categoryNames} 
-          displayType="pills"
-          scaleAnimation={true}
-          shadowEnabled={true}
-          itemStyle={{
-            text: 'text-gray-200',
-            bg: 'bg-purple-900',
-            size: 'xs',
-            border: '',
-            hover: 'hover:bg-purple-800'
-          }}
-          maxVisible={3}
-          emptyMessage="-"
-        />
       </div>,
       <div key="types" className="min-w-[150px] relative overflow-visible">
         <ShowItems 
@@ -332,6 +321,19 @@ export default function MiniatureOverview() {
         />
       </div>,
       productSetDisplay,
+      <div key="base_size" className="text-sm">
+        {mini.base_sizes?.base_size_name ? (
+          mini.base_sizes.base_size_name.charAt(0).toUpperCase() + mini.base_sizes.base_size_name.slice(1).toLowerCase()
+        ) : '-'}
+      </div>,
+      <div key="painted_by" className="text-sm">
+        {mini.painted_by?.painted_by_name ? (
+          mini.painted_by.painted_by_name.charAt(0).toUpperCase() + mini.painted_by.painted_by_name.slice(1).toLowerCase()
+        ) : '-'}
+      </div>,
+      <div key="location" className="text-sm">
+        {mini.location || '-'}
+      </div>,
       <div key="quantity" className="text-center w-[25px]">{mini.quantity || 0}</div>,
       <div 
         key="switch"
@@ -342,19 +344,14 @@ export default function MiniatureOverview() {
       >
         <Switch
           checked={!!mini.in_use}
+          className="!border !border-gray-500"
           onChange={async (checked) => {
             try {
               if (mini.id) {
-                // Get the miniature data before update for logging
                 const oldMiniature = await getMiniature(mini.id);
-                
-                // Update the in_use status
                 await updateMiniatureInUse(mini.id, checked);
-                
-                // Get the updated miniature data for logging
                 const newMiniature = await getMiniature(mini.id);
                 
-                // Log the change if we have a user
                 if (user?.id && oldMiniature && newMiniature) {
                   await AuditService.logMiniatureUpdate(
                     user.id,
@@ -364,16 +361,11 @@ export default function MiniatureOverview() {
                   );
                 }
                 
-                // Invalidate cache to force fresh data
                 invalidateCache();
-                
-                // Refresh all data in a single batch
                 const [updatedMinis] = await Promise.all([
                   getPageMinis(currentPage),
                   getTotalQuantity()
                 ]);
-                
-                // Update states
                 setMinis(updatedMinis);
               }
             } catch (error) {
@@ -385,16 +377,6 @@ export default function MiniatureOverview() {
       </div>
     ]
   }
-
-  const columnHeaders = [
-    'Name',
-    'Categories',
-    'Types',
-    'Tags',
-    'Product Set',
-    { title: 'QTY', className: 'text-center w-20' },
-    { title: 'In Use', className: 'text-center w-20' }
-  ]
 
   const handleAdd = () => {
     // Find default IDs for prepainted and medium base size
@@ -670,7 +652,7 @@ export default function MiniatureOverview() {
                 {minis.length === 0 ? (
                   <UI.EmptyTableState icon={<FaDiceD6 />} message="No miniatures found" />
                 ) : viewMode === 'table' ? (
-                  <div className="overflow-x-auto overflow-y-auto">
+                  <div className="overflow-x-auto overflow-y-auto p-1">
                     <table className="w-full divide-y divide-[#333333]">
                       <thead className="sticky top-0 z-10">
                         <tr>
@@ -692,14 +674,18 @@ export default function MiniatureOverview() {
                             key={mini.id}
                             className={`
                               ${mini.in_use ? 'bg-red-900/50' : 'bgRow'} 
-                              hover:bgRowHover transition-colors cursor-pointer
+                              group
+                              hover:bgRowHover hover:-translate-y-[1px]
+                              hover:shadow-[0_0_12px_rgba(0,0,0,0.3)] hover:relative hover:z-10
+                              transition-all duration-200 ease-in-out transform
+                              cursor-pointer
                             `}
                             onClick={() => handleEdit(mini, index)}
                           >
-                            {getItemColumns(mini).map((column, index) => (
+                            {getItemColumns(mini).map((column, columnIndex) => (
                               <td
-                                key={index}
-                                className="px-6 py-2 text-sm text-gray-300"
+                                key={columnIndex}
+                                className="px-6 py-2 text-sm text-gray-300 transition-colors duration-200 group-hover:text-gray-100"
                               >
                                 {column}
                               </td>
