@@ -47,7 +47,6 @@ export default function MiniatureOverview() {
     companies,
     getProductLinesByCompany,
     getProductSetsByProductLine,
-    miniTypes
   } = useMiniatureReferenceData()
 
   const {
@@ -461,8 +460,8 @@ export default function MiniatureOverview() {
 
   // Add effect to load all types
   useEffect(() => {
-    typeCategoryAdmin.loadData(0, 0).then(result => {
-      // console.log('Loaded all types:', result?.data?.length)
+    typeCategoryAdmin.loadData(0, 0).then(() => {
+      // Load all types without using the result
     })
   }, [])
 
@@ -790,9 +789,9 @@ export default function MiniatureOverview() {
                         className="text-gray-400 hover:text-gray-300 focus:outline-none"
                       >
                         {showPreDefinedFields ? (
-                          <span className="flex items-center gap-2"><FaMinusCircle className="w-4 h-4 text-orange-500 mr-2" /> Pre-define fields:</span>
+                          <span className="flex items-center gap-2"><FaMinusCircle className="w-4 h-4 text-orange-500 mr-2" /> Pre-defined</span>
                         ) : (
-                          <span className="flex items-center gap-2"><FaPlusCircle className="w-4 h-4 text-green-500 mr-2" /> Open pre-define fields</span>
+                          <span className="flex items-center gap-2"><FaPlusCircle className="w-4 h-4 text-green-500 mr-2" /> Pre-defined</span>
                         )}
                       </button>
                       {showPreDefinedFields && (
