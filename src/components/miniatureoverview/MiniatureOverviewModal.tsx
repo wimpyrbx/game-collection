@@ -1552,17 +1552,14 @@ export function MiniatureOverviewModal({
               <div className="grid grid-cols-2 gap-4">
                 {/* Types Card */}
                 <div className="border border-gray-700 rounded-lg overflow-hidden flex flex-col h-full">
-                  <div className="bg-gray-900/80 px-4 py-3 border-b border-gray-700">
+                  <div className="bg-gray-900/80 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
                     <h3 className="font-medium text-gray-200">Types</h3>
+                    <span className="text-xs text-gray-400">
+                      {typeSearchTerm ? `${filteredTypes.length} matches` : `${totalTypesCount} total types`}
+                    </span>
                   </div>
                   <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
                     <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium text-gray-300">Types</label>
-                        <span className="text-xs text-gray-400">
-                          {typeSearchTerm ? `${filteredTypes.length} matches` : `${totalTypesCount} total types`}
-                        </span>
-                      </div>
                       <div className="relative">
                         <UI.SearchInput
                           ref={typeSearchInputRef}

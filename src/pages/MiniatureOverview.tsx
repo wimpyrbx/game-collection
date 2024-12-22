@@ -685,7 +685,7 @@ export default function MiniatureOverview() {
                 {minis.length === 0 ? (
                   <UI.EmptyTableState icon={<FaDiceD6 />} message="No miniatures found" />
                 ) : viewMode === 'table' ? (
-                  <div className="overflow-x-auto overflow-y-auto p-1">
+                  <div className="overflow-x-auto overflow-y-auto h-[calc(92vh-23rem)]">
                     <table className="w-full divide-y divide-[#333333]">
                       <thead className="sticky top-0 z-10">
                         <tr>
@@ -718,7 +718,7 @@ export default function MiniatureOverview() {
                             {getItemColumns(mini).map((column, columnIndex) => (
                               <td
                                 key={columnIndex}
-                                className="px-6 py-2 text-sm text-gray-300 transition-colors duration-200 group-hover:text-gray-100"
+                                className="px-6 py-1.5 text-sm text-gray-300 transition-colors duration-200 group-hover:text-gray-100"
                               >
                                 {column}
                               </td>
@@ -729,7 +729,7 @@ export default function MiniatureOverview() {
                     </table>
                   </div>
                 ) : viewMode === 'grid' ? (
-                  <div className="grid grid-cols-4 auto-rows-fr gap-2 h-[calc(92vh-22rem)] overflow-y-auto p-5">
+                  <div className="grid grid-cols-4 auto-rows-fr gap-2 h-[calc(94vh-22rem)] overflow-y-auto p-5">
                     {minis.map((mini, index) => {
                       const originalPath = `${getMiniImagePath(mini.id ?? 0, 'original')}?t=${imageTimestamp}`
                       const company = mini.product_sets?.product_line?.company?.name
