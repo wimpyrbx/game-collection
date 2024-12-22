@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle } from 'react-icons/fa'
+import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle, FaMinusCircle, FaPlusCircle } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
@@ -752,7 +752,7 @@ export default function MiniatureOverview() {
                 </div>
               </div>
               <UI.CardHeaderRightSide>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-4 h-[50px] text-justify justify-center">
                   <div className="flex items-center gap-4">
                     {/* Pre-defined fields for new miniature */}
                     <div className="flex items-center gap-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
@@ -761,12 +761,11 @@ export default function MiniatureOverview() {
                         className="text-gray-400 hover:text-gray-300 focus:outline-none"
                       >
                         {showPreDefinedFields ? (
-                          <div className="w-4 h-4 flex items-center justify-center">−</div>
+                          <span className="flex items-center gap-2"><FaMinusCircle className="w-4 h-4 text-orange-500 mr-2" /> Pre-define fields:</span>
                         ) : (
-                          <div className="w-4 h-4 flex items-center justify-center">+</div>
+                          <span className="flex items-center gap-2"><FaPlusCircle className="w-4 h-4 text-green-500 mr-2" /> Open pre-define fields</span>
                         )}
                       </button>
-                      <div className="text-sm text-gray-400">Pre-define fields:</div>
                       {showPreDefinedFields && (
                         <div className="flex gap-2">
                           {/* Product Set */}
