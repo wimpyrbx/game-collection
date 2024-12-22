@@ -309,13 +309,11 @@ export function useTypeCategoryAdmin() {
 
       const cacheData = cache.data!
       
-      // Always set the total counts to the full dataset size
-      setTotalCount(cacheData.types.length)
-      
       // Skip filtering if no search term and return all items if limit is 0
       if (!search.trim()) {
         if (limit === 0) {
           setMiniTypes(cacheData.types as MiniType[])
+          setTotalCount(cacheData.types.length)
           return {
             data: cacheData.types,
             count: cacheData.types.length,
@@ -328,6 +326,7 @@ export function useTypeCategoryAdmin() {
         const pageTypes = cacheData.types.slice(startIndex, endIndex)
         
         setMiniTypes(pageTypes as MiniType[])
+        setTotalCount(cacheData.types.length)
         
         return {
           data: pageTypes,
@@ -344,6 +343,8 @@ export function useTypeCategoryAdmin() {
       )
       
       setMiniTypes(pageTypes as MiniType[])
+      // Update totalCount to reflect filtered count when searching
+      setTotalCount(filteredCount)
       
       return {
         data: pageTypes,

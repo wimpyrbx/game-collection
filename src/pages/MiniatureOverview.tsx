@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { FaTable, FaDiceD6, FaThLarge, FaDiceD20 } from 'react-icons/fa'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
@@ -16,6 +16,7 @@ import { useViewMode } from '../hooks/useViewMode'
 import { AuditService } from '../services/auditService'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
+import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -38,10 +39,15 @@ export default function MiniatureOverview() {
   const itemsPerPage = 12
   const initialLoadRef = useRef(true)
   const { user } = useAuth()
+  const typeCategoryAdmin = useTypeCategoryAdmin()
 
   const {
     paintedByOptions,
     baseSizeOptions,
+    companies,
+    getProductLinesByCompany,
+    getProductSetsByProductLine,
+    miniTypes
   } = useMiniatureReferenceData()
 
   const {
@@ -384,46 +390,157 @@ export default function MiniatureOverview() {
     ]
   }
 
-  const handleAdd = () => {
-    // Find default IDs for prepainted and medium base size
-    const prepaintedId = paintedByOptions.find(p => 
-      p.painted_by_name.toLowerCase() === 'prepainted'
-    )?.id || 0;
-    
+  // Add new state variables at the top of the component
+  const [defaultProductSetId, setDefaultProductSetId] = useState<number | null>(null)
+  const [defaultLocation, setDefaultLocation] = useState('')
+  const [defaultBaseSizeId, setDefaultBaseSizeId] = useState<number | null>(null)
+  const [defaultPaintedById, setDefaultPaintedById] = useState<number | null>(null)
+  const [productSearchTerm, setProductSearchTerm] = useState('')
+  const [showProductDropdown, setShowProductDropdown] = useState(false)
+  const [defaultTypeId, setDefaultTypeId] = useState<number | null>(null)
+  const [typeSearchTerm, setTypeSearchTerm] = useState('')
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false)
+  // Add new state for pre-defined fields visibility
+  const [showPreDefinedFields, setShowPreDefinedFields] = useState(true)
+
+  // Initialize default values for base size and painted by
+  useEffect(() => {
     const mediumId = baseSizeOptions.find(b => 
       b.base_size_name.toLowerCase() === 'medium'
-    )?.id || 0;
+    )?.id || null;
+    
+    const prepaintedId = paintedByOptions.find(p => 
+      p.painted_by_name.toLowerCase() === 'prepainted'
+    )?.id || null;
 
-    const defaultPaintedBy = paintedByOptions.find(p => p.id === prepaintedId);
-    const defaultBaseSize = baseSizeOptions.find(b => b.id === mediumId);
+    setDefaultBaseSizeId(mediumId);
+    setDefaultPaintedById(prepaintedId);
+  }, [baseSizeOptions, paintedByOptions]);
+
+  // Add filteredProducts computation
+  const filteredProducts = useMemo(() => {
+    if (!productSearchTerm) return []
+    
+    const searchLower = productSearchTerm.toLowerCase()
+    const results: Array<{
+      company: string
+      line: string
+      set: string
+      id: number
+    }> = []
+
+    companies.forEach(company => {
+      const lines = getProductLinesByCompany(company.id)
+      lines.forEach(line => {
+        const sets = getProductSetsByProductLine(line.id)
+        sets.forEach(set => {
+          const companyMatch = company.name.toLowerCase().includes(searchLower)
+          const lineMatch = line.name.toLowerCase().includes(searchLower)
+          const setMatch = set.name.toLowerCase().includes(searchLower)
+
+          if (companyMatch || lineMatch || setMatch) {
+            results.push({
+              company: company.name,
+              line: line.name,
+              set: set.name,
+              id: set.id
+            })
+          }
+        })
+      })
+    })
+
+    return results
+  }, [productSearchTerm, companies, getProductLinesByCompany, getProductSetsByProductLine])
+
+  // Add logging for typeCategoryAdmin
+  useEffect(() => {
+    // console.log('typeCategoryAdmin:', typeCategoryAdmin)
+    // console.log('miniTypes from typeCategoryAdmin:', typeCategoryAdmin.miniTypes)
+  }, [typeCategoryAdmin])
+
+  // Add effect to load all types
+  useEffect(() => {
+    typeCategoryAdmin.loadData(0, 0).then(result => {
+      // console.log('Loaded all types:', result?.data?.length)
+    })
+  }, [])
+
+  // Modify filteredTypes computation to use typeCategoryAdmin.miniTypes
+  const filteredTypes = useMemo(() => {
+    if (!typeSearchTerm) return []
+    
+    const searchLower = typeSearchTerm.toLowerCase()
+    return typeCategoryAdmin.miniTypes.filter(type => 
+      type.name.toLowerCase().includes(searchLower)
+    )
+  }, [typeSearchTerm, typeCategoryAdmin.miniTypes])
+
+  // Update the type dropdown section
+  const typeDropdownContent = (
+    <>
+      {showTypeDropdown && filteredTypes.length > 0 && (
+        <div className="absolute z-50 mt-1 w-96 max-h-60 overflow-auto rounded-md bg-gray-800 border border-gray-700 shadow-lg">
+          {filteredTypes.map((type) => (
+            <button
+              key={type.id}
+              className="w-full text-left px-4 py-2 hover:bg-gray-700 focus:bg-gray-700 focus:outline-none"
+              onClick={() => {
+                setDefaultTypeId(type.id)
+                setTypeSearchTerm(type.name)
+                setShowTypeDropdown(false)
+              }}
+            >
+              <div className="text-sm text-gray-200">{type.name}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </>
+  )
+
+  // Update handleAdd to use typeCategoryAdmin.miniTypes
+  const handleAdd = () => {
+    const defaultPaintedBy = paintedByOptions.find(p => p.id === defaultPaintedById);
+    const defaultBaseSize = baseSizeOptions.find(b => b.id === defaultBaseSizeId);
+    const defaultType = typeCategoryAdmin.miniTypes.find(t => t.id === defaultTypeId);
 
     // Initialize with empty miniature data for new entries
     const newMini: Mini = {
       name: '',
       description: '',
-      location: '',
+      location: defaultLocation,
       quantity: 1,
-      painted_by_id: prepaintedId,
-      base_size_id: mediumId,
-      product_set_id: null,
-      types: [],
+      painted_by_id: defaultPaintedById || 0,
+      base_size_id: defaultBaseSizeId || 0,
+      product_set_id: defaultProductSetId || null,
+      types: defaultType ? [{
+        mini_id: 0, // This will be set when the miniature is created
+        type_id: defaultType.id,
+        type: {
+          id: defaultType.id,
+          name: defaultType.name,
+          categories: []
+        },
+        proxy_type: false
+      }] : [],
       tags: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       in_use: null,
       painted_by: defaultPaintedBy || {
-        id: prepaintedId,
+        id: defaultPaintedById || 0,
         painted_by_name: 'Prepainted'
       },
       base_sizes: defaultBaseSize || {
-        id: mediumId,
+        id: defaultBaseSizeId || 0,
         base_size_name: 'Medium'
       },
       product_sets: undefined
     };
 
     setSelectedMini(newMini);
-    setSelectedMiniIndex(-1); // Reset index for new entry
+    setSelectedMiniIndex(-1);
     setIsModalOpen(true);
   };
 
@@ -635,32 +752,171 @@ export default function MiniatureOverview() {
                 </div>
               </div>
               <UI.CardHeaderRightSide>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1">
-                    <button
-                      className={`p-2 rounded focus:outline-none ${viewMode === 'table' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                      onClick={() => setViewMode('table')}
-                      title="Table View"
-                      tabIndex={-1}
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center gap-4">
+                    {/* Pre-defined fields for new miniature */}
+                    <div className="flex items-center gap-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                      <button
+                        onClick={() => setShowPreDefinedFields(!showPreDefinedFields)}
+                        className="text-gray-400 hover:text-gray-300 focus:outline-none"
+                      >
+                        {showPreDefinedFields ? (
+                          <div className="w-4 h-4 flex items-center justify-center">−</div>
+                        ) : (
+                          <div className="w-4 h-4 flex items-center justify-center">+</div>
+                        )}
+                      </button>
+                      <div className="text-sm text-gray-400">Pre-define fields:</div>
+                      {showPreDefinedFields && (
+                        <div className="flex gap-2">
+                          {/* Product Set */}
+                          <div className="relative">
+                            <UI.SearchInput
+                              value={productSearchTerm}
+                              onChange={(e) => {
+                                setProductSearchTerm(e.target.value)
+                                setShowProductDropdown(true)
+                                if (defaultProductSetId) {
+                                  setDefaultProductSetId(null)
+                                }
+                              }}
+                              placeholder="Product Set..."
+                              className="w-48"
+                            />
+                            {showProductDropdown && filteredProducts.length > 0 && (
+                              <div className="absolute z-50 mt-1 w-96 max-h-60 overflow-auto rounded-md bg-gray-800 border border-gray-700 shadow-lg">
+                                {filteredProducts.map((product) => (
+                                  <button
+                                    key={product.id}
+                                    className="w-full text-left px-4 py-2 hover:bg-gray-700 focus:bg-gray-700 focus:outline-none"
+                                    onClick={() => {
+                                      setDefaultProductSetId(product.id)
+                                      setProductSearchTerm(`${product.company} → ${product.line} → ${product.set}`)
+                                      setShowProductDropdown(false)
+                                    }}
+                                  >
+                                    <div className="text-sm text-gray-200">{product.company}</div>
+                                    <div className="text-xs text-gray-400">
+                                      {product.line} → {product.set}
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            {defaultProductSetId && (
+                              <button
+                                onClick={() => {
+                                  setDefaultProductSetId(null)
+                                  setProductSearchTerm('')
+                                }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                              >
+                                <FaTimesCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Location */}
+                          <div className="relative">
+                            <UI.SearchInput
+                              value={defaultLocation}
+                              onChange={(e) => setDefaultLocation(e.target.value)}
+                              placeholder="Location..."
+                              className="w-32"
+                            />
+                            {defaultLocation && (
+                              <button
+                                onClick={() => setDefaultLocation('')}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                              >
+                                <FaTimesCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Base Size */}
+                          <select
+                            value={defaultBaseSizeId || ''}
+                            onChange={(e) => setDefaultBaseSizeId(e.target.value ? Number(e.target.value) : null)}
+                            className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                          >
+                            {baseSizeOptions.map((size) => (
+                              <option key={size.id} value={size.id}>
+                                {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Painted By */}
+                          <select
+                            value={defaultPaintedById || ''}
+                            onChange={(e) => setDefaultPaintedById(e.target.value ? Number(e.target.value) : null)}
+                            className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                          >
+                            {paintedByOptions.map((painter) => (
+                              <option key={painter.id} value={painter.id}>
+                                {painter.painted_by_name.charAt(0).toUpperCase() + painter.painted_by_name.slice(1).toLowerCase()}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Type */}
+                          <div className="relative">
+                            <UI.SearchInput
+                              value={typeSearchTerm}
+                              onChange={(e) => {
+                                setTypeSearchTerm(e.target.value)
+                                setShowTypeDropdown(true)
+                                if (defaultTypeId) {
+                                  setDefaultTypeId(null)
+                                }
+                              }}
+                              onFocus={() => setShowTypeDropdown(true)}
+                              placeholder="Type..."
+                              className="w-48"
+                            />
+                            {typeDropdownContent}
+                            {defaultTypeId && (
+                              <button
+                                onClick={() => {
+                                  setDefaultTypeId(null)
+                                  setTypeSearchTerm('')
+                                }}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                              >
+                                <FaTimesCircle className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <UI.Button 
+                      variant="btnSuccess"
+                      onClick={handleAdd}
+                      disabled={loading}
                     >
-                      <FaTable className="w-4 h-4" />
-                    </button>
-                    <button
-                      className={`p-2 rounded focus:outline-none ${viewMode === 'grid' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                      onClick={() => setViewMode('grid')}
-                      title="Card View"
-                      tabIndex={-1}
-                    >
-                      <FaThLarge className="w-4 h-4" />
-                    </button>
+                      + Add Miniature
+                    </UI.Button>
+                    <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1 ml-auto">
+                      <button
+                        className={`p-2 rounded focus:outline-none ${viewMode === 'table' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => setViewMode('table')}
+                        title="Table View"
+                        tabIndex={-1}
+                      >
+                        <FaTable className="w-4 h-4" />
+                      </button>
+                      <button
+                        className={`p-2 rounded focus:outline-none ${viewMode === 'grid' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                        onClick={() => setViewMode('grid')}
+                        title="Card View"
+                        tabIndex={-1}
+                      >
+                        <FaThLarge className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <UI.Button 
-                    variant="btnSuccess"
-                    onClick={handleAdd}
-                    disabled={loading}
-                  >
-                    + Add Miniature
-                  </UI.Button>
                 </div>
               </UI.CardHeaderRightSide>
             </UI.CardHeader>
