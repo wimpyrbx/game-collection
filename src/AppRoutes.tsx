@@ -8,6 +8,7 @@ import TypeCategoryAdmin from './pages/TypeCategoryAdmin'
 import ProductAdmin from './pages/ProductAdmin'
 import MiniatureOverview from './pages/MiniatureOverview'
 import History from './pages/History'
+import Statistics from './pages/Statistics'
 import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 
@@ -114,6 +115,7 @@ export function AppRoutes() {
           <Route path="product-admin" element={<ProductAdmin />} />
           <Route path="miniature-overview" element={<MiniatureOverview />} />
           <Route path="history" element={<History />} />
+          <Route path="statistics" element={<Statistics />} />
         </Route>
       </Routes>
     </AuthProvider>

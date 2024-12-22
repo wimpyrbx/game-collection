@@ -211,8 +211,7 @@ export function useTypeCategoryAdmin() {
   const [categories, setCategories] = useState<MiniCategory[]>([])
   const [selectedTypeCategories, setSelectedTypeCategories] = useState<number[]>([])
   const [totalCount, setTotalCount] = useState(0)
-  const [totalCategories, setTotalCategories] = useState(0)
-  const [error, setError] = useState('')
+  const [, setError] = useState('')
 
   const cache = TypeCategoryCache.getInstance()
 
@@ -265,7 +264,6 @@ export function useTypeCategoryAdmin() {
         setMiniTypes(typesWithCategories)
         setCategories(cacheData.categories)
         setTotalCount(cacheData.types.length)
-        setTotalCategories(cacheData.totalCategories)
         
         return {
           data: typesWithCategories,
@@ -289,7 +287,6 @@ export function useTypeCategoryAdmin() {
       setMiniTypes(typesWithCategories)
       setCategories(cacheData.categories)
       setTotalCount(cacheData.types.length)
-      setTotalCategories(cacheData.totalCategories)
       
       return {
         data: typesWithCategories,
@@ -314,7 +311,6 @@ export function useTypeCategoryAdmin() {
       
       // Always set the total counts to the full dataset size
       setTotalCount(cacheData.types.length)
-      // Do not set totalCategories here as it should be managed by loadCategories
       
       // Skip filtering if no search term and return all items if limit is 0
       if (!search.trim()) {
@@ -374,10 +370,6 @@ export function useTypeCategoryAdmin() {
 
       const cacheData = cache.data!
       
-      // Set total categories from the exact count in cache
-      setTotalCategories(cacheData.totalCategories)
-      // console.log('Setting total categories to:', cacheData.totalCategories)
-
       // Skip filtering if no search term
       if (!searchTerm?.trim()) {
         const startIndex = offset
@@ -710,23 +702,22 @@ export function useTypeCategoryAdmin() {
 
   return {
     miniTypes,
+    setMiniTypes,
     categories,
     selectedTypeCategories,
-    totalCount,
-    totalCategories,
-    error,
     loadData,
     addType,
     editType,
     deleteType,
-    loadTypeCategoryIds,
-    updateTypeCategories,
-    checkTypeUsage,
-    loadCategories,
     addCategory,
     editCategory,
     deleteCategory,
-    checkCategoryUsage,
+    updateTypeCategories,
+    checkTypeUsage,
+    loadTypeCategoryIds,
+    loadCategories,
+    totalCount,
+    cache,
     invalidateCache
   }
 } 

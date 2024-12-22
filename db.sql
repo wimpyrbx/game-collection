@@ -522,7 +522,7 @@ INSERT INTO "mini_types" VALUES (1907,'Greenspawn Sneak');
 INSERT INTO "mini_types" VALUES (1908,'Greenspawn Sneak Raid Leader');
 INSERT INTO "mini_types" VALUES (1909,'Greenspawn Zealot');
 INSERT INTO "mini_types" VALUES (1910,'Grendel');
-INSERT INTO "mini_types" VALUES (1911,'Grendel’S Mother');
+INSERT INTO "mini_types" VALUES (1911,'Grendel'S Mother');
 INSERT INTO "mini_types" VALUES (1912,'Grimlock');
 INSERT INTO "mini_types" VALUES (1913,'Groundling');
 INSERT INTO "mini_types" VALUES (1914,'Gulgar');
@@ -3052,7 +3052,6 @@ INSERT INTO "type_to_categories" VALUES (2827,17);
 INSERT INTO "type_to_categories" VALUES (2828,17);
 INSERT INTO "type_to_categories" VALUES (2829,17);
 INSERT INTO "type_to_categories" VALUES (2830,17);
-INSERT INTO "type_to_categories" VALUES (2831,17);
 INSERT INTO "type_to_categories" VALUES (2833,17);
 INSERT INTO "type_to_categories" VALUES (2834,17);
 INSERT INTO "type_to_categories" VALUES (2835,17);
@@ -3591,6 +3590,80 @@ INSERT INTO "type_to_categories" VALUES (13,7);
 INSERT INTO "type_to_categories" VALUES (14,7);
 INSERT INTO "type_to_categories" VALUES (4,11);
 INSERT INTO "type_to_categories" VALUES (2031,14);
+-- Create views for statistics
+
+-- Daily statistics view
+CREATE OR REPLACE VIEW daily_statistics_view AS
+WITH dates AS (
+  SELECT date_trunc('day', min(created_at))::date as start_date,
+         date_trunc('day', current_timestamp)::date as end_date
+  FROM minis
+),
+date_range AS (
+  SELECT generate_series(start_date, end_date, '1 day'::interval)::date as date
+  FROM dates
+),
+additions AS (
+  SELECT date_trunc('day', created_at)::date as date,
+         count(*) as miniatures_added
+  FROM minis
+  GROUP BY 1
+),
+deletions AS (
+  SELECT date_trunc('day', created_at)::date as date,
+         count(*) as miniatures_deleted
+  FROM audit_logs
+  WHERE action = 'DELETE' AND "table" = 'minis'
+  GROUP BY 1
+),
+audit_counts AS (
+  SELECT date_trunc('day', created_at)::date as date,
+         count(*) as audit_logs
+  FROM audit_logs
+  GROUP BY 1
+)
+SELECT 
+  dr.date,
+  COALESCE(a.miniatures_added, 0) as miniatures_added,
+  COALESCE(d.miniatures_deleted, 0) as miniatures_deleted,
+  COALESCE(ac.audit_logs, 0) as audit_logs
+FROM date_range dr
+LEFT JOIN additions a ON dr.date = a.date
+LEFT JOIN deletions d ON dr.date = d.date
+LEFT JOIN audit_counts ac ON dr.date = ac.date
+ORDER BY dr.date;
+
+-- Base size distribution view
+CREATE OR REPLACE VIEW base_size_distribution_view AS
+SELECT 
+  bs.base_size_name,
+  COUNT(m.id) as count
+FROM base_sizes bs
+LEFT JOIN minis m ON bs.id = m.base_size_id
+GROUP BY bs.id, bs.base_size_name
+ORDER BY count DESC;
+
+-- Painted by distribution view
+CREATE OR REPLACE VIEW painted_by_distribution_view AS
+SELECT 
+  pb.painted_by_name,
+  COUNT(m.id) as count
+FROM painted_by pb
+LEFT JOIN minis m ON pb.id = m.painted_by_id
+GROUP BY pb.id, pb.painted_by_name
+ORDER BY count DESC;
+
+-- Type distribution view
+CREATE OR REPLACE VIEW type_distribution_view AS
+SELECT 
+  mt.name as type_name,
+  COUNT(DISTINCT mtt.mini_id) as count
+FROM mini_types mt
+LEFT JOIN mini_to_types mtt ON mt.id = mtt.type_id
+WHERE mtt.proxy_type = false OR mtt.proxy_type IS NULL
+GROUP BY mt.id, mt.name
+ORDER BY count DESC;
+
 CREATE UNIQUE INDEX IF NOT EXISTS "idx_unique_main_type" ON "mini_to_types" (
 	"mini_id"
 ) WHERE "proxy_type" = 0;

@@ -235,9 +235,25 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       // Filter data if there's a search term
       let filteredData = data || []
       if (internalSearchTerm) {
-        filteredData = filteredData.filter((mini: { name: string }) => 
-          mini.name.toLowerCase().includes(internalSearchTerm.toLowerCase())
-        )
+        const searchLower = internalSearchTerm.toLowerCase()
+        filteredData = filteredData.filter((mini) => {
+          // Search in name
+          if (mini.name.toLowerCase().includes(searchLower)) return true
+          
+          // Search in types
+          if (mini.types?.some(t => t.type.name.toLowerCase().includes(searchLower))) return true
+          
+          // Search in product sets
+          if (mini.product_sets?.name?.toLowerCase().includes(searchLower)) return true
+          
+          // Search in product lines
+          if (mini.product_sets?.product_line?.name?.toLowerCase().includes(searchLower)) return true
+          
+          // Search in companies
+          if (mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchLower)) return true
+          
+          return false
+        })
       }
 
       // Calculate total quantity
@@ -340,9 +356,15 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         // If we have valid cache and a search term, try to filter cached data first
         if (isCacheValid() && globalCache?.minis) {
           if (term) {
-            const filteredMinis = globalCache.minis.filter(mini => 
-              mini.name.toLowerCase().includes(term.toLowerCase())
-            )
+            const searchLower = term.toLowerCase()
+            const filteredMinis = globalCache.minis.filter(mini => {
+              if (mini.name.toLowerCase().includes(searchLower)) return true
+              if (mini.types?.some(t => t.type.name.toLowerCase().includes(searchLower))) return true
+              if (mini.product_sets?.name?.toLowerCase().includes(searchLower)) return true
+              if (mini.product_sets?.product_line?.name?.toLowerCase().includes(searchLower)) return true
+              if (mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchLower)) return true
+              return false
+            })
             setMinis(filteredMinis.map(mini => transformMini(mini)))
             setTotalMinis(filteredMinis.length)
             setTotalQuantity(filteredMinis.reduce((acc, curr) => acc + (curr.quantity || 0), 0))

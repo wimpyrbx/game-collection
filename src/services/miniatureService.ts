@@ -239,7 +239,9 @@ export async function updateMiniatureInUse(miniId: number, inUse: boolean) {
   try {
     const { error } = await supabase
       .from('minis')
-      .update({ in_use: inUse ? new Date().toISOString() : null })
+      .update({ 
+        in_use: inUse ? new Date().toISOString() : null 
+      })
       .eq('id', miniId)
 
     if (error) throw error

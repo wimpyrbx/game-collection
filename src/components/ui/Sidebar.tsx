@@ -1,4 +1,4 @@
-import { FaDiceD6, FaBoxes, FaSignOutAlt, FaTags, FaHome, FaHistory } from 'react-icons/fa'
+import { FaDiceD6, FaBoxes, FaSignOutAlt, FaTags, FaHome, FaHistory, FaChartBar } from 'react-icons/fa'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 
@@ -14,7 +14,8 @@ export function Sidebar() {
     { to: '/miniature-overview', icon: FaDiceD6, text: 'Miniatures' },
     { to: '/type-category-admin', icon: FaTags, text: 'Types & Categories' },
     { to: '/product-admin', icon: FaBoxes, text: 'Products' },
-    { to: '/history', icon: FaHistory, text: 'History' }
+    { to: '/history', icon: FaHistory, text: 'History' },
+    { to: '/statistics', icon: FaChartBar, text: 'Statistics' }
   ]
 
   const handleSignOut = async () => {

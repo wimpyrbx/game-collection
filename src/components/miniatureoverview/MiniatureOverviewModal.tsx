@@ -15,6 +15,7 @@ import { ShowItems } from '../ShowItems'
 import { sortByKey } from '../../utils/generalUtils'
 import { useAuth } from '../../contexts/AuthContext'
 import { AuditService } from '../../services/auditService'
+import { useTypeCategoryAdmin } from '../../hooks/useTypeCategoryAdmin'
 
 interface MiniatureOverviewModalProps {
   isOpen: boolean
@@ -116,6 +117,15 @@ export function MiniatureOverviewModal({
 }: MiniatureOverviewModalProps) {
   const { user } = useAuth()
   const { showSuccess, showError } = useNotifications()
+  const typeCategoryAdmin = useTypeCategoryAdmin()
+
+  // State declarations
+  const [, setIsLoadingTypes] = useState(false)
+  const [totalTypesCount, setTotalTypesCount] = useState(0)
+  const [typeSearchTerm, setTypeSearchTerm] = useState('')
+  const [showTypeDropdown, setShowTypeDropdown] = useState(false)
+  const [, setDropdownStyle] = useState({ width: 0, left: 0, top: 0 })
+
   // Tags state
   const [selectedTags, setSelectedTags] = useState<Array<{ id: number; name: string }>>([])
   const [tagInput, setTagInput] = useState('')
@@ -188,8 +198,6 @@ export function MiniatureOverviewModal({
 
   // Types state
   const [selectedTypes, setSelectedTypes] = useState<SelectedType[]>([])
-  const [typeSearchTerm, setTypeSearchTerm] = useState('')
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false)
 
   // Product set state
   const [productSearchTerm, setProductSearchTerm] = useState('')
@@ -206,11 +214,6 @@ export function MiniatureOverviewModal({
   const [isDeleting, setIsDeleting] = useState(false)
   const [, setIsInvalidProductSet] = useState(false)
   const [companyLogo, setCompanyLogo] = useState<string>('')
-  const [dropdownStyle, setDropdownStyle] = useState({
-    width: 0,
-    left: 0,
-    top: 0
-  })
 
   const {
     loading: loadingRef,
@@ -700,16 +703,89 @@ export function MiniatureOverviewModal({
     })
   }
 
+
+  // Search handlers
+
+  const handleTypeSearch = (searchTerm: string) => {
+    setTypeSearchTerm(searchTerm)
+    setShowTypeDropdown(true)
+  }
+
+  // Filter types based on search term
   const filteredTypes = useMemo(() => {
     const searchTerm = typeSearchTerm.toLowerCase().trim()
+    if (!searchTerm) return []
     
-    return miniTypes.filter(type => {
-      const typeName = type.name.toLowerCase().trim()
-      const matches = typeName.includes(searchTerm)
-      const notSelected = !selectedTypes.some(st => st.id === type.id)
-      return matches && notSelected
-    })
-  }, [typeSearchTerm, miniTypes, selectedTypes])
+    return typeCategoryAdmin.miniTypes
+      .filter(type => {
+        const typeName = type.name.toLowerCase().trim()
+        const matches = typeName.includes(searchTerm)
+        const notSelected = !selectedTypes.some(st => st.id === type.id)
+        return matches && notSelected
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [typeSearchTerm, selectedTypes, typeCategoryAdmin.miniTypes])
+
+  // Filter tags based on search term
+  const filteredTags = useMemo(() => {
+    const searchTerm = tagInput.toLowerCase().trim()
+    if (!searchTerm) return availableTags
+    
+    return availableTags
+      .filter(tag => {
+        const tagName = tag.name.toLowerCase().trim()
+        const matches = tagName.includes(searchTerm)
+        const notSelected = !selectedTags.some(st => st.id === tag.id)
+        return matches && notSelected
+      })
+      .sort((a, b) => a.name.localeCompare(b.name))
+  }, [tagInput, selectedTags, availableTags])
+
+  // Fetch all types on component mount
+  useEffect(() => {
+    fetchAllTypes()
+  }, [])
+
+  const fetchAllTypes = async () => {
+    try {
+      setIsLoadingTypes(true)
+      
+      // First get total count
+      const { count } = await supabase
+        .from('mini_types')
+        .select('*', { count: 'exact', head: true })
+
+      if (!count) return []
+
+      // Then fetch all records in batches
+      const BATCH_SIZE = 1000
+      const batches = Math.ceil(count / BATCH_SIZE)
+      let allTypes: any[] = []
+
+      for (let i = 0; i < batches; i++) {
+        const from = i * BATCH_SIZE
+        const to = from + BATCH_SIZE - 1
+
+        const { data, error } = await supabase
+          .from('mini_types')
+          .select('*')
+          .order('name')
+          .range(from, to)
+
+        if (error) throw error
+        if (data) allTypes = [...allTypes, ...data]
+      }
+
+      // Update total count and types
+      setTotalTypesCount(count)
+      typeCategoryAdmin.setMiniTypes(allTypes)
+      return allTypes
+    } catch (err) {
+      console.error('Error fetching types:', err)
+    } finally {
+      setIsLoadingTypes(false)
+    }
+  }
 
   // Get filtered product sets based on search
   const filteredProducts = useMemo(() => {
@@ -1480,40 +1556,42 @@ export function MiniatureOverviewModal({
                     <h3 className="font-medium text-gray-200">Types</h3>
                   </div>
                   <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
-                    <div className="relative" ref={searchContainerRef}>
-                      <UI.SearchInput
-                        value={typeSearchTerm}
-                        onChange={(e) => {
-                          setTypeSearchTerm(e.target.value)
-                          setShowTypeDropdown(true)
-                        }}
-                        placeholder="Search types..."
-                      />
-                      {showTypeDropdown && typeSearchTerm && filteredTypes.length > 0 && (
-                        <div 
-                          className="fixed max-h-48 overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999]"
-                          style={{
-                            width: dropdownStyle.width,
-                            left: dropdownStyle.left,
-                            top: dropdownStyle.top
-                          }}
-                        >
-                          {filteredTypes.map(type => (
-                            <button
-                              key={type.id}
-                              type="button"
-                              className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                handleTypeSelect(type.id)
-                              }}
-                            >
-                              {type.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                    <div className="space-y-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-gray-300">Types</label>
+                        <span className="text-xs text-gray-400">
+                          {typeSearchTerm ? `${filteredTypes.length} matches` : `${totalTypesCount} total types`}
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <UI.SearchInput
+                          ref={typeSearchInputRef}
+                          value={typeSearchTerm}
+                          onChange={(e) => handleTypeSearch(e.target.value)}
+                          placeholder="Search types..."
+                          className="w-full"
+                        />
+                        {filteredTypes.length > 0 && (
+                          <div 
+                            className="absolute max-h-48 w-full overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999] mt-1"
+                          >
+                            {filteredTypes.map(type => (
+                              <button
+                                key={type.id}
+                                type="button"
+                                className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  handleTypeSelect(type.id)
+                                }}
+                              >
+                                {type.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     {selectedTypes.length === 0 && (
                       <div className="inset-0 flex items-center justify-center pointer-events-none">
@@ -1584,7 +1662,7 @@ export function MiniatureOverviewModal({
                         onChange={setTagInput}
                         onTagAdd={handleTagAdd}
                         placeholder="Add tags..."
-                        availableTags={availableTags}
+                        availableTags={filteredTags}
                         onTagSelect={(tag) => {
                           if (!selectedTags.some(t => t.id === tag.id)) {
                             setSelectedTags(prev => [...prev, tag])

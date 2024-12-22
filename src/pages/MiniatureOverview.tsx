@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { FaTable, FaDiceD6, FaThLarge, FaShareAltSquare, FaDiceD20 } from 'react-icons/fa'
+import { FaTable, FaDiceD6, FaThLarge, FaDiceD20 } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
@@ -15,6 +15,7 @@ import { useMiniatureReferenceData } from '../hooks/useMiniatureReferenceData'
 import { useViewMode } from '../hooks/useViewMode'
 import { AuditService } from '../services/auditService'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../lib/supabase'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -48,7 +49,6 @@ export default function MiniatureOverview() {
     loading, 
     error, 
     totalMinis, 
-    totalQuantity, 
     getPageMinis,
     getAllMinis, 
     setMinis, 
@@ -59,6 +59,11 @@ export default function MiniatureOverview() {
   } = useMinis(itemsPerPage, miniSearch.searchTerm)
 
   const { showSuccess, showError } = useNotifications()
+
+  const [stats, setStats] = useState({
+    inUseCount: 0,
+    inUsePercentage: '0'
+  })
 
   // Preload images for adjacent pages
   useEffect(() => {
@@ -362,6 +367,7 @@ export default function MiniatureOverview() {
                 }
                 
                 invalidateCache();
+                await fetchData();
                 const [updatedMinis] = await Promise.all([
                   getPageMinis(currentPage),
                   getTotalQuantity()
@@ -547,6 +553,26 @@ export default function MiniatureOverview() {
   const hasNextMini = selectedMiniIndex < allMinis.length - 1
   const selectedMiniId = selectedMini?.id
 
+  const fetchData = async () => {
+    try {
+      const [totalResponse, inUseResponse] = await Promise.all([
+        supabase.from('minis').select('id'),
+        supabase.from('minis').select('id').not('in_use', 'is', null)
+      ]);
+
+      const totalCount = totalResponse.data?.length || 0;
+      const inUseCount = inUseResponse.data?.length || 0;
+
+      setStats(prev => ({
+        ...prev,
+        inUseCount,
+        inUsePercentage: totalCount > 0 ? ((inUseCount / totalCount) * 100).toFixed(1) : '0'
+      }));
+    } catch (error) {
+      console.error('Error fetching in-use statistics:', error);
+    }
+  };
+
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
     return (
@@ -566,19 +592,26 @@ export default function MiniatureOverview() {
 
     <PageHeader bgColor="none">
         <PageHeaderTextGroup>
-          <PageHeaderText>Miniature Overview</PageHeaderText>
-          <PageHeaderSubText>Manage your collection of miniatures</PageHeaderSubText>
+          <PageHeaderText>
+            <div className="flex items-center gap-2">
+              <FaDiceD6 className="w-6 h-6" />
+              Miniature Overview
+            </div>
+          </PageHeaderText>
+          <PageHeaderSubText>
+            View and manage your miniature collection
+          </PageHeaderSubText>
         </PageHeaderTextGroup>
         <PageHeaderBigNumber
-            icon={FaDiceD6}
-            number={totalMinis}
-            text="Total Types"
-          />
-          <PageHeaderBigNumber
-            icon={FaShareAltSquare}
-            number={totalQuantity}
-            text="Total Miniatures"
-          />
+          icon={FaDiceD6}
+          number={totalMinis || 0}
+          text="Total Miniatures"
+        />
+        <PageHeaderBigNumber
+          icon={FaDiceD6}
+          number={stats.inUseCount || 0}
+          text={`In Use (${stats.inUsePercentage}%)`}
+        />
       </PageHeader>
 
       <div className="grid grid-cols-12 gap-4">
