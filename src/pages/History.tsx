@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import * as UI from '../components/ui'
-import { FaHistory, FaDiceD20 } from 'react-icons/fa'
+import { FaHistory, FaDiceD20, FaDiceD6 } from 'react-icons/fa'
 import { useLocation } from 'react-router-dom'
 import type { AuditLog } from '../types/audit'
 import { getMiniImagePath } from '../utils/imageUtils'
@@ -256,6 +256,7 @@ export default function History() {
   const [loading, setLoading] = useState(true)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalQuantity, setTotalQuantity] = useState(0)
   const [referenceData, setReferenceData] = useState<ReferenceData>({
     baseSizes: [],
     paintedBy: [],
@@ -382,6 +383,26 @@ export default function History() {
     fetchLogs()
   }, [currentPage, location.key])
 
+  // Add effect to fetch total quantity
+  useEffect(() => {
+    const fetchTotalQuantity = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('minis')
+          .select('quantity')
+        
+        if (error) throw error
+        
+        const total = data.reduce((sum, mini) => sum + (mini.quantity || 0), 0)
+        setTotalQuantity(total)
+      } catch (error) {
+        console.error('Error fetching total quantity:', error)
+      }
+    }
+
+    fetchTotalQuantity()
+  }, [])
+
   if (loading) {
     return (
       <div className="p-8">
@@ -405,6 +426,11 @@ export default function History() {
             View changes made to miniatures. Showing last 100 entries only.
           </UI.PageHeaderSubText>
         </UI.PageHeaderTextGroup>
+        <UI.PageHeaderBigNumber
+          icon={FaDiceD6}
+          number={totalQuantity}
+          text="Total Quantity"
+        />
       </UI.PageHeader>
 
       <div className="bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">

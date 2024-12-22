@@ -36,6 +36,7 @@ export default function MiniatureOverview() {
   const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
   const [allMinis, setAllMinis] = useState<Mini[]>([])
   const [imageTimestamp, setImageTimestamp] = useState(() => Date.now())
+  const [totalQuantity, setTotalQuantity] = useState(0)
   const itemsPerPage = 12
   const initialLoadRef = useRef(true)
   const { user } = useAuth()
@@ -69,6 +70,11 @@ export default function MiniatureOverview() {
     inUseCount: 0,
     inUsePercentage: '0'
   })
+
+  // Add useEffect to fetch data
+  useEffect(() => {
+    fetchData();
+  }, [minis.length]); // Re-fetch when minis length changes
 
   // Preload images for adjacent pages
   useEffect(() => {
@@ -568,37 +574,23 @@ export default function MiniatureOverview() {
 
   const handleSave = async (miniatureData?: Partial<Mini>) => {
     try {
-      // If we have miniature data, update the selected mini with it
       if (miniatureData) {
         setSelectedMini(prev => prev ? { ...prev, ...miniatureData } : undefined);
       }
 
       setIsModalOpen(false);
-      
-      // Wait a bit to let the modal close animation finish
       await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Invalidate the cache to force a fresh fetch
       invalidateCache();
-
-      // Refresh all data in a single batch
-      const [updatedMinis] = await Promise.all([
-        getPageMinis(currentPage),
-        getTotalQuantity()
-      ]);
-
-      // Update states
+      const updatedMinis = await getPageMinis(currentPage);
       setMinis(updatedMinis);
       refreshImages();
       
-      // If we were editing a miniature, update the selected miniature with the new data
       if (selectedMini?.id) {
         const updatedMini = updatedMinis.find(mini => mini.id === selectedMini.id);
         if (updatedMini) {
           setSelectedMini(updatedMini);
         }
       }
-    
     } catch (error) {
       console.error('Error saving miniature:', error);
       showError('Failed to save miniature');
@@ -673,7 +665,7 @@ export default function MiniatureOverview() {
     try {
       const [totalResponse, inUseResponse] = await Promise.all([
         supabase.from('minis').select('id'),
-        supabase.from('minis').select('id').not('in_use', 'is', null)
+        supabase.from('minis').select('id').not('in_use', 'is', null),
       ]);
 
       const totalCount = totalResponse.data?.length || 0;
@@ -685,9 +677,27 @@ export default function MiniatureOverview() {
         inUsePercentage: totalCount > 0 ? ((inUseCount / totalCount) * 100).toFixed(1) : '0'
       }));
     } catch (error) {
-      console.error('Error fetching in-use statistics:', error);
+      console.error('Error fetching statistics:', error);
     }
   };
+
+  // Add new useEffect to update total quantity when minis change
+  useEffect(() => {
+    const calculateTotalQuantity = async () => {
+      try {
+        const { data } = await supabase.from('minis').select('quantity');
+        const total = (data || []).reduce((sum, mini) => {
+          const quantity = typeof mini.quantity === 'number' ? mini.quantity : 0;
+          return sum + quantity;
+        }, 0);
+        setTotalQuantity(total);
+      } catch (error) {
+        console.error('Error calculating total quantity:', error);
+      }
+    };
+
+    calculateTotalQuantity();
+  }, [minis]);
 
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
@@ -722,6 +732,11 @@ export default function MiniatureOverview() {
           icon={FaDiceD6}
           number={totalMinis || 0}
           text="Total Miniatures"
+        />
+        <PageHeaderBigNumber
+          icon={FaDiceD6}
+          number={totalQuantity}
+          text="Total Quantity"
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
