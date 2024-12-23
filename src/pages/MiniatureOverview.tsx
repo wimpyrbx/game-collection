@@ -794,23 +794,23 @@ export default function MiniatureOverview() {
             </div>
             <div className="flex flex-col">
               {typeCategoryAdmin.miniTypes.map((type) => (
-                <button
-                  key={type.id}
+            <button
+              key={type.id}
                   className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm group relative"
-                  onClick={() => {
-                    setDefaultTypeId(type.id)
-                    setTypeSearchTerm(type.name)
-                    setShowTypeDropdown(false)
-                  }}
-                >
+              onClick={() => {
+                setDefaultTypeId(type.id)
+                setTypeSearchTerm(type.name)
+                setShowTypeDropdown(false)
+              }}
+            >
                   <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-200">{type.name}</div>
+              <div className="text-sm text-gray-200">{type.name}</div>
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400">
                       Press to select
                     </div>
                   </div>
-                </button>
-              ))}
+            </button>
+          ))}
             </div>
           </div>
         </div>
@@ -1167,22 +1167,22 @@ export default function MiniatureOverview() {
                                       }}
                                     >
                                       <div className="flex flex-col">
-                                        {filteredProducts.map((product) => (
-                                          <button
-                                            key={product.id}
+                                    {filteredProducts.map((product) => (
+                                      <button
+                                        key={product.id}
                                             className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
                                             onMouseDown={(e) => {
                                               e.preventDefault()
-                                              setDefaultProductSetId(product.id)
+                                          setDefaultProductSetId(product.id)
                                               setProductSearchTerm(`${product.company} - ${product.line} - ${product.set}`)
-                                              setShowProductDropdown(false)
-                                            }}
-                                          >
+                                          setShowProductDropdown(false)
+                                        }}
+                                      >
                                             <div className="text-sm font-medium text-gray-200 truncate">{product.company} - {product.line}</div>
                                             <div className="text-xs text-gray-400 truncate">{product.set}</div>
-                                          </button>
-                                        ))}
-                                      </div>
+                                      </button>
+                                    ))}
+                                  </div>
                                     </div>
                                   </div>,
                                   document.body
@@ -1249,9 +1249,9 @@ export default function MiniatureOverview() {
                                 {/* Classic Approach */}
                                 <div className="relative group type-dropdown-container z-[99999]">
                                   <div className="relative" ref={classicInputRef}>
-                                    <UI.SearchInput
+                                <UI.SearchInput
                                       value={typeSearchTermClassic}
-                                      onChange={(e) => {
+                                  onChange={(e) => {
                                         setTypeSearchTermClassic(e.target.value)
                                         setShowTypeDropdownClassic(true)
                                         if (selectedTypeClassic) {
@@ -1259,21 +1259,21 @@ export default function MiniatureOverview() {
                                         }
                                       }}
                                       onFocus={() => setShowTypeDropdownClassic(true)}
-                                      placeholder="Type..."
-                                      className="w-48"
-                                    />
+                                  placeholder="Type..."
+                                  className="w-48"
+                                />
                                     {typeDropdownClassic}
                                     {selectedTypeClassic && (
-                                      <button
-                                        onClick={() => {
+                                  <button
+                                    onClick={() => {
                                           setSelectedTypeClassic(null)
                                           setTypeSearchTermClassic('')
-                                        }}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                                      >
-                                        <FaTimesCircle className="w-4 h-4" />
-                                      </button>
-                                    )}
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                  >
+                                    <FaTimesCircle className="w-4 h-4" />
+                                  </button>
+                                )}
                                   </div>
                                 </div>
                               </div>

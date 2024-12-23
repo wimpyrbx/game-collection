@@ -750,7 +750,9 @@ export function MiniatureOverviewModal({
     const searchTerm = typeSearchTerm.toLowerCase().trim()
     if (!searchTerm) return []
     
-    return typeCategoryAdmin.miniTypes
+    // Use miniTypes directly instead of cache.data?.types
+    const allTypes = typeCategoryAdmin.miniTypes
+    return allTypes
       .filter(type => {
         const typeName = type.name.toLowerCase().trim()
         const matches = typeName.includes(searchTerm)
@@ -1128,6 +1130,14 @@ export function MiniatureOverviewModal({
     cleanupImageState();
     onNext?.();
   };
+
+  // Load all types when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      // Load all types by passing 0, 0 to get the complete dataset
+      typeCategoryAdmin.loadData(0, 0)
+    }
+  }, [isOpen])
 
   if (isOpen && !miniData) {
     return (
@@ -1552,7 +1562,7 @@ export function MiniatureOverviewModal({
                   <div className="bg-gray-900/80 px-4 py-3 border-b border-gray-700 flex justify-between items-center">
                     <h3 className="font-medium text-gray-200">Types</h3>
                     <span className="text-xs text-gray-400">
-                      {typeSearchTerm ? `${filteredTypes.length} matches` : `${totalTypesCount} total types`}
+                      {typeSearchTerm ? `${filteredTypes.length} matches` : `${typeCategoryAdmin.miniTypes.length} total types`}
                     </span>
                   </div>
                   <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
