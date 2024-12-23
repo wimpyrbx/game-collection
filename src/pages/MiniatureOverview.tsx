@@ -17,6 +17,7 @@ import { AuditService } from '../services/auditService'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -809,129 +810,145 @@ export default function MiniatureOverview() {
                           <span className="flex items-center gap-2"><FaPlusCircle className="w-4 h-4 text-green-500 mr-2" /> Pre-defined</span>
                         )}
                       </button>
-                      {showPreDefinedFields && (
-                        <div className="flex gap-2">
-                          {/* Product Set */}
-                          <div className="relative">
-                            <UI.SearchInput
-                              value={productSearchTerm}
-                              onChange={(e) => {
-                                setProductSearchTerm(e.target.value)
-                                setShowProductDropdown(true)
-                                if (defaultProductSetId) {
-                                  setDefaultProductSetId(null)
-                                }
-                              }}
-                              placeholder="Product Set..."
-                              className="w-48"
-                            />
-                            {showProductDropdown && filteredProducts.length > 0 && (
-                              <div className="absolute z-50 mt-1 w-96 max-h-60 overflow-auto rounded-md bg-gray-800 border border-gray-700 shadow-lg">
-                                {filteredProducts.map((product) => (
+                      <AnimatePresence>
+                        {showPreDefinedFields && (
+                          <motion.div 
+                            initial={{ width: 0, height: 0, scale: 0.98, opacity: 0 }}
+                            animate={{ width: "auto", height: "auto", scale: 1, opacity: 1 }}
+                            exit={{ width: 0, height: 0, scale: 0.98, opacity: 0 }}
+                            transition={{ 
+                              duration: 0.5,
+                              opacity: { duration: 0.2 },
+                              height: { type: "spring", bounce: 0.1, duration: 0.5 },
+                              width: { type: "spring", bounce: 0.1, duration: 0.5 },
+                              scale: { type: "spring", bounce: 0.1, duration: 0.5 }
+                            }}
+                            className="overflow-hidden origin-left"
+                          >
+                            <div className="flex gap-2 py-2 px-2 whitespace-nowrap">
+                              {/* Product Set */}
+                              <div className="relative">
+                                <UI.SearchInput
+                                  value={productSearchTerm}
+                                  onChange={(e) => {
+                                    setProductSearchTerm(e.target.value)
+                                    setShowProductDropdown(true)
+                                    if (defaultProductSetId) {
+                                      setDefaultProductSetId(null)
+                                    }
+                                  }}
+                                  placeholder="Product Set..."
+                                  className="w-48"
+                                />
+                                {showProductDropdown && filteredProducts.length > 0 && (
+                                  <div className="absolute z-50 mt-1 w-96 max-h-60 overflow-auto rounded-md bg-gray-800 border border-gray-700 shadow-lg">
+                                    {filteredProducts.map((product) => (
+                                      <button
+                                        key={product.id}
+                                        className="w-full text-left px-4 py-2 hover:bg-gray-700 focus:bg-gray-700 focus:outline-none"
+                                        onClick={() => {
+                                          setDefaultProductSetId(product.id)
+                                          setProductSearchTerm(`${product.company} → ${product.line} → ${product.set}`)
+                                          setShowProductDropdown(false)
+                                        }}
+                                      >
+                                        <div className="text-sm text-gray-200">{product.company}</div>
+                                        <div className="text-xs text-gray-400">
+                                          {product.line} → {product.set}
+                                        </div>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                {defaultProductSetId && (
                                   <button
-                                    key={product.id}
-                                    className="w-full text-left px-4 py-2 hover:bg-gray-700 focus:bg-gray-700 focus:outline-none"
                                     onClick={() => {
-                                      setDefaultProductSetId(product.id)
-                                      setProductSearchTerm(`${product.company} → ${product.line} → ${product.set}`)
-                                      setShowProductDropdown(false)
+                                      setDefaultProductSetId(null)
+                                      setProductSearchTerm('')
                                     }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                                   >
-                                    <div className="text-sm text-gray-200">{product.company}</div>
-                                    <div className="text-xs text-gray-400">
-                                      {product.line} → {product.set}
-                                    </div>
+                                    <FaTimesCircle className="w-4 h-4" />
                                   </button>
-                                ))}
+                                )}
                               </div>
-                            )}
-                            {defaultProductSetId && (
-                              <button
-                                onClick={() => {
-                                  setDefaultProductSetId(null)
-                                  setProductSearchTerm('')
-                                }}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+
+                              {/* Location */}
+                              <div className="relative">
+                                <UI.SearchInput
+                                  value={defaultLocation}
+                                  onChange={(e) => setDefaultLocation(e.target.value)}
+                                  placeholder="Location..."
+                                  className="w-32"
+                                />
+                                {defaultLocation && (
+                                  <button
+                                    onClick={() => setDefaultLocation('')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                  >
+                                    <FaTimesCircle className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Base Size */}
+                              <select
+                                value={defaultBaseSizeId || ''}
+                                onChange={(e) => setDefaultBaseSizeId(e.target.value ? Number(e.target.value) : null)}
+                                className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
                               >
-                                <FaTimesCircle className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
+                                {baseSizeOptions.map((size) => (
+                                  <option key={size.id} value={size.id}>
+                                    {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
+                                  </option>
+                                ))}
+                              </select>
 
-                          {/* Location */}
-                          <div className="relative">
-                            <UI.SearchInput
-                              value={defaultLocation}
-                              onChange={(e) => setDefaultLocation(e.target.value)}
-                              placeholder="Location..."
-                              className="w-32"
-                            />
-                            {defaultLocation && (
-                              <button
-                                onClick={() => setDefaultLocation('')}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                              {/* Painted By */}
+                              <select
+                                value={defaultPaintedById || ''}
+                                onChange={(e) => setDefaultPaintedById(e.target.value ? Number(e.target.value) : null)}
+                                className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
                               >
-                                <FaTimesCircle className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
+                                {paintedByOptions.map((painter) => (
+                                  <option key={painter.id} value={painter.id}>
+                                    {painter.painted_by_name.charAt(0).toUpperCase() + painter.painted_by_name.slice(1).toLowerCase()}
+                                  </option>
+                                ))}
+                              </select>
 
-                          {/* Base Size */}
-                          <select
-                            value={defaultBaseSizeId || ''}
-                            onChange={(e) => setDefaultBaseSizeId(e.target.value ? Number(e.target.value) : null)}
-                            className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
-                          >
-                            {baseSizeOptions.map((size) => (
-                              <option key={size.id} value={size.id}>
-                                {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
-                              </option>
-                            ))}
-                          </select>
-
-                          {/* Painted By */}
-                          <select
-                            value={defaultPaintedById || ''}
-                            onChange={(e) => setDefaultPaintedById(e.target.value ? Number(e.target.value) : null)}
-                            className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
-                          >
-                            {paintedByOptions.map((painter) => (
-                              <option key={painter.id} value={painter.id}>
-                                {painter.painted_by_name.charAt(0).toUpperCase() + painter.painted_by_name.slice(1).toLowerCase()}
-                              </option>
-                            ))}
-                          </select>
-
-                          {/* Type */}
-                          <div className="relative">
-                            <UI.SearchInput
-                              value={typeSearchTerm}
-                              onChange={(e) => {
-                                setTypeSearchTerm(e.target.value)
-                                setShowTypeDropdown(true)
-                                if (defaultTypeId) {
-                                  setDefaultTypeId(null)
-                                }
-                              }}
-                              onFocus={() => setShowTypeDropdown(true)}
-                              placeholder="Type..."
-                              className="w-48"
-                            />
-                            {typeDropdownContent}
-                            {defaultTypeId && (
-                              <button
-                                onClick={() => {
-                                  setDefaultTypeId(null)
-                                  setTypeSearchTerm('')
-                                }}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                              >
-                                <FaTimesCircle className="w-4 h-4" />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
+                              {/* Type */}
+                              <div className="relative">
+                                <UI.SearchInput
+                                  value={typeSearchTerm}
+                                  onChange={(e) => {
+                                    setTypeSearchTerm(e.target.value)
+                                    setShowTypeDropdown(true)
+                                    if (defaultTypeId) {
+                                      setDefaultTypeId(null)
+                                    }
+                                  }}
+                                  onFocus={() => setShowTypeDropdown(true)}
+                                  placeholder="Type..."
+                                  className="w-48"
+                                />
+                                {typeDropdownContent}
+                                {defaultTypeId && (
+                                  <button
+                                    onClick={() => {
+                                      setDefaultTypeId(null)
+                                      setTypeSearchTerm('')
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                  >
+                                    <FaTimesCircle className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
                     <UI.Button 
                       variant="btnSuccess"

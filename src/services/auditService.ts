@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabaseMonitor'
+import { supabase } from '../lib/supabase'
 import type { AuditLogChanges, FieldChange } from '../types/audit'
 
 export class AuditService {

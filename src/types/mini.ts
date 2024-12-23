@@ -58,8 +58,14 @@ export interface Mini {
 export interface MiniType {
   id: number
   name: string
-  categories: Array<{
+  categories?: Array<{
     category: {
+      id: number
+      name: string
+    }
+  }>
+  type_to_categories?: Array<{
+    mini_categories: {
       id: number
       name: string
     }

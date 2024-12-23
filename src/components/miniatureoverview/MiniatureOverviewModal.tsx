@@ -3,7 +3,7 @@ import { Input } from '../ui/Input'
 import * as UI from '../ui'
 import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaTrashAlt } from 'react-icons/fa'
 import { HiOutlineArrowSmallLeft, HiOutlineArrowSmallRight } from 'react-icons/hi2'
-import type { Mini } from '../../types/mini'
+import type { Mini, MiniType } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath, getCompanyLogoPath } from '../../utils/imageUtils'
 import { createMiniature, updateMiniature, deleteImage } from '../../services/miniatureService'
@@ -12,7 +12,6 @@ import { supabase } from '../../lib/supabase'
 import { TagInput } from '../ui/input/TagInput'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ShowItems } from '../ShowItems'
-import { sortByKey } from '../../utils/generalUtils'
 import { useAuth } from '../../contexts/AuthContext'
 import { AuditService } from '../../services/auditService'
 import { useTypeCategoryAdmin } from '../../hooks/useTypeCategoryAdmin'
@@ -380,6 +379,8 @@ export function MiniatureOverviewModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
+    // console.log('Submit handler started, user:', user)
+    
     if (!validateForm()) {
       return
     }
@@ -435,6 +436,7 @@ export function MiniatureOverviewModal({
       try {
         // Save miniature data first before handling image upload
         if (isEditMode && miniData?.id) {
+          // console.log('Updating existing miniature:', miniData.id)
           // Store old state before update
           const oldState = {
             ...miniData,
@@ -446,20 +448,35 @@ export function MiniatureOverviewModal({
           
           // Log the update if there's a user
           if (user?.id) {
+            // console.log('Logging miniature update:', {
+            //   userId: user.id,
+            //   miniatureId: miniData.id,
+            //   oldState,
+            //   newState: miniatureData
+            // })
             await AuditService.logMiniatureUpdate(
               user.id,
               miniData.id,
               oldState,
               miniatureData
             )
+          } else {
+            console.log('No user ID available for audit logging')
           }
         } else {
+          // console.log('Creating new miniature')
           const newMini = await createMiniature(miniatureData)
           if (newMini?.id) {
             newMiniId = newMini.id
             // Log the creation if there's a user
             if (user?.id) {
+              // console.log('Logging miniature creation:', {
+              //   userId: user.id,
+              //   miniature: newMini
+              // })
               await AuditService.logMiniatureCreate(user.id, newMini)
+            } else {
+              console.log('No user ID available for audit logging')
             }
           } else {
             throw new Error('Failed to get ID for new miniature')
@@ -588,12 +605,11 @@ export function MiniatureOverviewModal({
   }
 
   const handleTypeSelect = (typeId: number) => {
-    const selectedType = typeCategoryAdmin.miniTypes.find(t => t.id === typeId)
-    console.log('Selected type:', selectedType)
-    console.log('Type categories:', selectedType?.categories)
+    const selectedType: MiniType | undefined = typeCategoryAdmin.miniTypes.find(t => t.id === typeId);
     
     if (selectedType && !selectedTypes.some(t => t.id === typeId)) {
-      const isFirstType = selectedTypes.length === 0
+      const isFirstType = selectedTypes.length === 0;
+      
       const newType: SelectedType = {
         id: typeId,
         name: selectedType.name,
@@ -601,36 +617,32 @@ export function MiniatureOverviewModal({
         type: {
           id: selectedType.id,
           name: selectedType.name,
-          categories: selectedType.categories?.map(cat => ({
+          categories: selectedType.type_to_categories?.map(ttc => ({
             category: {
-              id: cat.category.id,
-              name: cat.category.name
+              id: ttc.mini_categories.id,
+              name: ttc.mini_categories.name
             }
           })) || []
         }
-      }
+      };
       
-      console.log('New type being added:', newType)
-      console.log('Current selected types:', selectedTypes)
-      
-      setSelectedTypes(prev => [...prev, newType])
+      setSelectedTypes(prev => [...prev, newType]);
       
       setFormData(prev => ({
         ...prev,
         types: [...prev.types, { id: typeId, proxy_type: !isFirstType }]
-      }))
+      }));
       
-      setTypeSearchTerm('')
-      setShowTypeDropdown(false)
+      setTypeSearchTerm('');
+      setShowTypeDropdown(false);
       
-      // Ensure focus is set after state updates are complete
       setTimeout(() => {
         if (typeSearchInputRef.current) {
-          typeSearchInputRef.current.focus()
+          typeSearchInputRef.current.focus();
         }
-      }, 0)
+      }, 0);
     }
-  }
+  };
 
   const handleTypeRemove = (typeId: number) => {
     setSelectedTypes(prev => {
@@ -668,57 +680,13 @@ export function MiniatureOverviewModal({
     })
   }
 
-  const toggleProxyType = (typeId: number) => {
+  const handleTypeClick = (typeId: number) => {
     setSelectedTypes(prev => {
-      // Find the type we're toggling
-      const targetType = prev.find(t => t.id === typeId)
-      console.log('Toggling type:', targetType)
-      
-      if (!targetType) return prev
-
-      // If this type is already main, don't allow toggle if it's the only main
-      if (!targetType.proxy_type && !prev.some(t => t.id !== typeId && !t.proxy_type)) {
-        console.log('Cannot toggle only main type to proxy')
-        return prev
-      }
-
-      // Create the updated types array
-      let updatedTypes: SelectedType[];
-
-      // If we're making this type the main type
-      if (targetType.proxy_type) {
-        console.log('Making type the main type:', targetType)
-        // Make all types proxy types, then make the target type the main type
-        updatedTypes = prev.map(t => ({
-          ...t,
-          proxy_type: t.id !== typeId
-        }))
-      } else {
-        // If we're making this type a proxy type, find another type to make main
-        const newMainTypeId = prev.find(t => t.id !== typeId)?.id
-        console.log('Making type a proxy, new main type ID:', newMainTypeId)
-        
-        if (!newMainTypeId) return prev
-
-        updatedTypes = prev.map(t => ({
-          ...t,
-          proxy_type: t.id !== newMainTypeId
-        }))
-      }
-
-      console.log('Updated types:', updatedTypes)
-      console.log('Main type categories:', updatedTypes.find(t => !t.proxy_type)?.type?.categories)
-
-      // Update form data to match
-      setFormData(prevForm => ({
-        ...prevForm,
-        types: updatedTypes.map(t => ({
-          id: t.id,
-          proxy_type: t.proxy_type
-        }))
+      // Mark clicked type as main (proxy_type = false), all others proxy_type = true
+      return prev.map(st => ({
+        ...st,  // Preserve ALL existing type data including categories
+        proxy_type: st.id === typeId ? false : true
       }))
-
-      return updatedTypes
     })
   }
 
@@ -732,13 +700,19 @@ export function MiniatureOverviewModal({
     return mainType.type?.categories || [];
   }, [selectedTypes]);
 
-  // Sort categories
+  // Sort categories with type safety
   const sortedCategories = useMemo(() => {
     return selectedTypeCategories
-      .map(cat => ({
-        id: cat.category.id,
-        name: cat.category.name
-      }))
+      .map(cat => {
+        if (!cat.category) {
+          return null;
+        }
+        return {
+          id: cat.category.id,
+          name: cat.category.name
+        };
+      })
+      .filter((cat): cat is { id: number; name: string } => cat !== null)
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [selectedTypeCategories]);
 
@@ -764,13 +738,6 @@ export function MiniatureOverviewModal({
     }));
   }, [sortedTags]);
 
-  // Add debug logging for selectedTypeCategories
-  useEffect(() => {
-    console.log('Selected types changed:', selectedTypes)
-    console.log('Main type:', selectedTypes.find(type => !type.proxy_type))
-    console.log('Selected type categories:', selectedTypeCategories)
-  }, [selectedTypes, selectedTypeCategories])
-
   // Search handlers
 
   const handleTypeSearch = (searchTerm: string) => {
@@ -779,7 +746,7 @@ export function MiniatureOverviewModal({
   }
 
   // Filter types based on search term
-  const filteredTypes = useMemo(() => {
+  const filteredTypes: MiniType[] = useMemo(() => {
     const searchTerm = typeSearchTerm.toLowerCase().trim()
     if (!searchTerm) return []
     
@@ -815,44 +782,38 @@ export function MiniatureOverviewModal({
 
   const fetchAllTypes = async () => {
     try {
-      setIsLoadingTypes(true)
+      setIsLoadingTypes(true);
       
-      // First get total count
-      const { count } = await supabase
+      const { data: typeData, error } = await supabase
         .from('mini_types')
-        .select('*', { count: 'exact', head: true })
+        .select(`
+          *,
+          type_to_categories(
+            mini_categories(
+              id,
+              name
+            )
+          )
+        `);
 
-      if (!count) return []
-
-      // Then fetch all records in batches
-      const BATCH_SIZE = 1000
-      const batches = Math.ceil(count / BATCH_SIZE)
-      let allTypes: any[] = []
-
-      for (let i = 0; i < batches; i++) {
-        const from = i * BATCH_SIZE
-        const to = from + BATCH_SIZE - 1
-
-        const { data, error } = await supabase
-          .from('mini_types')
-          .select('*')
-          .order('name')
-          .range(from, to)
-
-        if (error) throw error
-        if (data) allTypes = [...allTypes, ...data]
+      if (error) {
+        throw error;
       }
 
-      // Update total count and types
-      setTotalTypesCount(count)
-      typeCategoryAdmin.setMiniTypes(allTypes)
-      return allTypes
+      if (typeData) {
+        setTotalTypesCount(typeData.length);
+        typeCategoryAdmin.setMiniTypes(typeData);
+        return typeData;
+      }
+
+      return [];
     } catch (err) {
-      console.error('Error fetching types:', err)
+      console.error('Error in fetchAllTypes:', err);
+      return [];
     } finally {
-      setIsLoadingTypes(false)
+      setIsLoadingTypes(false);
     }
-  }
+  };
 
   // Get filtered product sets based on search
   const filteredProducts = useMemo(() => {
@@ -1638,7 +1599,7 @@ export function MiniatureOverviewModal({
                             <div key={`${type.id}-${index}`} className="border-b border-gray-700 last:border-b-0">
                               <div
                                 className="flex items-center justify-between px-3 py-1 hover:bg-gray-700 cursor-pointer"
-                                onClick={() => toggleProxyType(type.id)}
+                                onClick={() => handleTypeClick(type.id)}
                               >
                                 <div className="flex items-center gap-2">
                                   <div className={`w-2 h-2 rounded-full ${type.proxy_type ? 'bg-orange-500' : 'bg-green-500'}`} />

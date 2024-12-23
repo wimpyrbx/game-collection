@@ -309,24 +309,25 @@ export default function History() {
     const fetchLogs = async () => {
       setLoading(true)
       try {
-        // First get total count
+        // First get total count (limit to last 100 entries)
         const { count } = await supabase
           .from('audit_logs')
           .select('*', { count: 'exact', head: true })
+          .order('id', { ascending: false })
+          .limit(100)
 
         // Then get paginated logs, starting from the most recent entries
-        const totalCount = count || 0
-        const maxPages = 10
+        const totalCount = Math.min(count || 0, 100) // Limit to 100 entries
         const calculatedPages = Math.ceil(totalCount / logsPerPage)
-        setTotalPages(Math.min(calculatedPages, maxPages))
+        setTotalPages(calculatedPages)
 
-        const startIndex = Math.max(0, totalCount - (10 * logsPerPage)) // Only show last 100 entries
         const offset = (currentPage - 1) * logsPerPage
         const { data, error } = await supabase
           .from('audit_logs')
           .select('*')
-          .order('created_at', { ascending: false })
-          .range(startIndex + offset, startIndex + offset + logsPerPage - 1)
+          .order('id', { ascending: false })
+          .limit(100) // Limit to last 100 entries
+          .range(offset, offset + logsPerPage - 1)
 
         if (error) throw error
 

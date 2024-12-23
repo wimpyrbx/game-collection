@@ -21,7 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // If we're in development, set a mock session and user
     if (process.env.NODE_ENV === 'development') {
       const mockUser = {
-        id: 'e9b9f965-0716-4016-9d4c-71bf095b52c9', // Valid UUID for development
+        id: '0a8f4947-f743-4721-8e20-e342311cfd83', // Valid UUID for development
         email: 'dev@local.host',
         // Add other required user properties
       } as User
