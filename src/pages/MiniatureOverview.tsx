@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle, FaMinusCircle, FaPlusCircle, FaList, FaTags } from 'react-icons/fa'
+import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle, FaMinusCircle, FaPlusCircle } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
@@ -52,14 +52,8 @@ export default function MiniatureOverview() {
 
   // Add state for each dropdown approach
   const [typeSearchTermClassic, setTypeSearchTermClassic] = useState('')
-  const [typeSearchTermGrid, setTypeSearchTermGrid] = useState('')
-  const [typeSearchTermTags, setTypeSearchTermTags] = useState('')
   const [showTypeDropdownClassic, setShowTypeDropdownClassic] = useState(false)
-  const [showTypeDropdownGrid, setShowTypeDropdownGrid] = useState(false)
-  const [showTypeDropdownTags, setShowTypeDropdownTags] = useState(false)
   const [selectedTypeClassic, setSelectedTypeClassic] = useState<number | null>(null)
-  const [selectedTypeGrid, setSelectedTypeGrid] = useState<number | null>(null)
-  const [selectedTypeTags, setSelectedTypeTags] = useState<number | null>(null)
 
   // Add click outside handlers to close dropdowns
   useEffect(() => {
@@ -74,8 +68,6 @@ export default function MiniatureOverview() {
           }
         }
         setShowTypeDropdownClassic(false)
-        setShowTypeDropdownGrid(false)
-        setShowTypeDropdownTags(false)
       }
     }
 
@@ -446,9 +438,6 @@ export default function MiniatureOverview() {
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
   const [defaultTypeId, setDefaultTypeId] = useState<number | null>(null)
-  const [typeSearchTerm, setTypeSearchTerm] = useState('')
-  const [showTypeDropdown, setShowTypeDropdown] = useState(false)
-  // Add new state for pre-defined fields visibility
   const [showPreDefinedFields, setShowPreDefinedFields] = useState(true)
 
   // Initialize default values for base size and painted by
@@ -524,100 +513,6 @@ export default function MiniatureOverview() {
   }, [typeSearchTermClassic, typeCategoryAdmin.miniTypes])
 
   // Grid approach: Fuzzy search with score-based sorting
-  const filteredTypesGrid = useMemo(() => {
-    if (!typeSearchTermGrid) return []
-    const searchLower = typeSearchTermGrid.toLowerCase()
-    
-    return typeCategoryAdmin.miniTypes
-      .map(type => {
-        const nameLower = type.name.toLowerCase()
-        let score = 0
-        
-        // Exact match gets highest score
-        if (nameLower === searchLower) score += 100
-        // Starts with search term gets high score
-        else if (nameLower.startsWith(searchLower)) score += 75
-        // Contains search term gets medium score
-        else if (nameLower.includes(searchLower)) score += 50
-        // Contains all letters in sequence gets low score
-        else {
-          let searchIndex = 0
-          for (let char of nameLower) {
-            if (char === searchLower[searchIndex]) {
-              searchIndex++
-              if (searchIndex === searchLower.length) {
-                score += 25
-                break
-              }
-            }
-          }
-        }
-        
-        return { type, score }
-      })
-      .filter(item => item.score > 0)
-      .sort((a, b) => b.score - a.score || a.type.name.localeCompare(b.type.name))
-      .map(item => item.type)
-  }, [typeSearchTermGrid, typeCategoryAdmin.miniTypes])
-
-  // Tags approach: Async search with debounce
-  const [filteredTypesTags, setFilteredTypesTags] = useState<typeof typeCategoryAdmin.miniTypes>([])
-  const searchTimeoutRef = useRef<NodeJS.Timeout>()
-
-  useEffect(() => {
-    const performSearch = async () => {
-      if (!typeSearchTermTags) {
-        setFilteredTypesTags([])
-        return
-      }
-
-      // Simulate async search with artificial delay
-      const searchLower = typeSearchTermTags.toLowerCase()
-      
-      try {
-        // Use Supabase for server-side filtering
-        const { data: results, error } = await supabase
-          .from('mini_types')
-          .select('*')
-          .ilike('name', `%${searchLower}%`)
-          .order('name')
-          .limit(50)
-
-        if (error) throw error
-        
-        if (results) {
-          // Transform results to match our type structure
-          const transformedResults = results.map(result => ({
-            id: result.id,
-            name: result.name,
-            type_to_categories: []
-          }))
-          setFilteredTypesTags(transformedResults)
-        }
-      } catch (error) {
-        console.error('Error searching types:', error)
-        // Fallback to client-side filtering if server search fails
-        const filtered = typeCategoryAdmin.miniTypes
-          .filter(type => type.name.toLowerCase().includes(searchLower))
-          .sort((a, b) => a.name.localeCompare(b.name))
-        setFilteredTypesTags(filtered)
-      }
-    }
-
-    // Clear existing timeout
-    if (searchTimeoutRef.current) {
-      clearTimeout(searchTimeoutRef.current)
-    }
-
-    // Set new timeout for debounced search
-    searchTimeoutRef.current = setTimeout(performSearch, 300)
-
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current)
-      }
-    }
-  }, [typeSearchTermTags, typeCategoryAdmin.miniTypes])
 
   // Three different approaches for type dropdown
   const typeDropdownClassic = showTypeDropdownClassic && filteredTypesClassic.length > 0 && createPortal(
@@ -654,93 +549,6 @@ export default function MiniatureOverview() {
     document.body
   )
 
-  const typeDropdownGrid = (
-    <>
-      {showTypeDropdownGrid && filteredTypesGrid.length > 0 && (
-        <div className="fixed inset-0 z-[9999] pointer-events-none">
-          <div className="fixed inset-0 bg-transparent" onClick={() => setShowTypeDropdownGrid(false)} />
-          <div 
-            className="fixed z-[9999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800/95 backdrop-blur-sm shadow-xl scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 p-2 pointer-events-auto"
-            style={{
-              top: `${gridInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
-              left: `${gridInputRef.current?.getBoundingClientRect().left ?? 0}px`,
-              width: `${gridInputRef.current?.offsetWidth ?? 0}px`,
-              maxHeight: '400px'
-            }}
-          >
-            <div className="grid grid-cols-1 gap-2">
-              {filteredTypesGrid.map((type) => (
-                <button
-                  key={type.id}
-                  className="group relative overflow-hidden rounded-md hover:bg-gray-700/50 transition-all duration-200 border border-gray-700/50 hover:border-gray-600 hover:shadow-lg hover:-translate-y-[1px]"
-                  onClick={() => {
-                    setSelectedTypeGrid(type.id)
-                    setTypeSearchTermGrid(type.name)
-                    setShowTypeDropdownGrid(false)
-                    setDefaultTypeId(type.id)
-                  }}
-                >
-                  <div className="p-2">
-                    <div className="text-sm font-medium text-gray-200 mb-1 truncate">{type.name}</div>
-                    <div className="flex items-center gap-2 text-xs text-gray-400">
-                      <div className="w-1 h-1 rounded-full bg-blue-500"></div>
-                      Type
-                    </div>
-                  </div>
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-
-  const typeDropdownTags = (
-    <>
-      {showTypeDropdownTags && filteredTypesTags.length > 0 && (
-        <div className="fixed inset-0 z-[9999] pointer-events-none">
-          <div className="fixed inset-0 bg-transparent" onClick={() => setShowTypeDropdownTags(false)} />
-          <div 
-            className="fixed z-[9999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800/95 backdrop-blur-sm shadow-xl scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 pointer-events-auto"
-            style={{
-              top: `${tagsInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
-              left: `${tagsInputRef.current?.getBoundingClientRect().left ?? 0}px`,
-              width: `${tagsInputRef.current?.offsetWidth ?? 0}px`,
-              maxHeight: '350px'
-            }}
-          >
-            <div className="sticky top-0 z-10 bg-gray-900/90 backdrop-blur-sm border-b border-gray-700 p-3">
-              <div className="text-sm font-medium text-gray-200 mb-1">Select Type</div>
-              <div className="text-xs text-gray-400">Found {filteredTypesTags.length} matching types</div>
-            </div>
-            <div className="p-3 flex flex-col gap-2">
-              {filteredTypesTags.map((type) => (
-                <button
-                  key={type.id}
-                  className="group relative px-3 py-1.5 rounded-full bg-gray-700/50 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 transition-all duration-200 hover:shadow-lg hover:-translate-y-[1px]"
-                  onClick={() => {
-                    setSelectedTypeTags(type.id)
-                    setTypeSearchTermTags(type.name)
-                    setShowTypeDropdownTags(false)
-                    setDefaultTypeId(type.id)
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
-                    <span className="text-sm text-gray-200">{type.name}</span>
-                  </div>
-                  <div className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
-
   // Add effect to update dropdown positions
   useEffect(() => {
     const updateDropdownPosition = () => {
@@ -766,57 +574,6 @@ export default function MiniatureOverview() {
       window.removeEventListener('resize', updateDropdownPosition)
     }
   }, [])
-
-  // Add state to switch between dropdown styles
-  const [dropdownStyle, setDropdownStyle] = useState<'classic' | 'grid' | 'tags'>('classic')
-
-  // Function to get current dropdown based on style
-  const getCurrentDropdown = () => {
-    switch (dropdownStyle) {
-      case 'grid':
-        return typeDropdownGrid
-      case 'tags':
-        return typeDropdownTags
-      default:
-        return typeDropdownClassic
-    }
-  }
-
-  // Update the type dropdown section
-  const typeDropdownContent = (
-    <>
-      {showTypeDropdown && (
-        <div className="absolute z-[9999] w-full">
-          <div className="fixed inset-0" onClick={() => setShowTypeDropdown(false)} />
-          <div className="absolute w-full max-h-[300px] overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-            <div className="sticky top-0 z-10 bg-gray-900/90 backdrop-blur-sm border-b border-gray-700 p-2 text-xs text-gray-400">
-              {typeCategoryAdmin.miniTypes.length} types found
-            </div>
-            <div className="flex flex-col">
-              {typeCategoryAdmin.miniTypes.map((type) => (
-            <button
-              key={type.id}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm group relative"
-              onClick={() => {
-                setDefaultTypeId(type.id)
-                setTypeSearchTerm(type.name)
-                setShowTypeDropdown(false)
-              }}
-            >
-                  <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-200">{type.name}</div>
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400">
-                      Press to select
-                    </div>
-                  </div>
-            </button>
-          ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
-  )
 
   // Update handleAdd to use typeCategoryAdmin.miniTypes
   const handleAdd = () => {
@@ -1111,8 +868,8 @@ export default function MiniatureOverview() {
                             
                             // Reset type
                             setDefaultTypeId(null);
-                            setTypeSearchTerm('');
-                            setShowTypeDropdown(false);
+                            setTypeSearchTermClassic('');
+                            setShowTypeDropdownClassic(false);
                           }
                         }}
                         className="text-gray-400 hover:text-gray-300 focus:outline-none"

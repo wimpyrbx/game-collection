@@ -132,7 +132,6 @@ export function MiniatureOverviewModal({
     tags: [] as { id: number }[]
   })
   const [, setIsLoadingTypes] = useState(false)
-  const [totalTypesCount, setTotalTypesCount] = useState(0)
   const [typeSearchTerm, setTypeSearchTerm] = useState('')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
   const [, setDropdownStyle] = useState({ width: 0, left: 0, top: 0 })
@@ -803,7 +802,6 @@ export function MiniatureOverviewModal({
       }
 
       if (typeData) {
-        setTotalTypesCount(typeData.length);
         typeCategoryAdmin.setMiniTypes(typeData);
         return typeData;
       }
