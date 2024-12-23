@@ -120,13 +120,23 @@ export function MiniatureOverviewModal({
   const typeCategoryAdmin = useTypeCategoryAdmin()
 
   // State declarations
+  const [selectedTypes, setSelectedTypes] = useState<SelectedType[]>([])
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    location: '',
+    quantity: 1,
+    painted_by_id: 0,
+    base_size_id: 0,
+    product_set_id: null as number | null,
+    types: [] as { id: number, proxy_type: boolean }[],
+    tags: [] as { id: number }[]
+  })
   const [, setIsLoadingTypes] = useState(false)
   const [totalTypesCount, setTotalTypesCount] = useState(0)
   const [typeSearchTerm, setTypeSearchTerm] = useState('')
   const [showTypeDropdown, setShowTypeDropdown] = useState(false)
   const [, setDropdownStyle] = useState({ width: 0, left: 0, top: 0 })
-
-  // Tags state
   const [selectedTags, setSelectedTags] = useState<Array<{ id: number; name: string }>>([])
   const [tagInput, setTagInput] = useState('')
   const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([])
@@ -182,22 +192,6 @@ export function MiniatureOverviewModal({
       subscription.unsubscribe()
     }
   }, [])
-
-  // Form data state
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    location: '',
-    quantity: 1,
-    painted_by_id: 0,
-    base_size_id: 0,
-    product_set_id: null as number | null,
-    types: [] as { id: number, proxy_type: boolean }[],
-    tags: [] as { id: number }[]
-  })
-
-  // Types state
-  const [selectedTypes, setSelectedTypes] = useState<SelectedType[]>([])
 
   // Product set state
   const [productSearchTerm, setProductSearchTerm] = useState('')
@@ -595,6 +589,9 @@ export function MiniatureOverviewModal({
 
   const handleTypeSelect = (typeId: number) => {
     const selectedType = typeCategoryAdmin.miniTypes.find(t => t.id === typeId)
+    console.log('Selected type:', selectedType)
+    console.log('Type categories:', selectedType?.categories)
+    
     if (selectedType && !selectedTypes.some(t => t.id === typeId)) {
       const isFirstType = selectedTypes.length === 0
       const newType: SelectedType = {
@@ -612,6 +609,9 @@ export function MiniatureOverviewModal({
           })) || []
         }
       }
+      
+      console.log('New type being added:', newType)
+      console.log('Current selected types:', selectedTypes)
       
       setSelectedTypes(prev => [...prev, newType])
       
@@ -672,37 +672,104 @@ export function MiniatureOverviewModal({
     setSelectedTypes(prev => {
       // Find the type we're toggling
       const targetType = prev.find(t => t.id === typeId)
+      console.log('Toggling type:', targetType)
+      
       if (!targetType) return prev
 
       // If this type is already main, don't allow toggle if it's the only main
       if (!targetType.proxy_type && !prev.some(t => t.id !== typeId && !t.proxy_type)) {
+        console.log('Cannot toggle only main type to proxy')
         return prev
       }
 
-      const updated = prev.map(t => ({
-        ...t,
-        proxy_type: t.id === typeId ? !t.proxy_type : t.id !== typeId ? true : t.proxy_type
-      }))
+      // Create the updated types array
+      let updatedTypes: SelectedType[];
 
-      // Also update formData.types to match
+      // If we're making this type the main type
+      if (targetType.proxy_type) {
+        console.log('Making type the main type:', targetType)
+        // Make all types proxy types, then make the target type the main type
+        updatedTypes = prev.map(t => ({
+          ...t,
+          proxy_type: t.id !== typeId
+        }))
+      } else {
+        // If we're making this type a proxy type, find another type to make main
+        const newMainTypeId = prev.find(t => t.id !== typeId)?.id
+        console.log('Making type a proxy, new main type ID:', newMainTypeId)
+        
+        if (!newMainTypeId) return prev
+
+        updatedTypes = prev.map(t => ({
+          ...t,
+          proxy_type: t.id !== newMainTypeId
+        }))
+      }
+
+      console.log('Updated types:', updatedTypes)
+      console.log('Main type categories:', updatedTypes.find(t => !t.proxy_type)?.type?.categories)
+
+      // Update form data to match
       setFormData(prevForm => ({
         ...prevForm,
-        types: updated.map(t => ({
+        types: updatedTypes.map(t => ({
           id: t.id,
-          type_id: t.id,
-          proxy_type: t.proxy_type,
-          type: {
-            id: t.id,
-            name: t.name,
-            categories: miniTypes.find(mt => mt.id === t.id)?.categories || []
-          }
+          proxy_type: t.proxy_type
         }))
       }))
 
-      return updated
+      return updatedTypes
     })
   }
 
+  // First, make sure we're getting the categories from the main type only
+  const selectedTypeCategories = useMemo(() => {
+    // Get the main type (non-proxy type)
+    const mainType = selectedTypes.find(type => !type.proxy_type);
+    if (!mainType) return [];
+
+    // Get categories directly from the type object
+    return mainType.type?.categories || [];
+  }, [selectedTypes]);
+
+  // Sort categories
+  const sortedCategories = useMemo(() => {
+    return selectedTypeCategories
+      .map(cat => ({
+        id: cat.category.id,
+        name: cat.category.name
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [selectedTypeCategories]);
+
+  // Sort tags
+  const sortedTags = useMemo(() => {
+    return selectedTags
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [selectedTags]);
+
+  // Map sorted categories and tags to items
+  const categoryItems = useMemo(() => {
+    return sortedCategories.map(category => ({
+      id: category.id,
+      label: category.name
+    }));
+  }, [sortedCategories]);
+
+  const tagItems = useMemo(() => {
+    return sortedTags.map(tag => ({
+      id: tag.id,
+      label: tag.name
+    }));
+  }, [sortedTags]);
+
+  // Add debug logging for selectedTypeCategories
+  useEffect(() => {
+    console.log('Selected types changed:', selectedTypes)
+    console.log('Main type:', selectedTypes.find(type => !type.proxy_type))
+    console.log('Selected type categories:', selectedTypeCategories)
+  }, [selectedTypes, selectedTypeCategories])
 
   // Search handlers
 
@@ -1007,37 +1074,6 @@ export function MiniatureOverviewModal({
       mounted = false;
     };
   }, [miniData]); // Add miniData as dependency
-
-  // First, make sure we're getting the categories from all types
-  const selectedTypeCategories = useMemo(() => {
-    // Get categories from all types
-    const allCategories = selectedTypes.flatMap(type => {
-      const typeWithCategories = miniTypes.find(t => t.id === type.id)
-      return typeWithCategories?.categories || []
-    })
-    
-    // Remove duplicates based on category id
-    const uniqueCategories = Array.from(
-      new Map(allCategories.map(cat => [cat.id, cat])).values()
-    )
-    
-    return uniqueCategories
-  }, [selectedTypes, miniTypes])
-
-  // Sort categories, tags, and types
-  const sortedCategories = sortByKey(selectedTypeCategories, 'name');
-  const sortedTags = sortByKey(selectedTags, 'name');
-
-  // Map sorted categories, tags, and types to items
-  const categoryItems = sortedCategories.map(category => ({
-    id: category.id,
-    label: category.name
-  }));
-
-  const tagItems = sortedTags.map(tag => ({
-    id: tag.id,
-    label: tag.name
-  }));
 
   // Update company logo when product set changes or modal opens
   useEffect(() => {

@@ -729,20 +729,20 @@ export default function MiniatureOverview() {
           </PageHeaderSubText>
         </PageHeaderTextGroup>
         <PageHeaderBigNumber
-          icon={FaDiceD6}
+            icon={FaDiceD6}
           number={totalMinis || 0}
           text="Total Miniatures"
-        />
-        <PageHeaderBigNumber
+          />
+          <PageHeaderBigNumber
           icon={FaDiceD6}
-          number={totalQuantity}
+            number={totalQuantity}
           text="Total Quantity"
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
           number={stats.inUseCount || 0}
           text={`In Use (${stats.inUsePercentage}%)`}
-        />
+          />
       </PageHeader>
 
       <div className="grid grid-cols-12 gap-4">
@@ -767,7 +767,7 @@ export default function MiniatureOverview() {
               </div>
               <UI.CardHeaderRightSide>
                 <div className="flex flex-col gap-4 h-[50px] text-justify justify-center">
-                  <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4">
                     {/* Pre-defined fields for new miniature */}
                     <div className="flex items-center gap-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
                       <button
@@ -941,23 +941,23 @@ export default function MiniatureOverview() {
                       + Add Miniature
                     </UI.Button>
                     <div className="flex items-center gap-2 bg-gray-800 rounded-lg p-1 ml-auto">
-                      <button
-                        className={`p-2 rounded focus:outline-none ${viewMode === 'table' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                        onClick={() => setViewMode('table')}
-                        title="Table View"
-                        tabIndex={-1}
-                      >
-                        <FaTable className="w-4 h-4" />
-                      </button>
-                      <button
-                        className={`p-2 rounded focus:outline-none ${viewMode === 'grid' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
-                        onClick={() => setViewMode('grid')}
-                        title="Card View"
-                        tabIndex={-1}
-                      >
-                        <FaThLarge className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button
+                      className={`p-2 rounded focus:outline-none ${viewMode === 'table' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                      onClick={() => setViewMode('table')}
+                      title="Table View"
+                      tabIndex={-1}
+                    >
+                      <FaTable className="w-4 h-4" />
+                    </button>
+                    <button
+                      className={`p-2 rounded focus:outline-none ${viewMode === 'grid' ? 'bg-gray-700 text-white' : 'text-gray-400 hover:text-white'}`}
+                      onClick={() => setViewMode('grid')}
+                      title="Card View"
+                      tabIndex={-1}
+                    >
+                      <FaThLarge className="w-4 h-4" />
+                    </button>
+                  </div>
                   </div>
                 </div>
               </UI.CardHeaderRightSide>
