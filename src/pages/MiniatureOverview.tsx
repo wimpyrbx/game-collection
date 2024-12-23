@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle, FaMinusCircle, FaPlusCircle } from 'react-icons/fa'
+import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle, FaMinusCircle, FaPlusCircle, FaList, FaTags } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
 import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
@@ -18,6 +18,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../lib/supabase'
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 import { motion, AnimatePresence } from 'framer-motion'
+import { createPortal } from 'react-dom'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -42,6 +43,47 @@ export default function MiniatureOverview() {
   const initialLoadRef = useRef(true)
   const { user } = useAuth()
   const typeCategoryAdmin = useTypeCategoryAdmin()
+
+  // Add refs for dropdown positioning
+  const classicInputRef = useRef<HTMLDivElement>(null)
+  const productSetInputRef = useRef<HTMLDivElement>(null)
+  const gridInputRef = useRef<HTMLDivElement>(null)
+  const tagsInputRef = useRef<HTMLDivElement>(null)
+
+  // Add state for each dropdown approach
+  const [typeSearchTermClassic, setTypeSearchTermClassic] = useState('')
+  const [typeSearchTermGrid, setTypeSearchTermGrid] = useState('')
+  const [typeSearchTermTags, setTypeSearchTermTags] = useState('')
+  const [showTypeDropdownClassic, setShowTypeDropdownClassic] = useState(false)
+  const [showTypeDropdownGrid, setShowTypeDropdownGrid] = useState(false)
+  const [showTypeDropdownTags, setShowTypeDropdownTags] = useState(false)
+  const [selectedTypeClassic, setSelectedTypeClassic] = useState<number | null>(null)
+  const [selectedTypeGrid, setSelectedTypeGrid] = useState<number | null>(null)
+  const [selectedTypeTags, setSelectedTypeTags] = useState<number | null>(null)
+
+  // Add click outside handlers to close dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.type-dropdown-container')) {
+        // If there's a selected type but no search term, restore the selected type's name
+        if (selectedTypeClassic && !typeSearchTermClassic) {
+          const selectedType = typeCategoryAdmin.miniTypes.find(t => t.id === selectedTypeClassic)
+          if (selectedType) {
+            setTypeSearchTermClassic(selectedType.name)
+          }
+        }
+        setShowTypeDropdownClassic(false)
+        setShowTypeDropdownGrid(false)
+        setShowTypeDropdownTags(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [selectedTypeClassic, typeSearchTermClassic, typeCategoryAdmin.miniTypes])
 
   const {
     paintedByOptions,
@@ -472,34 +514,305 @@ export default function MiniatureOverview() {
     })
   }, [])
 
-  // Modify filteredTypes computation to use typeCategoryAdmin.miniTypes
-  const filteredTypes = useMemo(() => {
-    if (!typeSearchTerm) return []
-    
-    const searchLower = typeSearchTerm.toLowerCase()
+  // Classic approach: Direct filtering with memoization
+  const filteredTypesClassic = useMemo(() => {
+    if (!typeSearchTermClassic) return []
+    const searchLower = typeSearchTermClassic.toLowerCase()
     return typeCategoryAdmin.miniTypes.filter(type => 
       type.name.toLowerCase().includes(searchLower)
-    )
-  }, [typeSearchTerm, typeCategoryAdmin.miniTypes])
+    ).sort((a, b) => a.name.localeCompare(b.name))
+  }, [typeSearchTermClassic, typeCategoryAdmin.miniTypes])
+
+  // Grid approach: Fuzzy search with score-based sorting
+  const filteredTypesGrid = useMemo(() => {
+    if (!typeSearchTermGrid) return []
+    const searchLower = typeSearchTermGrid.toLowerCase()
+    
+    return typeCategoryAdmin.miniTypes
+      .map(type => {
+        const nameLower = type.name.toLowerCase()
+        let score = 0
+        
+        // Exact match gets highest score
+        if (nameLower === searchLower) score += 100
+        // Starts with search term gets high score
+        else if (nameLower.startsWith(searchLower)) score += 75
+        // Contains search term gets medium score
+        else if (nameLower.includes(searchLower)) score += 50
+        // Contains all letters in sequence gets low score
+        else {
+          let searchIndex = 0
+          for (let char of nameLower) {
+            if (char === searchLower[searchIndex]) {
+              searchIndex++
+              if (searchIndex === searchLower.length) {
+                score += 25
+                break
+              }
+            }
+          }
+        }
+        
+        return { type, score }
+      })
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score || a.type.name.localeCompare(b.type.name))
+      .map(item => item.type)
+  }, [typeSearchTermGrid, typeCategoryAdmin.miniTypes])
+
+  // Tags approach: Async search with debounce
+  const [filteredTypesTags, setFilteredTypesTags] = useState<typeof typeCategoryAdmin.miniTypes>([])
+  const searchTimeoutRef = useRef<NodeJS.Timeout>()
+
+  useEffect(() => {
+    const performSearch = async () => {
+      if (!typeSearchTermTags) {
+        setFilteredTypesTags([])
+        return
+      }
+
+      // Simulate async search with artificial delay
+      const searchLower = typeSearchTermTags.toLowerCase()
+      
+      try {
+        // Use Supabase for server-side filtering
+        const { data: results, error } = await supabase
+          .from('mini_types')
+          .select('*')
+          .ilike('name', `%${searchLower}%`)
+          .order('name')
+          .limit(50)
+
+        if (error) throw error
+        
+        if (results) {
+          // Transform results to match our type structure
+          const transformedResults = results.map(result => ({
+            id: result.id,
+            name: result.name,
+            type_to_categories: []
+          }))
+          setFilteredTypesTags(transformedResults)
+        }
+      } catch (error) {
+        console.error('Error searching types:', error)
+        // Fallback to client-side filtering if server search fails
+        const filtered = typeCategoryAdmin.miniTypes
+          .filter(type => type.name.toLowerCase().includes(searchLower))
+          .sort((a, b) => a.name.localeCompare(b.name))
+        setFilteredTypesTags(filtered)
+      }
+    }
+
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(performSearch, 300)
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [typeSearchTermTags, typeCategoryAdmin.miniTypes])
+
+  // Three different approaches for type dropdown
+  const typeDropdownClassic = showTypeDropdownClassic && filteredTypesClassic.length > 0 && createPortal(
+    <div className="fixed inset-0 z-[99999]">
+      <div className="fixed inset-0" onClick={() => setShowTypeDropdownClassic(false)} />
+      <div 
+        className="fixed z-[99999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
+        style={{
+          top: `${classicInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
+          left: `${classicInputRef.current?.getBoundingClientRect().left ?? 0}px`,
+          width: `${classicInputRef.current?.offsetWidth ?? 0}px`,
+          maxHeight: '300px'
+        }}
+      >
+        <div className="flex flex-col">
+          {filteredTypesClassic.map((type) => (
+            <button
+              key={type.id}
+              className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setTypeSearchTermClassic(type.name)
+                setSelectedTypeClassic(type.id)
+                setDefaultTypeId(type.id)
+                setShowTypeDropdownClassic(false)
+              }}
+            >
+              <div className="text-sm text-gray-200 truncate">{type.name}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+
+  const typeDropdownGrid = (
+    <>
+      {showTypeDropdownGrid && filteredTypesGrid.length > 0 && (
+        <div className="fixed inset-0 z-[9999] pointer-events-none">
+          <div className="fixed inset-0 bg-transparent" onClick={() => setShowTypeDropdownGrid(false)} />
+          <div 
+            className="fixed z-[9999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800/95 backdrop-blur-sm shadow-xl scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 p-2 pointer-events-auto"
+            style={{
+              top: `${gridInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
+              left: `${gridInputRef.current?.getBoundingClientRect().left ?? 0}px`,
+              width: `${gridInputRef.current?.offsetWidth ?? 0}px`,
+              maxHeight: '400px'
+            }}
+          >
+            <div className="grid grid-cols-1 gap-2">
+              {filteredTypesGrid.map((type) => (
+                <button
+                  key={type.id}
+                  className="group relative overflow-hidden rounded-md hover:bg-gray-700/50 transition-all duration-200 border border-gray-700/50 hover:border-gray-600 hover:shadow-lg hover:-translate-y-[1px]"
+                  onClick={() => {
+                    setSelectedTypeGrid(type.id)
+                    setTypeSearchTermGrid(type.name)
+                    setShowTypeDropdownGrid(false)
+                    setDefaultTypeId(type.id)
+                  }}
+                >
+                  <div className="p-2">
+                    <div className="text-sm font-medium text-gray-200 mb-1 truncate">{type.name}</div>
+                    <div className="flex items-center gap-2 text-xs text-gray-400">
+                      <div className="w-1 h-1 rounded-full bg-blue-500"></div>
+                      Type
+                    </div>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-blue-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+
+  const typeDropdownTags = (
+    <>
+      {showTypeDropdownTags && filteredTypesTags.length > 0 && (
+        <div className="fixed inset-0 z-[9999] pointer-events-none">
+          <div className="fixed inset-0 bg-transparent" onClick={() => setShowTypeDropdownTags(false)} />
+          <div 
+            className="fixed z-[9999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800/95 backdrop-blur-sm shadow-xl scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 pointer-events-auto"
+            style={{
+              top: `${tagsInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
+              left: `${tagsInputRef.current?.getBoundingClientRect().left ?? 0}px`,
+              width: `${tagsInputRef.current?.offsetWidth ?? 0}px`,
+              maxHeight: '350px'
+            }}
+          >
+            <div className="sticky top-0 z-10 bg-gray-900/90 backdrop-blur-sm border-b border-gray-700 p-3">
+              <div className="text-sm font-medium text-gray-200 mb-1">Select Type</div>
+              <div className="text-xs text-gray-400">Found {filteredTypesTags.length} matching types</div>
+            </div>
+            <div className="p-3 flex flex-col gap-2">
+              {filteredTypesTags.map((type) => (
+                <button
+                  key={type.id}
+                  className="group relative px-3 py-1.5 rounded-full bg-gray-700/50 hover:bg-gray-700 border border-gray-600 hover:border-gray-500 transition-all duration-200 hover:shadow-lg hover:-translate-y-[1px]"
+                  onClick={() => {
+                    setSelectedTypeTags(type.id)
+                    setTypeSearchTermTags(type.name)
+                    setShowTypeDropdownTags(false)
+                    setDefaultTypeId(type.id)
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                    <span className="text-sm text-gray-200">{type.name}</span>
+                  </div>
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-r from-orange-500/0 via-orange-500/5 to-orange-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  )
+
+  // Add effect to update dropdown positions
+  useEffect(() => {
+    const updateDropdownPosition = () => {
+      const updatePosition = (inputRef: React.RefObject<HTMLDivElement>, dropdownType: string) => {
+        if (inputRef.current) {
+          const rect = inputRef.current.getBoundingClientRect()
+          document.documentElement.style.setProperty(`--${dropdownType}-dropdown-top`, `${rect.bottom + window.scrollY}px`)
+          document.documentElement.style.setProperty(`--${dropdownType}-dropdown-left`, `${rect.left + window.scrollX}px`)
+        }
+      }
+
+      updatePosition(classicInputRef, 'classic')
+      updatePosition(gridInputRef, 'grid')
+      updatePosition(tagsInputRef, 'tags')
+    }
+
+    updateDropdownPosition()
+    window.addEventListener('scroll', updateDropdownPosition)
+    window.addEventListener('resize', updateDropdownPosition)
+
+    return () => {
+      window.removeEventListener('scroll', updateDropdownPosition)
+      window.removeEventListener('resize', updateDropdownPosition)
+    }
+  }, [])
+
+  // Add state to switch between dropdown styles
+  const [dropdownStyle, setDropdownStyle] = useState<'classic' | 'grid' | 'tags'>('classic')
+
+  // Function to get current dropdown based on style
+  const getCurrentDropdown = () => {
+    switch (dropdownStyle) {
+      case 'grid':
+        return typeDropdownGrid
+      case 'tags':
+        return typeDropdownTags
+      default:
+        return typeDropdownClassic
+    }
+  }
 
   // Update the type dropdown section
   const typeDropdownContent = (
     <>
-      {showTypeDropdown && filteredTypes.length > 0 && (
-        <div className="absolute z-50 mt-1 w-96 max-h-60 overflow-auto rounded-md bg-gray-800 border border-gray-700 shadow-lg">
-          {filteredTypes.map((type) => (
-            <button
-              key={type.id}
-              className="w-full text-left px-4 py-2 hover:bg-gray-700 focus:bg-gray-700 focus:outline-none"
-              onClick={() => {
-                setDefaultTypeId(type.id)
-                setTypeSearchTerm(type.name)
-                setShowTypeDropdown(false)
-              }}
-            >
-              <div className="text-sm text-gray-200">{type.name}</div>
-            </button>
-          ))}
+      {showTypeDropdown && (
+        <div className="absolute z-[9999] w-full">
+          <div className="fixed inset-0" onClick={() => setShowTypeDropdown(false)} />
+          <div className="absolute w-full max-h-[300px] overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+            <div className="sticky top-0 z-10 bg-gray-900/90 backdrop-blur-sm border-b border-gray-700 p-2 text-xs text-gray-400">
+              {typeCategoryAdmin.miniTypes.length} types found
+            </div>
+            <div className="flex flex-col">
+              {typeCategoryAdmin.miniTypes.map((type) => (
+                <button
+                  key={type.id}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm group relative"
+                  onClick={() => {
+                    setDefaultTypeId(type.id)
+                    setTypeSearchTerm(type.name)
+                    setShowTypeDropdown(false)
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-200">{type.name}</div>
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400">
+                      Press to select
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </>
@@ -825,9 +1138,9 @@ export default function MiniatureOverview() {
                             }}
                             className="overflow-hidden origin-left"
                           >
-                            <div className="flex gap-2 py-2 px-2 whitespace-nowrap">
+                            <div className="flex gap-2 py-1 px-1 whitespace-nowrap">
                               {/* Product Set */}
-                              <div className="relative">
+                              <div className="relative" ref={productSetInputRef}>
                                 <UI.SearchInput
                                   value={productSearchTerm}
                                   onChange={(e) => {
@@ -837,28 +1150,42 @@ export default function MiniatureOverview() {
                                       setDefaultProductSetId(null)
                                     }
                                   }}
+                                  onFocus={() => setShowProductDropdown(true)}
                                   placeholder="Product Set..."
                                   className="w-48"
                                 />
-                                {showProductDropdown && filteredProducts.length > 0 && (
-                                  <div className="absolute z-50 mt-1 w-96 max-h-60 overflow-auto rounded-md bg-gray-800 border border-gray-700 shadow-lg">
-                                    {filteredProducts.map((product) => (
-                                      <button
-                                        key={product.id}
-                                        className="w-full text-left px-4 py-2 hover:bg-gray-700 focus:bg-gray-700 focus:outline-none"
-                                        onClick={() => {
-                                          setDefaultProductSetId(product.id)
-                                          setProductSearchTerm(`${product.company} → ${product.line} → ${product.set}`)
-                                          setShowProductDropdown(false)
-                                        }}
-                                      >
-                                        <div className="text-sm text-gray-200">{product.company}</div>
-                                        <div className="text-xs text-gray-400">
-                                          {product.line} → {product.set}
-                                        </div>
-                                      </button>
-                                    ))}
-                                  </div>
+                                {showProductDropdown && filteredProducts.length > 0 && createPortal(
+                                  <div className="fixed inset-0 z-[99999]">
+                                    <div className="fixed inset-0" onClick={() => setShowProductDropdown(false)} />
+                                    <div 
+                                      className="fixed z-[99999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
+                                      style={{
+                                        top: `${productSetInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
+                                        left: `${productSetInputRef.current?.getBoundingClientRect().left ?? 0}px`,
+                                        width: `${(productSetInputRef.current?.offsetWidth ?? 0) * 2}px`,
+                                        maxHeight: '300px'
+                                      }}
+                                    >
+                                      <div className="flex flex-col">
+                                        {filteredProducts.map((product) => (
+                                          <button
+                                            key={product.id}
+                                            className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
+                                            onMouseDown={(e) => {
+                                              e.preventDefault()
+                                              setDefaultProductSetId(product.id)
+                                              setProductSearchTerm(`${product.company} - ${product.line} - ${product.set}`)
+                                              setShowProductDropdown(false)
+                                            }}
+                                          >
+                                            <div className="text-sm font-medium text-gray-200 truncate">{product.company} - {product.line}</div>
+                                            <div className="text-xs text-gray-400 truncate">{product.set}</div>
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>,
+                                  document.body
                                 )}
                                 {defaultProductSetId && (
                                   <button
@@ -917,33 +1244,38 @@ export default function MiniatureOverview() {
                                 ))}
                               </select>
 
-                              {/* Type */}
-                              <div className="relative">
-                                <UI.SearchInput
-                                  value={typeSearchTerm}
-                                  onChange={(e) => {
-                                    setTypeSearchTerm(e.target.value)
-                                    setShowTypeDropdown(true)
-                                    if (defaultTypeId) {
-                                      setDefaultTypeId(null)
-                                    }
-                                  }}
-                                  onFocus={() => setShowTypeDropdown(true)}
-                                  placeholder="Type..."
-                                  className="w-48"
-                                />
-                                {typeDropdownContent}
-                                {defaultTypeId && (
-                                  <button
-                                    onClick={() => {
-                                      setDefaultTypeId(null)
-                                      setTypeSearchTerm('')
-                                    }}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                                  >
-                                    <FaTimesCircle className="w-4 h-4" />
-                                  </button>
-                                )}
+                              {/* Type Inputs - Three Different Approaches */}
+                              <div className="flex gap-4">
+                                {/* Classic Approach */}
+                                <div className="relative group type-dropdown-container z-[99999]">
+                                  <div className="relative" ref={classicInputRef}>
+                                    <UI.SearchInput
+                                      value={typeSearchTermClassic}
+                                      onChange={(e) => {
+                                        setTypeSearchTermClassic(e.target.value)
+                                        setShowTypeDropdownClassic(true)
+                                        if (selectedTypeClassic) {
+                                          setSelectedTypeClassic(null)
+                                        }
+                                      }}
+                                      onFocus={() => setShowTypeDropdownClassic(true)}
+                                      placeholder="Type..."
+                                      className="w-48"
+                                    />
+                                    {typeDropdownClassic}
+                                    {selectedTypeClassic && (
+                                      <button
+                                        onClick={() => {
+                                          setSelectedTypeClassic(null)
+                                          setTypeSearchTermClassic('')
+                                        }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                      >
+                                        <FaTimesCircle className="w-4 h-4" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </motion.div>
