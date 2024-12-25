@@ -14,6 +14,7 @@ export interface Database {
           base_size_id: number
           product_set_id: number | null
           in_use: boolean | null
+          material_id: number | null
         }
         Insert: {
           id?: number
@@ -27,6 +28,7 @@ export interface Database {
           base_size_id: number
           product_set_id?: number | null
           in_use?: boolean | null
+          material_id?: number | null
         }
         Update: {
           id?: number
@@ -40,6 +42,27 @@ export interface Database {
           base_size_id?: number
           product_set_id?: number | null
           in_use?: boolean | null
+          material_id?: number | null
+        }
+      }
+      minis_materials: {
+        Row: {
+          id: number
+          material_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          material_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          material_name?: string
+          created_at?: string
+          updated_at?: string
         }
       }
       audit_logs: {

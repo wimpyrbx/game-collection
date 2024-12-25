@@ -31,6 +31,7 @@ interface SupabaseMini {
   painted_by_id: number
   base_size_id: number
   product_set_id: number | null
+  material_id: number | null
   in_use: string | null
   types: SupabaseMiniType[]
   painted_by: {
@@ -40,6 +41,10 @@ interface SupabaseMini {
   base_sizes: {
     id: number
     base_size_name: string
+  }
+  material?: {
+    id: number
+    name: string
   }
   product_sets?: {
     id: number
@@ -79,6 +84,7 @@ const transformMini = (item: SupabaseMini): Mini => ({
   painted_by_id: item.painted_by_id,
   base_size_id: item.base_size_id,
   product_set_id: item.product_set_id,
+  material_id: item.material_id,
   in_use: item.in_use,
   types: item.types?.map((t: SupabaseMiniType) => ({
     mini_id: t.mini_id,
@@ -97,6 +103,7 @@ const transformMini = (item: SupabaseMini): Mini => ({
   })) || [],
   painted_by: item.painted_by,
   base_sizes: item.base_sizes,
+  material: item.material,
   product_sets: item.product_sets,
   tags: item.tags?.map(t => ({
     tag: {
@@ -120,6 +127,7 @@ const MINIATURE_QUERY = `
   painted_by_id,
   base_size_id,
   product_set_id,
+  material_id,
   in_use,
   types:mini_to_types(
     mini_id,
@@ -143,6 +151,12 @@ const MINIATURE_QUERY = `
   base_sizes:base_size_id(
     id,
     base_size_name
+  ),
+  material:material_id(
+    id,
+    material_name,
+    created_at,
+    updated_at
   ),
   product_sets:product_set_id(
     id,

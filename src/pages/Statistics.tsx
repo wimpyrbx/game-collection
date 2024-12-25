@@ -20,7 +20,6 @@ interface CumulativeStats {
 interface Distribution {
   name: string
   value: number
-  fullTotal: number
 }
 
 
@@ -69,8 +68,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 // Custom pie tooltip with percentage
 const CustomPieTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
-    // Get the total from the full dataset in the payload
-    const total = payload[0].payload.fullTotal;
+    const total = payload.reduce((sum, entry) => sum + entry.value, 0);
     const percent = total ? (payload[0].value / total) * 100 : 0;
     return (
       <div className="bg-gray-900/95 border border-gray-600 rounded-lg p-3 shadow-lg">
@@ -226,11 +224,9 @@ export default function Statistics() {
 
       if (baseSizeError) throw baseSizeError
 
-      const baseSizeTotal = baseSizeData.reduce((sum, item) => sum + (item.minis as any[]).length, 0);
       setBaseSizeDistribution(baseSizeData.map(item => ({
         name: item.base_size_name,
-        value: (item.minis as any[]).length,
-        fullTotal: baseSizeTotal
+        value: (item.minis as any[]).length
       })).sort((a, b) => b.value - a.value))
 
       // Fetch painted by distribution
@@ -243,11 +239,9 @@ export default function Statistics() {
 
       if (paintedByError) throw paintedByError
 
-      const paintedByTotal = paintedByData.reduce((sum, item) => sum + (item.minis as any[]).length, 0);
       setPaintedByDistribution(paintedByData.map(item => ({
         name: item.painted_by_name,
-        value: (item.minis as any[]).length,
-        fullTotal: paintedByTotal
+        value: (item.minis as any[]).length
       })).sort((a, b) => b.value - a.value))
 
       // Fetch type distribution
@@ -260,11 +254,9 @@ export default function Statistics() {
 
       if (typeError) throw typeError
 
-      const typeTotal = typeData.reduce((sum, item) => sum + (item.mini_to_types as any[]).length, 0);
       setTypeDistribution(typeData.map(item => ({
         name: item.name,
-        value: (item.mini_to_types as any[]).length,
-        fullTotal: typeTotal
+        value: (item.mini_to_types as any[]).length
       })).sort((a, b) => b.value - a.value).slice(0, 10))
 
     } catch (error) {

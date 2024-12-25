@@ -9,6 +9,7 @@ export interface Mini {
   painted_by_id: number
   base_size_id: number
   product_set_id: number | null
+  material_id: number | null
   in_use: string | null
   image_path?: string
   types: Array<{
@@ -35,6 +36,10 @@ export interface Mini {
     id: number
     base_size_name: string
   }
+  material?: {
+    id: number
+    name: string
+  }
   product_sets?: {
     id: number
     name: string
@@ -53,6 +58,13 @@ export interface Mini {
       name: string
     }
   }>
+}
+
+export interface MiniMaterial {
+  id: number
+  material_name: string
+  created_at: string
+  updated_at: string
 }
 
 export interface MiniType {

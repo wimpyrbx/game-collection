@@ -875,9 +875,9 @@ export default function MiniatureOverview() {
                         className="text-gray-400 hover:text-gray-300 focus:outline-none"
                       >
                         {showPreDefinedFields ? (
-                          <span className="flex items-center gap-2"><FaMinusCircle className="w-4 h-4 text-orange-500 mr-2" /> Pre-defined</span>
+                          <span className="flex items-center gap-2"><FaMinusCircle className="w-4 h-4 text-orange-500" /></span>
                         ) : (
-                          <span className="flex items-center gap-2"><FaPlusCircle className="w-4 h-4 text-green-500 mr-2" /> Pre-defined</span>
+                          <span className="flex items-center gap-2"><FaPlusCircle className="w-4 h-4 text-green-500" /></span>
                         )}
                       </button>
                       <AnimatePresence>
@@ -895,9 +895,9 @@ export default function MiniatureOverview() {
                             }}
                             className="overflow-hidden origin-left"
                           >
-                            <div className="flex gap-2 py-1 px-1 whitespace-nowrap">
+                            <div className="flex gap-2 py-1 px-0 whitespace-nowrap">
                               {/* Product Set */}
-                              <div className="relative" ref={productSetInputRef}>
+                              <div className="relative text-xs" ref={productSetInputRef}>
                                 <UI.SearchInput
                                   value={productSearchTerm}
                                   onChange={(e) => {
@@ -909,7 +909,7 @@ export default function MiniatureOverview() {
                                   }}
                                   onFocus={() => setShowProductDropdown(true)}
                                   placeholder="Product Set..."
-                                  className="w-48"
+                                  className="w-32 text-xs"
                                 />
                                 {showProductDropdown && filteredProducts.length > 0 && createPortal(
                                   <div className="fixed inset-0 z-[99999]">
@@ -927,7 +927,7 @@ export default function MiniatureOverview() {
                                     {filteredProducts.map((product) => (
                                       <button
                                         key={product.id}
-                                            className="w-full text-left px-3 py-2 hover:bg-gray-700 text-sm"
+                                            className="w-full text-left px-3 py-2 hover:bg-gray-700 text-xs"
                                             onMouseDown={(e) => {
                                               e.preventDefault()
                                           setDefaultProductSetId(product.id)
@@ -935,7 +935,7 @@ export default function MiniatureOverview() {
                                           setShowProductDropdown(false)
                                         }}
                                       >
-                                            <div className="text-sm font-medium text-gray-200 truncate">{product.company} - {product.line}</div>
+                                            <div className="text-xs font-medium text-gray-200 truncate">{product.company} - {product.line}</div>
                                             <div className="text-xs text-gray-400 truncate">{product.set}</div>
                                       </button>
                                     ))}
@@ -963,7 +963,7 @@ export default function MiniatureOverview() {
                                   value={defaultLocation}
                                   onChange={(e) => setDefaultLocation(e.target.value)}
                                   placeholder="Location..."
-                                  className="w-32"
+                                  className="w-32 text-xs"
                                 />
                                 {defaultLocation && (
                                   <button
@@ -979,7 +979,7 @@ export default function MiniatureOverview() {
                               <select
                                 value={defaultBaseSizeId || ''}
                                 onChange={(e) => setDefaultBaseSizeId(e.target.value ? Number(e.target.value) : null)}
-                                className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                                className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
                               >
                                 {baseSizeOptions.map((size) => (
                                   <option key={size.id} value={size.id}>
@@ -992,11 +992,24 @@ export default function MiniatureOverview() {
                               <select
                                 value={defaultPaintedById || ''}
                                 onChange={(e) => setDefaultPaintedById(e.target.value ? Number(e.target.value) : null)}
-                                className="w-32 bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5"
+                                className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
                               >
                                 {paintedByOptions.map((painter) => (
                                   <option key={painter.id} value={painter.id}>
                                     {painter.painted_by_name.charAt(0).toUpperCase() + painter.painted_by_name.slice(1).toLowerCase()}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Material */}
+                              <select
+                                value={defaultMaterialId || ''}
+                                onChange={(e) => setDefaultMaterialId(e.target.value ? Number(e.target.value) : null)}
+                                className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
+                              >
+                                {materialOptions.map((material) => (
+                                  <option key={material.id} value={material.id}>
+                                    {material.material_name.charAt(0).toUpperCase() + material.material_name.slice(1).toLowerCase()}
                                   </option>
                                 ))}
                               </select>
@@ -1017,7 +1030,7 @@ export default function MiniatureOverview() {
                                       }}
                                       onFocus={() => setShowTypeDropdownClassic(true)}
                                   placeholder="Type..."
-                                  className="w-48"
+                                  className="w-32 text-xs"
                                 />
                                     {typeDropdownClassic}
                                     {selectedTypeClassic && (

@@ -34,13 +34,13 @@ interface MiniatureOverviewModalProps {
 
 interface SelectedType {
   id: number
-  name: string
   proxy_type: boolean
-  type?: {
+  name: string
+  type: {
     id: number
     name: string
-    categories?: Array<{
-      category?: {
+    categories: Array<{
+      category: {
         id: number
         name: string
       }
@@ -128,6 +128,7 @@ export function MiniatureOverviewModal({
     painted_by_id: 0,
     base_size_id: 0,
     product_set_id: null as number | null,
+    material_id: null as number | null,
     types: [] as { id: number, proxy_type: boolean }[],
     tags: [] as { id: number }[]
   })
@@ -213,6 +214,7 @@ export function MiniatureOverviewModal({
     paintedByOptions,
     baseSizeOptions,
     companies,
+    materials,
     miniTypes,
     getProductLinesByCompany,
     getProductSetsByProductLine
@@ -271,28 +273,23 @@ export function MiniatureOverviewModal({
   // Load mini data when editing
   useEffect(() => {
     if (miniData) {
-      // Handle types with proper type and category structure
-      const mappedTypes = miniData.types?.filter(t => t && t.type)?.map(t => ({
+      const mappedTypes = miniData.types?.map(t => ({
         id: t.type_id,
         proxy_type: t.proxy_type,
         name: t.type.name,
         type: {
           id: t.type.id,
           name: t.type.name,
-          categories: t.type.categories?.map(cat => ({
-            category: cat.category  // Keep the nested category structure
-          })) || []
+          categories: t.type.categories
         }
       })) || []
 
-      // Handle tags with proper tag structure
-      const mappedTags = miniData.tags?.filter(t => t && t.tag)?.map(t => ({
+      const mappedTags = miniData.tags?.map(t => ({
         id: t.tag.id,
         name: t.tag.name
       })) || []
 
-      setFormData(prev => ({
-        ...prev,
+      setFormData({
         name: miniData.name || '',
         description: miniData.description || '',
         location: miniData.location || '',
@@ -300,9 +297,10 @@ export function MiniatureOverviewModal({
         painted_by_id: miniData.painted_by_id || 0,
         base_size_id: miniData.base_size_id || 0,
         product_set_id: miniData.product_set_id || null,
+        material_id: miniData.material_id || null,
         types: mappedTypes,
         tags: mappedTags
-      }))
+      })
 
       setSelectedTypes(mappedTypes)
       setSelectedTags(mappedTags)
@@ -340,6 +338,7 @@ export function MiniatureOverviewModal({
         painted_by_id: 0,
         base_size_id: 0,
         product_set_id: null,
+        material_id: null,
         types: [],
         tags: []
       })
@@ -408,6 +407,7 @@ export function MiniatureOverviewModal({
         painted_by_id: formData.painted_by_id,
         base_size_id: formData.base_size_id,
         product_set_id: formData.product_set_id,
+        material_id: formData.material_id,
         types: selectedTypes.map(t => ({
           mini_id: miniData?.id || 0,
           type_id: t.id,
@@ -611,8 +611,8 @@ export function MiniatureOverviewModal({
       
       const newType: SelectedType = {
         id: typeId,
-        name: selectedType.name,
         proxy_type: !isFirstType,
+        name: selectedType.name,
         type: {
           id: selectedType.id,
           name: selectedType.name,
@@ -952,6 +952,7 @@ export function MiniatureOverviewModal({
         base_size_id: isOpen && !miniData ? mediumId : 0,
         painted_by_id: isOpen && !miniData ? prepaintedId : 0,
         product_set_id: null,
+        material_id: null,
         types: [],
         tags: []
       })
@@ -1136,6 +1137,22 @@ export function MiniatureOverviewModal({
       typeCategoryAdmin.loadData(0, 0)
     }
   }, [isOpen])
+
+  const handleReset = () => {
+    const prepaintedId = paintedByOptions.find(p => p.painted_by_name.toLowerCase() === 'prepainted')?.id || 0
+    setFormData({
+      name: '',
+      description: '',
+      location: '',
+      quantity: 1,
+      painted_by_id: isOpen && !miniData ? prepaintedId : 0,
+      base_size_id: 0,
+      product_set_id: null,
+      material_id: null,
+      types: [],
+      tags: []
+    })
+  }
 
   if (isOpen && !miniData) {
     return (
@@ -1372,69 +1389,102 @@ export function MiniatureOverviewModal({
               </div>
 
               {/* Location */}
-              <Input
-                value={formData.location}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, location: e.target.value }))
-                  if (validationErrors.location) {
-                    setValidationErrors(prev => ({ ...prev, location: undefined }))
-                  }
-                }}
-                placeholder="Location"
-                required
-                ref={locationInputRef}
-                error={validationErrors.location}
-              />
-
-              {/* Base Size */}
-              <select
-                value={formData.base_size_id}
-                onChange={(e) => {
-                  const value = parseInt(e.target.value)
-                  setFormData(prev => ({ ...prev, base_size_id: value }))
-                  if (validationErrors.base_size_id) {
-                    setValidationErrors(prev => ({ ...prev, base_size_id: undefined }))
-                  }
-                }}
-                required
-                ref={baseSizeSelectRef}
-                className={`h-10 w-full px-3 bg-gray-800 rounded border ${
-                  validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
-                } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
-              >
-                {baseSizeOptions.map(size => (
-                  <option key={size.id} value={size.id}>
-                    {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
-                  </option>
-                ))}
-              </select>
-
-              {/* Painted By Boxes */}
-              <div className="flex gap-2">
-                {paintedByOptions.map(painter => (
-                  <button
-                    key={painter.id}
-                    type="button"
-                    className={`p-3 rounded border capitalize ${
-                      formData.painted_by_id === painter.id
-                        ? 'border-green-600 bg-green-600/20'
-                        : validationErrors.painted_by_id 
-                          ? 'border-red-500'
-                          : 'border-gray-600 hover:border-gray-500'
-                    } transition-colors text-sm`}
-                    onClick={() => {
-                      setFormData(prev => ({ ...prev, painted_by_id: painter.id }))
-                      if (validationErrors.painted_by_id) {
-                        setValidationErrors(prev => ({ ...prev, painted_by_id: undefined }))
+              <div className="flex items-center gap-2">
+                <label className="text-gray-400 w-20">Location:</label>
+                <div className="flex-1">
+                  <Input
+                    value={formData.location}
+                    onChange={(e) => {
+                      setFormData(prev => ({ ...prev, location: e.target.value }))
+                      if (validationErrors.location) {
+                        setValidationErrors(prev => ({ ...prev, location: undefined }))
                       }
                     }}
-                  >
-                    {painter.painted_by_name.toLowerCase()}
-                  </button>
-                ))}
+                    placeholder="Location"
+                    required
+                    ref={locationInputRef}
+                    error={validationErrors.location}
+                  />
+                </div>
               </div>
 
-              
+              {/* Base Size */}
+              <div className="flex items-center gap-2">
+                <label className="text-gray-400 w-20">Base:</label>
+                <div className="flex-1">
+                  <select
+                    value={formData.base_size_id}
+                    onChange={(e) => {
+                      const value = parseInt(e.target.value)
+                      setFormData(prev => ({ ...prev, base_size_id: value }))
+                      if (validationErrors.base_size_id) {
+                        setValidationErrors(prev => ({ ...prev, base_size_id: undefined }))
+                      }
+                    }}
+                    required
+                    ref={baseSizeSelectRef}
+                    className={`h-10 w-full px-3 bg-gray-800 rounded border ${
+                      validationErrors.base_size_id ? 'border-red-500' : 'border-gray-700'
+                    } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none`}
+                  >
+                    {baseSizeOptions.map(size => (
+                      <option key={size.id} value={size.id}>
+                        {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Material Dropdown */}
+              <div className="flex items-center gap-2">
+                <label className="text-gray-400 w-20">Material:</label>
+                <div className="flex-1">
+                  <select
+                    value={formData.material_id || ''}
+                    onChange={(e) => {
+                      const value = e.target.value ? parseInt(e.target.value) : null
+                      setFormData(prev => ({ ...prev, material_id: value }))
+                    }}
+                    className="h-10 w-full px-3 bg-gray-800 rounded border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  >
+                    {materials.map(material => (
+                      <option key={material.id} value={material.id}>
+                        {material.material_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Painted By Boxes */}
+              <div className="flex items-center gap-2">
+                <label className="text-gray-400 w-20">Painted:</label>
+                <div className="flex gap-1 flex-1">
+                  {paintedByOptions.map(painter => (
+                    <button
+                      key={painter.id}
+                      type="button"
+                      className={`px-2 py-1 rounded border text-xs ${
+                        formData.painted_by_id === painter.id 
+                          ? 'border-green-600 bg-green-600/20'
+                          : validationErrors.painted_by_id 
+                            ? 'border-red-500'
+                            : 'border-gray-600 hover:border-gray-500'
+                      } transition-colors`}
+                      onClick={() => {
+                        setFormData(prev => ({ ...prev, painted_by_id: painter.id }))
+                        if (validationErrors.painted_by_id) {
+                          setValidationErrors(prev => ({ ...prev, painted_by_id: undefined }))
+                        }
+                      }}
+                    >
+                      {painter.painted_by_name.toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
             </div>
 
             {/* Right Column - Types, Tags, and moved fields */}

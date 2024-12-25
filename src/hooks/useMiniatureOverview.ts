@@ -60,6 +60,7 @@ const MINIATURE_QUERY = `
   updated_at,
   painted_by:painted_by_id(id, painted_by_name),
   base_size:base_size_id(id, base_size_name),
+  material:material_id(id, name),
   product_set:product_set_id(
     id,
     name,
@@ -91,6 +92,7 @@ interface ReferenceData {
   companies: Array<{ id: number; name: string }>
   productLines: Array<{ id: number; name: string; company_id: number }>
   productSets: Array<{ id: number; name: string; product_line_id: number }>
+  materials: Array<{ id: number; name: string }>
   miniTypes: Array<{
     id: number
     name: string
@@ -110,9 +112,11 @@ const transformData = (rawItem: any): Mini => ({
   painted_by_id: rawItem.painted_by.id,
   base_size_id: rawItem.base_size.id,
   product_set_id: rawItem.product_set?.id || null,
+  material_id: rawItem.material?.id || null,
   in_use: rawItem.in_use,
   painted_by: rawItem.painted_by,
   base_sizes: rawItem.base_size,
+  material: rawItem.material,
   product_sets: rawItem.product_set,
   types: rawItem.types.map((t: any) => ({
     mini_id: t.mini_id,

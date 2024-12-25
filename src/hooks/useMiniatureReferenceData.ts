@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabaseMonitor'
 
 interface PaintedBy {
@@ -33,7 +33,12 @@ interface Category {
   name: string
 }
 
-
+interface Material {
+  id: number
+  material_name: string
+  created_at: string
+  updated_at: string
+}
 
 interface MiniType {
   id: number
@@ -48,6 +53,7 @@ interface ReferenceDataStore {
   companies: Company[]
   productLines: ProductLine[]
   productSets: ProductSet[]
+  materials: Material[]
   miniTypes: MiniType[]
   loading: boolean
   error: string | null
@@ -60,6 +66,7 @@ let store: ReferenceDataStore = {
   companies: [],
   productLines: [],
   productSets: [],
+  materials: [],
   miniTypes: [],
   loading: true,
   error: null,
@@ -81,6 +88,7 @@ async function loadReferenceData() {
       { data: companiesData, error: companiesError },
       { data: productLinesData, error: productLinesError },
       { data: productSetsData, error: productSetsError },
+      { data: materialsData, error: materialsError },
       { data: types, error: typesError }
     ] = await Promise.all([
       supabase.from('painted_by').select('*').order('painted_by_name'),
@@ -88,6 +96,7 @@ async function loadReferenceData() {
       supabase.from('product_companies').select('*').order('name'),
       supabase.from('product_lines').select('*').order('name'),
       supabase.from('product_sets').select('*').order('name'),
+      supabase.from('minis_materials').select('*').order('material_name'),
       supabase.from('mini_types')
         .select(`
           id,
@@ -107,6 +116,7 @@ async function loadReferenceData() {
     if (companiesError) throw companiesError
     if (productLinesError) throw productLinesError
     if (productSetsError) throw productSetsError
+    if (materialsError) throw materialsError
     if (typesError) throw typesError
 
     const transformedTypes: MiniType[] = (types || []).map((type: any) => ({
@@ -127,6 +137,7 @@ async function loadReferenceData() {
       companies: companiesData || [],
       productLines: productLinesData || [],
       productSets: productSetsData || [],
+      materials: materialsData || [],
       miniTypes: transformedTypes,
       loading: false,
       error: null,
@@ -202,25 +213,7 @@ export function useMiniatureReferenceData() {
         {
           event: '*',
           schema: 'public',
-          table: 'product_companies'
-        },
-        () => loadData()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'product_lines'
-        },
-        () => loadData()
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'product_sets'
+          table: 'minis_materials'
         },
         () => loadData()
       )
@@ -231,16 +224,23 @@ export function useMiniatureReferenceData() {
     }
   }, [])
 
+  const getProductLinesByCompany = useCallback((companyId: number) => {
+    return state.productLines.filter(line => line.company_id === companyId)
+  }, [state.productLines])
+
+  const getProductSetsByProductLine = useCallback((productLineId: number) => {
+    return state.productSets.filter(set => set.product_line_id === productLineId)
+  }, [state.productSets])
+
   return {
     loading: state.loading,
     error: state.error,
     paintedByOptions: state.paintedByOptions,
     baseSizeOptions: state.baseSizeOptions,
     companies: state.companies,
+    materials: state.materials,
     miniTypes: state.miniTypes,
-    getProductLinesByCompany: (companyId: number) => 
-      state.productLines.filter(pl => pl.company_id === companyId),
-    getProductSetsByProductLine: (productLineId: number) =>
-      state.productSets.filter(ps => ps.product_line_id === productLineId)
+    getProductLinesByCompany,
+    getProductSetsByProductLine
   }
 } 

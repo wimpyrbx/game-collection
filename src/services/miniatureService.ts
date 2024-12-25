@@ -18,6 +18,7 @@ interface MiniatureData {
   painted_by_id: number
   base_size_id: number
   product_set_id: number | null
+  material_id: number | null
   types?: MiniatureType[]
   tags?: MiniatureTag[]
 }
@@ -32,7 +33,8 @@ export async function createMiniature(data: Partial<MiniatureData>) {
       quantity: data.quantity,
       painted_by_id: data.painted_by_id,
       base_size_id: data.base_size_id,
-      product_set_id: data.product_set_id
+      product_set_id: data.product_set_id,
+      material_id: data.material_id
     }
 
     const { data: newMini, error: miniError } = await supabase
@@ -89,7 +91,8 @@ export async function updateMiniature(miniId: number, data: Partial<MiniatureDat
       quantity: data.quantity,
       painted_by_id: data.painted_by_id,
       base_size_id: data.base_size_id,
-      product_set_id: data.product_set_id
+      product_set_id: data.product_set_id,
+      material_id: data.material_id
     }
 
     const { error: miniError } = await supabase
