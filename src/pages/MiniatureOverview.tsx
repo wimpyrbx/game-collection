@@ -43,6 +43,9 @@ export default function MiniatureOverview() {
   const initialLoadRef = useRef(true)
   const { user } = useAuth()
   const typeCategoryAdmin = useTypeCategoryAdmin()
+  const referenceData = useMiniatureReferenceData();
+  const materialOptions = referenceData.materials || [];
+  const [defaultMaterialId, setDefaultMaterialId] = useState<number | null>(null);
 
   // Add refs for dropdown positioning
   const classicInputRef = useRef<HTMLDivElement>(null)
@@ -590,6 +593,7 @@ export default function MiniatureOverview() {
       painted_by_id: defaultPaintedById || 0,
       base_size_id: defaultBaseSizeId || 0,
       product_set_id: defaultProductSetId || null,
+      material_id: defaultMaterialId || null,
       types: defaultType ? [{
         mini_id: 0, // This will be set when the miniature is created
         type_id: defaultType.id,
@@ -770,6 +774,15 @@ export default function MiniatureOverview() {
     calculateTotalQuantity();
   }, [minis]);
 
+  useEffect(() => {
+    if (materialOptions.length > 0) {
+      const plasticMaterial = materialOptions.find(m => m.material_name.toLowerCase() === 'plastic');
+      if (plasticMaterial && !defaultMaterialId) {
+        setDefaultMaterialId(plasticMaterial.id);
+      }
+    }
+  }, [materialOptions, defaultMaterialId]);
+
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
     return (
@@ -865,6 +878,12 @@ export default function MiniatureOverview() {
                               p.painted_by_name.toLowerCase() === 'prepainted'
                             )?.id || null;
                             setDefaultPaintedById(prepaintedId);
+
+                            // Reset material to "plastic"
+                            const plasticId = materialOptions.find(m => 
+                              m.material_name.toLowerCase() === 'plastic'
+                            )?.id || null;
+                            setDefaultMaterialId(plasticId);
                             
                             // Reset type
                             setDefaultTypeId(null);
@@ -1007,6 +1026,7 @@ export default function MiniatureOverview() {
                                 onChange={(e) => setDefaultMaterialId(e.target.value ? Number(e.target.value) : null)}
                                 className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
                               >
+                                <option value="">Material...</option>
                                 {materialOptions.map((material) => (
                                   <option key={material.id} value={material.id}>
                                     {material.material_name.charAt(0).toUpperCase() + material.material_name.slice(1).toLowerCase()}

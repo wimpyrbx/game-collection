@@ -96,7 +96,9 @@ async function loadReferenceData() {
       supabase.from('product_companies').select('*').order('name'),
       supabase.from('product_lines').select('*').order('name'),
       supabase.from('product_sets').select('*').order('name'),
-      supabase.from('minis_materials').select('*').order('material_name'),
+      supabase.from('minis_materials')
+        .select('id, material_name, created_at, updated_at')
+        .order('material_name'),
       supabase.from('mini_types')
         .select(`
           id,

@@ -60,11 +60,11 @@ export interface Mini {
   }>
 }
 
-export interface MiniMaterial {
-  id: number
-  material_name: string
-  created_at: string
-  updated_at: string
+export interface Material {
+  id: number;
+  material_name: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface MiniType {
