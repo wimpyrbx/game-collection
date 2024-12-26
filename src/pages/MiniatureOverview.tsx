@@ -312,7 +312,7 @@ export default function MiniatureOverview() {
             src={`${getMiniImagePath(mini.id ?? 0, 'thumb')}?t=${imageTimestamp}`}
             alt={mini.name}
             loading="lazy"
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover object-[85%_20%] transition-transform duration-500 scale-120 ease-in-out group-hover:scale-150 opacity-60 group-hover:opacity-100"
             onError={(e) => {
               e.currentTarget.onerror = null
               e.currentTarget.style.display = 'none'
@@ -1200,7 +1200,7 @@ export default function MiniatureOverview() {
                             <img
                               src={originalPath}
                               alt={mini.name}
-                              className="w-full h-full object-cover object-[center_25%] transition-transform duration-300 ease-in-out group-hover:scale-110 opacity-80 group-hover:opacity-90"
+                              className="w-full h-full object-cover object-[85%_20%] transition-transform duration-500 scale-120 ease-in-out group-hover:scale-150 group-hover:translate-x-5 opacity-60 group-hover:opacity-100"
                               onError={(e) => {
                                 e.currentTarget.onerror = null
                                 e.currentTarget.style.display = 'none'
@@ -1219,16 +1219,14 @@ export default function MiniatureOverview() {
                           {/* Content Overlay */}
                           <div className="absolute inset-0 p-3 m-0 flex flex-col min-h-0">
                             {/* Top Row - Fixed height */}
-                            <div className="flex-none flex justify-between items-start gap-2">
-                              <div className="flex flex-col gap-1.5 max-w-[70%]">
+                            <div className="flex-none relative">
+                              <div className="flex flex-col gap-1.5 max-w-[90%]">
                                 <h3 className="font-bold text-gray-100 text-base leading-tight line-clamp-2">
                                   {mini.name}
                                 </h3>
-
                               </div>
                               {quantity > 1 ? (
-                                <div className="flex-none bg-blue-700/80 backdrop-blur-sm px-2 py-0.5 pb-1 rounded-full text-md text-gray-100 border border-blue-700/50">
-                                  {/* QTY: {quantity} if > 1 */}
+                                <div className="absolute top-0 right-0 flex-none bg-blue-700/80 backdrop-blur-sm px-2 py-0.5 pb-1 rounded-full text-md text-gray-100 border border-blue-700/50">
                                   {quantity}
                                 </div>
                               ) : null}
