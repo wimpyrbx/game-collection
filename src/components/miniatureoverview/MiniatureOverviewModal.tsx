@@ -365,14 +365,18 @@ export function MiniatureOverviewModal({
       const mediumId = baseSizeOptions.find(b => 
         b.base_size_name.toLowerCase() === 'medium'
       )?.id || 0
+      const plasticId = materials.find(m =>
+        m.material_name.toLowerCase() === 'plastic'
+      )?.id || null
 
       setFormData(prev => ({
         ...prev,
         painted_by_id: prepaintedId,
-        base_size_id: mediumId
+        base_size_id: mediumId,
+        material_id: plasticId
       }))
     }
-  }, [paintedByOptions, baseSizeOptions, miniData, isOpen])
+  }, [paintedByOptions, baseSizeOptions, materials, miniData, isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -1137,22 +1141,6 @@ export function MiniatureOverviewModal({
       typeCategoryAdmin.loadData(0, 0)
     }
   }, [isOpen])
-
-  const handleReset = () => {
-    const prepaintedId = paintedByOptions.find(p => p.painted_by_name.toLowerCase() === 'prepainted')?.id || 0
-    setFormData({
-      name: '',
-      description: '',
-      location: '',
-      quantity: 1,
-      painted_by_id: isOpen && !miniData ? prepaintedId : 0,
-      base_size_id: 0,
-      product_set_id: null,
-      material_id: null,
-      types: [],
-      tags: []
-    })
-  }
 
   if (isOpen && !miniData) {
     return (

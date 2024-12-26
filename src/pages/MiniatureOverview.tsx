@@ -853,7 +853,7 @@ export default function MiniatureOverview() {
                 <div className="flex flex-col gap-4 h-[50px] text-justify justify-center">
                 <div className="flex items-center gap-4">
                     {/* Pre-defined fields for new miniature */}
-                    <div className="flex items-center gap-4 bg-gray-800/50 p-3 rounded-lg border border-gray-700">
+                    <div className="flex items-center gap-4 bg-gray-800/50 p-2 pl-5 pr-5 rounded-lg border border-gray-700">Fields
                       <button
                         onClick={() => {
                           setShowPreDefinedFields(!showPreDefinedFields);
@@ -1026,7 +1026,6 @@ export default function MiniatureOverview() {
                                 onChange={(e) => setDefaultMaterialId(e.target.value ? Number(e.target.value) : null)}
                                 className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
                               >
-                                <option value="">Material...</option>
                                 {materialOptions.map((material) => (
                                   <option key={material.id} value={material.id}>
                                     {material.material_name.charAt(0).toUpperCase() + material.material_name.slice(1).toLowerCase()}
