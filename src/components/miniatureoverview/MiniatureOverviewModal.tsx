@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { Input } from '../ui/Input'
 import * as UI from '../ui'
-import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaTrashAlt } from 'react-icons/fa'
+import { FaDiceD6, FaTimesCircle, FaDiceD20, FaTrash, FaExclamationTriangle, FaTrashAlt, FaExpand } from 'react-icons/fa'
 import { HiOutlineArrowSmallLeft, HiOutlineArrowSmallRight } from 'react-icons/hi2'
 import type { Mini, MiniType } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
@@ -1142,6 +1142,35 @@ export function MiniatureOverviewModal({
     }
   }, [isOpen])
 
+  // Add handleDeleteImage function
+  const handleDeleteImage = async () => {
+    try {
+      if (miniData?.id) {
+        const oldImageUrl = getMiniImagePath(miniData.id, 'original')
+        await deleteImage(miniData.id)
+        setImageExists(false)
+        if (onImageUpload) {
+          onImageUpload()
+        }
+        showSuccess('Image deleted successfully')
+        
+        // Log the image deletion if there's a user
+        if (user?.id) {
+          await AuditService.logImageOperation(
+            user.id,
+            miniData.id,
+            'IMAGE_DELETE',
+            undefined,
+            oldImageUrl
+          )
+        }
+      }
+    } catch (error) {
+      console.error('Error deleting image:', error)
+      showError('Failed to delete image')
+    }
+  }
+
   if (isOpen && !miniData) {
     return (
       <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
@@ -1293,41 +1322,32 @@ export function MiniatureOverviewModal({
                     >
                       {/* Add delete button */}
                       {miniData?.id && imageExists && !previewUrl && (
-                        <button
-                          type="button"
-                          onClick={async (e) => {
-                            e.stopPropagation()
-                            try {
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteImage();
+                            }}
+                            className="absolute top-2 right-2 p-2 bg-red-900/80 hover:bg-red-800 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
+                            title="Delete image"
+                          >
+                            <FaTrashAlt className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
                               if (miniData.id) {
-                                const oldImageUrl = getMiniImagePath(miniData.id, 'original')
-                                await deleteImage(miniData.id)
-                                setImageExists(false)
-                                if (onImageUpload) {
-                                  onImageUpload()
-                                }
-                                showSuccess('Image deleted successfully')
-                                
-                                // Log the image deletion if there's a user
-                                if (user?.id) {
-                                  await AuditService.logImageOperation(
-                                    user.id,
-                                    miniData.id,
-                                    'IMAGE_DELETE',
-                                    undefined,
-                                    oldImageUrl
-                                  )
-                                }
+                                window.open(getMiniImagePath(miniData.id, 'original'), '_blank');
                               }
-                            } catch (error) {
-                              console.error('Error deleting image:', error)
-                              showError('Failed to delete image')
-                            }
-                          }}
-                          className="absolute top-2 right-2 p-2 bg-red-900/80 hover:bg-red-800 rounded-full text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10"
-                          title="Delete image"
-                        >
-                          <FaTrashAlt className="w-4 h-4" />
-                        </button>
+                            }}
+                            className="absolute top-2 left-2 p-2 bg-black/50 hover:bg-black/70 rounded-full text-white/90 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200 backdrop-blur-sm z-10"
+                            title="View full size"
+                          >
+                            <FaExpand className="w-4 h-4" />
+                          </button>
+                        </>
                       )}
                       <motion.img
                         initial={{ opacity: 0, scale: 0.3, y: 50 }}
