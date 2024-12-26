@@ -1217,15 +1217,66 @@ export default function MiniatureOverview() {
                           </div>
 
                           {/* Content Overlay */}
-                          <div className="absolute inset-0 p-3 flex flex-col min-h-0">
+                          <div className="absolute inset-0 p-3 m-0 flex flex-col min-h-0">
                             {/* Top Row - Fixed height */}
                             <div className="flex-none flex justify-between items-start gap-2">
                               <div className="flex flex-col gap-1.5 max-w-[70%]">
                                 <h3 className="font-bold text-gray-100 text-base leading-tight line-clamp-2">
                                   {mini.name}
                                 </h3>
-                                {mini.types && (
-                                  <div className="flex items-center">
+
+                              </div>
+                              {quantity > 1 ? (
+                                <div className="flex-none bg-blue-700/80 backdrop-blur-sm px-2 py-0.5 pb-1 rounded-full text-md text-gray-100 border border-blue-700/50">
+                                  {/* QTY: {quantity} if > 1 */}
+                                  {quantity}
+                                </div>
+                              ) : null}
+                            </div>
+
+                            {/* Middle Content - Scrollable if needed */}
+                            <div className="flex-1 min-h-0 mt-1 mb-2">
+                              {mini.product_sets && (
+                                <>
+                                  {company && (
+                                    <div className="flex flex-col items-start gap-1 mt-0 mb-1.5">
+                                      <img
+                                        src={getCompanyLogoPath(company)}
+                                        alt={company}
+                                        className="h-6 w-auto object-contain opacity-90 mb-0.5"
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = 'none';
+                                        }}
+                                      />
+                                      <p className="text-blue-400 text-xs m-0 p-0">{company}
+                                      {productLine && productSet && (
+                                        productLine.toLowerCase() === productSet.toLowerCase() ? (
+                                          <span className="block text-gray-300 text-xs truncate">
+                                            {productSet}
+                                          </span>
+                                        ) : (
+                                          <>
+                                            <span className="block text-gray-300 text-xs truncate">
+                                              {productLine}
+                                            </span>
+                                            <span className="block text-gray-300 text-xs truncate">
+                                              {productSet}
+                                            </span>
+                                          </>
+                                        )
+                                      )}
+                                      </p>
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+
+                            {/* Bottom Row - Fixed height */}
+                            <div className="flex-none flex justify-between items-end mt-1.5">
+                              <div className="space-y-0.5">
+                              {mini.types && (
+                                  <div className="flex items-center mb-2">
                                     <ShowItems 
                                       items={[
                                         // Main type first
@@ -1263,53 +1314,7 @@ export default function MiniatureOverview() {
                                       emptyMessage=""
                                     />
                                   </div>
-                                )}
-                              </div>
-                              <div className="flex-none bg-blue-700/80 backdrop-blur-sm px-2 py-0.5 pb-1 rounded-full text-xs text-gray-100 border border-blue-700/50">
-                                QTY: {quantity}
-                              </div>
-                            </div>
-
-                            {/* Middle Content - Scrollable if needed */}
-                            <div className="flex-1 min-h-0 mt-2">
-                              {mini.product_sets && (
-                                <>
-                                  {company && (
-                                    <div className="flex flex-col items-start gap-1 mb-1.5">
-                                      <img
-                                        src={getCompanyLogoPath(company)}
-                                        alt={company}
-                                        className="h-5 w-auto object-contain opacity-90 mb-0.5"
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                        }}
-                                      />
-                                      <p className="text-blue-400 text-sm">{company}</p>
-                                    </div>
-                                  )}
-                                  {productLine && productSet && (
-                                    productLine.toLowerCase() === productSet.toLowerCase() ? (
-                                      <p className="text-gray-300 text-xs truncate">
-                                        {productSet}
-                                      </p>
-                                    ) : (
-                                      <>
-                                        <p className="text-gray-300 text-xs truncate">
-                                          {productLine}
-                                        </p>
-                                        <p className="text-gray-300 text-xs truncate">
-                                          {productSet}
-                                        </p>
-                                      </>
-                                    )
-                                  )}
-                                </>
-                              )}
-                            </div>
-
-                            {/* Bottom Row - Fixed height */}
-                            <div className="flex-none flex justify-between items-end mt-1.5">
-                              <div className="space-y-0.5">
+                                )}                                
                                 <p className="text-xs text-gray-400">
                                   <span className="text-gray-500">Base:</span> {baseSize.charAt(0).toUpperCase() + baseSize.slice(1).toLowerCase()}
                                 </p>
