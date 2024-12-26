@@ -38,7 +38,7 @@ export interface Mini {
   }
   material?: {
     id: number
-    name: string
+    material_name: string
   }
   product_sets?: {
     id: number

@@ -44,7 +44,7 @@ interface SupabaseMini {
   }
   material?: {
     id: number
-    name: string
+    material_name: string
   }
   product_sets?: {
     id: number
@@ -103,7 +103,10 @@ const transformMini = (item: SupabaseMini): Mini => ({
   })) || [],
   painted_by: item.painted_by,
   base_sizes: item.base_sizes,
-  material: item.material,
+  material: item.material ? {
+    id: item.material.id,
+    material_name: item.material.material_name
+  } : undefined,
   product_sets: item.product_sets,
   tags: item.tags?.map(t => ({
     tag: {

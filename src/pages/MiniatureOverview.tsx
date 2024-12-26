@@ -1265,7 +1265,7 @@ export default function MiniatureOverview() {
                                   </div>
                                 )}
                               </div>
-                              <div className="flex-none bg-blue-900/80 backdrop-blur-sm px-2 py-0.5 rounded-full text-xs text-gray-100 border border-blue-700/50">
+                              <div className="flex-none bg-blue-700/80 backdrop-blur-sm px-2 py-0.5 pb-1 rounded-full text-xs text-gray-100 border border-blue-700/50">
                                 QTY: {quantity}
                               </div>
                             </div>
@@ -1313,6 +1313,9 @@ export default function MiniatureOverview() {
                                 <p className="text-xs text-gray-400">
                                   <span className="text-gray-500">Base:</span> {baseSize.charAt(0).toUpperCase() + baseSize.slice(1).toLowerCase()}
                                 </p>
+                                <p className="text-xs text-gray-400">
+                                  <span className="text-gray-500">Material:</span> {mini.material?.material_name || 'No Material'}
+                                </p>  
                                 <p className="text-xs text-gray-400">
                                   <span className="text-gray-500">By:</span> {paintedBy.charAt(0).toUpperCase() + paintedBy.slice(1).toLowerCase()}
                                 </p>
