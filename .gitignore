@@ -25,3 +25,7 @@ dist-ssr
 
 # Manual
 .env
+
+# Backups
+python/dist_*
+python/backup_*

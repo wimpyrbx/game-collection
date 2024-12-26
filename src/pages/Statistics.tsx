@@ -3,8 +3,6 @@ import { supabase } from '../lib/supabase'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts'
 import { format, subDays, parseISO, addDays } from 'date-fns'
 
-// Removed unused type definition: Tables
-
 interface DailyStats {
   date: string
   miniatures_added: number
@@ -22,6 +20,10 @@ interface Distribution {
   value: number
 }
 
+interface HourlyStats {
+  hour: number
+  count: number
+}
 
 interface CustomTooltipProps {
   active?: boolean
@@ -44,17 +46,30 @@ const COLORS = [
   '#6A6F8C'  // Darker lavender
 ]
 
-// Removed unused variable tooltipStyle
-
 // Add custom label style for pie charts
 
 // Custom tooltip component
-const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
+const CustomTooltip = ({ active, payload, label, labelFormatter }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
+    const formattedTime = labelFormatter ? labelFormatter(label!) : label
+
+    // Handle hourly activity chart tooltip
+    if (payload[0].payload && typeof payload[0].payload.hour === 'number') {
+      return (
+        <div className="bg-gray-900/95 border border-gray-600 rounded-lg p-3 shadow-lg">
+          <p className="text-gray-200 text-sm mb-2 font-medium">{formattedTime}</p>
+          <p className="text-white text-sm mb-2">
+            <span style={{ color: payload[0].color }}>Entries:</span> {payload[0].value}
+          </p>
+        </div>
+      );
+    }
+
+    // Handle other charts
     return (
       <div className="bg-gray-900/95 border border-gray-600 rounded-lg p-3 shadow-lg">
         <p className="text-gray-200 text-sm mb-1">{label}</p>
-        {payload.map((pld, index) => (
+        {payload.map((pld: { color: string; name: string; value: number }, index: number) => (
           <p key={index} className="text-white text-sm">
             <span style={{ color: pld.color }}>{pld.name}</span>: {pld.value}
           </p>
@@ -68,7 +83,7 @@ const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
 // Custom pie tooltip with percentage
 const CustomPieTooltip = ({ active, payload }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
-    const total = payload.reduce((sum, entry) => sum + entry.value, 0);
+    const total = payload.reduce((sum: number, entry: { value: number }) => sum + entry.value, 0);
     const percent = total ? (payload[0].value / total) * 100 : 0;
     return (
       <div className="bg-gray-900/95 border border-gray-600 rounded-lg p-3 shadow-lg">
@@ -100,12 +115,13 @@ const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, nam
   );
 };
 
-export default function Statistics() {
+function Statistics() {
   const [dailyStats, setDailyStats] = useState<DailyStats[]>([])
   const [cumulativeStats, setCumulativeStats] = useState<CumulativeStats[]>([])
   const [baseSizeDistribution, setBaseSizeDistribution] = useState<Distribution[]>([])
   const [paintedByDistribution, setPaintedByDistribution] = useState<Distribution[]>([])
   const [typeDistribution, setTypeDistribution] = useState<Distribution[]>([])
+  const [processedHourlyStats, setProcessedHourlyStats] = useState<HourlyStats[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -259,6 +275,36 @@ export default function Statistics() {
         value: (item.mini_to_types as any[]).length
       })).sort((a, b) => b.value - a.value).slice(0, 10))
 
+      // Fetch hourly audit log distribution
+      const { data: hourlyData, error: hourlyError } = await supabase
+        .from('audit_logs')
+        .select('created_at')
+
+      if (hourlyError) throw hourlyError
+
+      // Process hourly stats
+      const hourlyMap = new Map<number, number>()
+      // Initialize all hours with 0
+      for (let i = 0; i < 24; i++) {
+        hourlyMap.set(i, 0)
+      }
+
+      // Count logs by hour
+      hourlyData.forEach(row => {
+        const hour = new Date(row.created_at).getHours()
+        hourlyMap.set(hour, (hourlyMap.get(hour) || 0) + 1)
+      })
+
+      // Convert map to array and sort by hour
+      const processedStats = Array.from(hourlyMap.entries())
+        .map(([hour, count]) => ({
+          hour,
+          count
+        }))
+        .sort((a, b) => a.hour - b.hour)
+
+      setProcessedHourlyStats(processedStats)
+
     } catch (error) {
       console.error('Error fetching statistics:', error)
     } finally {
@@ -356,6 +402,36 @@ export default function Statistics() {
         </div>
       </div>
 
+      {/* Hourly Activity Chart */}
+      <div className="mb-8">
+        <div className="bg-gray-800/50 p-4 rounded-lg border border-gray-700">
+          <h2 className="text-xl font-semibold mb-4 text-cyan-100">Log Entries by Hour</h2>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={processedHourlyStats} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" />
+                <XAxis 
+                  dataKey="hour" 
+                  stroke="#94A3B8"
+                  tickFormatter={(hour) => `${hour.toString().padStart(2, '0')}:00`}
+                />
+                <YAxis stroke="#94A3B8" />
+                <Tooltip 
+                  content={<CustomTooltip />}
+                  labelFormatter={(hour) => `${hour.toString().padStart(2, '0')}:00 - ${(hour + 1).toString().padStart(2, '0')}:00`}
+                />
+                <Bar
+                  dataKey="count"
+                  name="Log Entries"
+                  fill="#0F766E"
+                  radius={[4, 4, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
       {/* Distribution Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Base Size Distribution */}
@@ -447,4 +523,6 @@ export default function Statistics() {
       </div>
     </div>
   )
-} 
+}
+
+export default Statistics; 
