@@ -91,7 +91,29 @@ async function loadReferenceData() {
       { data: materialsData, error: materialsError },
       { data: types, error: typesError }
     ] = await Promise.all([
-      supabase.from('painted_by').select('*').order('painted_by_name'),
+      supabase.from('painted_by')
+        .select('*')
+        .order('painted_by_name', { ascending: true, nullsFirst: false })
+        .then(({ data, error }) => {
+          // Custom sort order for painted by options
+          if (data) {
+            data.sort((a, b) => {
+              const order: Record<string, number> = {
+                'self': 1,
+                'prepainted': 2,
+                'touchup': 3,
+                'other': 4
+              };
+              const aOrder = order[a.painted_by_name.toLowerCase()] || 999;
+              const bOrder = order[b.painted_by_name.toLowerCase()] || 999;
+              if (aOrder === bOrder) {
+                return a.painted_by_name.localeCompare(b.painted_by_name);
+              }
+              return aOrder - bOrder;
+            });
+          }
+          return { data, error };
+        }),
       supabase.from('base_sizes').select('*').order('base_size_name'),
       supabase.from('product_companies').select('*').order('name'),
       supabase.from('product_lines').select('*').order('name'),
