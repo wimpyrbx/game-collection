@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FaQuestionCircle } from 'react-icons/fa';
+import { createPortal } from 'react-dom';
 
 export type TogglePlacement = 'start' | 'end' | 'right' | 'top';
 
@@ -81,7 +82,19 @@ export function ShowItems({
 }: ShowItemsProps) {
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const [showAll, setShowAll] = useState(false);
-  
+  const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
+  const tooltipTriggerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isTooltipVisible && tooltipTriggerRef.current) {
+      const rect = tooltipTriggerRef.current.getBoundingClientRect();
+      setTooltipPosition({
+        x: rect.right + 8, // Add 8px gap
+        y: rect.top - 4 // Subtract 4px to align better
+      });
+    }
+  }, [isTooltipVisible]);
+
   const renderItem = (item: any, index: number) => {
     const itemText = typeof item === 'string' ? item : item.label || item.name || ''
     const itemId = typeof item === 'string' ? item : item.id
@@ -164,19 +177,24 @@ export function ShowItems({
   const tooltipContent = showTooltip && !showAll && items.length > maxVisible && (
     <div className="relative inline-block">
       <div
+        ref={tooltipTriggerRef}
         className="text-gray-400 hover:text-gray-300 cursor-help"
         onMouseEnter={() => setIsTooltipVisible(true)}
         onMouseLeave={() => setIsTooltipVisible(false)}
       >
         <FaQuestionCircle className="w-4 h-5 pt-1 text-yellow-500" />
       </div>
-      {isTooltipVisible && (
+      {isTooltipVisible && createPortal(
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0, scale: 0.95 }}
           transition={{ duration: 0.15 }}
-          className="absolute z-[99999] left-full top-1/2 -translate-y-1/2 ml-2 bg-gray-800 rounded shadow-xl shadow-black/50 border border-gray-700 w-[200px]"
+          className="fixed z-[99999] bg-gray-800 rounded shadow-xl shadow-black/50 border border-gray-700 w-[200px]"
+          style={{
+            left: `${tooltipPosition.x}px`,
+            top: `${tooltipPosition.y}px`,
+          }}
         >
           <div className="text-xs">
             <div className="font-medium px-3 py-2.5 border-b border-gray-700 bg-gray-900/80 text-gray-300">
@@ -204,7 +222,8 @@ export function ShowItems({
               })}
             </div>
           </div>
-        </motion.div>
+        </motion.div>,
+        document.body
       )}
     </div>
   );
