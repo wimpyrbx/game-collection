@@ -1621,7 +1621,7 @@ export function MiniatureOverviewModal({
                       {typeSearchTerm ? `${filteredTypes.length} matches` : `${typeCategoryAdmin.miniTypes.length} total types`}
                     </span>
                   </div>
-                  <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
+                  <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[100px]">
                     <div className="space-y-2">
                       <div className="relative">
                         <UI.SearchInput
@@ -1633,7 +1633,7 @@ export function MiniatureOverviewModal({
                         />
                         {filteredTypes.length > 0 && (
                           <div 
-                            className="absolute max-h-48 w-full overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999] mt-1"
+                            className="absolute max-h-16 w-full overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999] mt-1"
                           >
                             {filteredTypes.map(type => (
                               <button
@@ -1715,7 +1715,7 @@ export function MiniatureOverviewModal({
                   <div className="bg-gray-900/80 px-4 py-3 border-b border-gray-700">
                     <h3 className="font-medium text-gray-200">Tags</h3>
                   </div>
-                  <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[300px]">
+                  <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[150px]">
                     <div className="relative" ref={tagSearchContainerRef}>
                       <TagInput
                         value={tagInput}

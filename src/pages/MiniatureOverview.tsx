@@ -815,17 +815,17 @@ export default function MiniatureOverview() {
         <PageHeaderBigNumber
             icon={FaDiceD6}
           number={totalMinis || 0}
-          text="Total Miniatures"
+          text="Unique Miniatures"
           />
           <PageHeaderBigNumber
           icon={FaDiceD6}
             number={totalQuantity}
-          text="Total Quantity"
+          text="Total Miniatures"
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
           number={stats.inUseCount || 0}
-          text={`In Use (${stats.inUsePercentage}%)`}
+          text={`In Use`}
           />
       </PageHeader>
 
