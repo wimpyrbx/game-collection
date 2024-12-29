@@ -994,7 +994,7 @@ export function MiniatureOverviewModal({
       setDropdownStyle({
         width: rect.width,
         left: rect.left,
-        top: rect.bottom + 4 // 4px gap
+        top: (searchContainerRef.current?.getBoundingClientRect()?.bottom ?? 0) + 4,
       });
     }
 
@@ -1639,7 +1639,7 @@ export function MiniatureOverviewModal({
                               maxHeight: '400px',
                               width: searchContainerRef.current?.getBoundingClientRect().width,
                               left: searchContainerRef.current?.getBoundingClientRect().left,
-                              top: searchContainerRef.current?.getBoundingClientRect().bottom + 4,
+                              top: (searchContainerRef.current?.getBoundingClientRect()?.bottom ?? 0) + 4,
                             }}
                           >
                             {filteredTypes.map(type => (

@@ -671,8 +671,9 @@ export default function MiniatureOverview() {
 
       // If we just added a new miniature, find its position in the sorted list
       if (!selectedMini?.id && miniatureData?.name && allMinis) {
+        const miniatureName = miniatureData.name.toLowerCase();
         const miniatureIndex = allMinis.findIndex(mini => 
-          mini.name.toLowerCase() >= miniatureData.name.toLowerCase()
+          mini.name.toLowerCase() >= miniatureName
         );
         
         // Calculate which page this index falls on

@@ -468,7 +468,10 @@ export function useTypeCategoryAdmin() {
       return { error: error.message }
     }
 
+    // Just invalidate the cache but don't update UI state
     invalidateCache()
+    await cache.loadData()
+    
     return { error: null }
   }
 
@@ -573,10 +576,8 @@ export function useTypeCategoryAdmin() {
     // Update the selected categories immediately
     setSelectedTypeCategories(categoryIds)
     
-    // Reload cache and update all states
-    const cacheData = await cache.loadData()
-    setCategories(cacheData.categories)
-    setMiniTypes(cacheData.types.slice(0, 10)) // Refresh first page of types
+    // Reload cache but don't update the UI state
+    await cache.loadData()
     
     return { error: null }
   }
