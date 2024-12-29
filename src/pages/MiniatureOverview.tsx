@@ -661,19 +661,25 @@ export default function MiniatureOverview() {
       invalidateCache();
       
       // Fetch fresh data including new total count
-      const { data: totalResponse } = await supabase.from('minis').select('id');
-      const totalCount = totalResponse?.length || 0;
-      const totalPages = Math.ceil(totalCount / itemsPerPage);
+      const { data: allMinis } = await supabase
+        .from('minis')
+        .select('id, name')
+        .order('name');
       
-      // Update total minis in state to trigger pagination update
+      const totalCount = allMinis?.length || 0;
       setTotalMinis(totalCount);
-      
-      // If we're adding a new miniature and we're not on the last page,
-      // navigate to the last page where the new miniature will appear
-      if (!selectedMini?.id && currentPage < totalPages) {
-        setCurrentPage(totalPages);
+
+      // If we just added a new miniature, find its position in the sorted list
+      if (!selectedMini?.id && miniatureData?.name && allMinis) {
+        const miniatureIndex = allMinis.findIndex(mini => 
+          mini.name.toLowerCase() >= miniatureData.name.toLowerCase()
+        );
+        
+        // Calculate which page this index falls on
+        const targetPage = Math.floor(Math.max(0, miniatureIndex) / itemsPerPage) + 1;
+        setCurrentPage(targetPage);
       } else {
-        // If we're staying on the current page, refresh it
+        // If we're editing, stay on current page
         const updatedMinis = await getPageMinis(currentPage);
         setMinis(updatedMinis);
       }

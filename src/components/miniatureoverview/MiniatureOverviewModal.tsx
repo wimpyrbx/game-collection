@@ -15,6 +15,7 @@ import { ShowItems } from '../ShowItems'
 import { useAuth } from '../../contexts/AuthContext'
 import { AuditService } from '../../services/auditService'
 import { useTypeCategoryAdmin } from '../../hooks/useTypeCategoryAdmin'
+import { createPortal } from 'react-dom'
 
 interface MiniatureOverviewModalProps {
   isOpen: boolean
@@ -1623,7 +1624,7 @@ export function MiniatureOverviewModal({
                   </div>
                   <div className="p-4 space-y-3 bg-gray-800 flex-1 min-h-[100px]">
                     <div className="space-y-2">
-                      <div className="relative">
+                      <div className="relative" ref={searchContainerRef}>
                         <UI.SearchInput
                           ref={typeSearchInputRef}
                           value={typeSearchTerm}
@@ -1631,9 +1632,15 @@ export function MiniatureOverviewModal({
                           placeholder="Search types..."
                           className="w-full"
                         />
-                        {filteredTypes.length > 0 && (
+                        {filteredTypes.length > 0 && createPortal(
                           <div 
-                            className="absolute max-h-16 w-full overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 z-[9999] mt-1"
+                            className="fixed overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 h-64 z-[99999]"
+                            style={{
+                              maxHeight: '400px',
+                              width: searchContainerRef.current?.getBoundingClientRect().width,
+                              left: searchContainerRef.current?.getBoundingClientRect().left,
+                              top: searchContainerRef.current?.getBoundingClientRect().bottom + 4,
+                            }}
                           >
                             {filteredTypes.map(type => (
                               <button
@@ -1649,7 +1656,8 @@ export function MiniatureOverviewModal({
                                 {type.name}
                               </button>
                             ))}
-                          </div>
+                          </div>,
+                          document.body
                         )}
                       </div>
                     </div>
