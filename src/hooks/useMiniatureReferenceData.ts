@@ -87,7 +87,6 @@ async function loadReferenceData() {
       { data: baseSizes, error: baseSizesError },
       { data: companiesData, error: companiesError },
       { data: productLinesData, error: productLinesError },
-      { data: productSetsData, error: productSetsError },
       { data: materialsData, error: materialsError },
       { data: types, error: typesError }
     ] = await Promise.all([
@@ -117,7 +116,6 @@ async function loadReferenceData() {
       supabase.from('base_sizes').select('*').order('base_size_name'),
       supabase.from('product_companies').select('*').order('name'),
       supabase.from('product_lines').select('*').order('name'),
-      supabase.from('product_sets').select('*').order('name'),
       supabase.from('minis_materials')
         .select('id, material_name, created_at, updated_at')
         .order('material_name'),
@@ -139,9 +137,34 @@ async function loadReferenceData() {
     if (baseSizesError) throw baseSizesError
     if (companiesError) throw companiesError
     if (productLinesError) throw productLinesError
-    if (productSetsError) throw productSetsError
     if (materialsError) throw materialsError
     if (typesError) throw typesError
+
+    // Batch fetch product sets
+    let allProductSets: any[] = []
+    let hasMoreSets = true
+    let setStart = 0
+
+    while (hasMoreSets) {
+      const { data: productSetsData, error: productSetsError } = await supabase
+        .from('product_sets')
+        .select('*')
+        .order('name')
+        .range(setStart, setStart + 999)
+
+      if (productSetsError) throw productSetsError
+
+      if (productSetsData) {
+        allProductSets = [...allProductSets, ...productSetsData]
+        if (productSetsData.length < 1000) {
+          hasMoreSets = false
+        } else {
+          setStart += 1000
+        }
+      } else {
+        hasMoreSets = false
+      }
+    }
 
     const transformedTypes: MiniType[] = (types || []).map((type: any) => ({
       id: type.id,
@@ -160,7 +183,7 @@ async function loadReferenceData() {
       baseSizeOptions: baseSizes || [],
       companies: companiesData || [],
       productLines: productLinesData || [],
-      productSets: productSetsData || [],
+      productSets: allProductSets,
       materials: materialsData || [],
       miniTypes: transformedTypes,
       loading: false,
