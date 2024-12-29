@@ -99,7 +99,8 @@ export default function MiniatureOverview() {
     getTotalQuantity,
     currentPage,
     setCurrentPage,
-    invalidateCache
+    invalidateCache,
+    setTotalMinis
   } = useMinis(itemsPerPage, miniSearch.searchTerm)
 
   const { showSuccess, showError } = useNotifications()
@@ -655,15 +656,39 @@ export default function MiniatureOverview() {
 
       setIsModalOpen(false);
       await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Invalidate cache to force fresh data fetch
       invalidateCache();
-      const updatedMinis = await getPageMinis(currentPage);
-      setMinis(updatedMinis);
+      
+      // Fetch fresh data including new total count
+      const { data: totalResponse } = await supabase.from('minis').select('id');
+      const totalCount = totalResponse?.length || 0;
+      const totalPages = Math.ceil(totalCount / itemsPerPage);
+      
+      // Update total minis in state to trigger pagination update
+      setTotalMinis(totalCount);
+      
+      // If we're adding a new miniature and we're not on the last page,
+      // navigate to the last page where the new miniature will appear
+      if (!selectedMini?.id && currentPage < totalPages) {
+        setCurrentPage(totalPages);
+      } else {
+        // If we're staying on the current page, refresh it
+        const updatedMinis = await getPageMinis(currentPage);
+        setMinis(updatedMinis);
+      }
+      
+      // Update total quantity
+      await getTotalQuantity();
+      
+      // Refresh images
       refreshImages();
       
       if (selectedMini?.id) {
-        const updatedMini = updatedMinis.find(mini => mini.id === selectedMini.id);
-        if (updatedMini) {
-          setSelectedMini(updatedMini);
+        const updatedMini = await getPageMinis(currentPage);
+        const found = updatedMini.find(mini => mini.id === selectedMini.id);
+        if (found) {
+          setSelectedMini(found);
         }
       }
     } catch (error) {

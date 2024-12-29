@@ -602,7 +602,8 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     getTotalQuantity,
     setMinis,
     invalidateCache,
-    handleDelete
+    handleDelete,
+    setTotalMinis
   }
 } 
 
