@@ -427,26 +427,27 @@ export default function ProductAdmin() {
   return (
     <>
       <PageHeader bgColor="none">
-            <PageHeaderTextGroup> 
-              <PageHeaderText>Product Companies, Lines and Sets</PageHeaderText>
-              <PageHeaderSubText>Manage your collection of product companies, lines, and sets</PageHeaderSubText>
-            </PageHeaderTextGroup>
-              <PageHeaderBigNumber
-                icon={FaArchive}
-                number={state.overallTotals.companies}
-                text="Total Companies"
-              />
-              <PageHeaderBigNumber
-                icon={FaList}
-                number={state.overallTotals.lines}
-                text="Total Product Lines"
-              />
-              <PageHeaderBigNumber
-                icon={FaListAlt}
-                number={state.overallTotals.sets}
-                text="Total Product Sets"
-              />
-          
+        <PageHeaderTextGroup>
+          <PageHeaderText>Product Companies, Lines and Sets</PageHeaderText>
+          <PageHeaderSubText>Manage your collection of product companies, lines, and sets</PageHeaderSubText>
+        </PageHeaderTextGroup>
+        <div className="flex items-center gap-2">
+          <PageHeaderBigNumber
+            icon={FaArchive}
+            number={state.overallTotals.companies}
+            text="Total Companies"
+          />
+          <PageHeaderBigNumber
+            icon={FaList}
+            number={state.overallTotals.lines}
+            text="Total Product Lines"
+          />
+          <PageHeaderBigNumber
+            icon={FaListAlt}
+            number={state.overallTotals.sets}
+            text="Total Product Sets"
+          />
+        </div>
       </PageHeader>
 
       <div className="grid grid-cols-12 gap-4">

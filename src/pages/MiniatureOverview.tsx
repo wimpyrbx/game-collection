@@ -4,7 +4,7 @@ import { useMinis } from '../hooks/useMinis'
 import * as UI from '../components/ui'
 import { ShowItems } from '../components/ShowItems'
 import type { Mini } from '../types/mini'
-import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber, type PageHeaderBigNumberProps } from '../components/ui'
 import { getMiniImagePath, getCompanyLogoPath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 import { useNotifications } from '../contexts/NotificationContext'
@@ -869,6 +869,22 @@ export default function MiniatureOverview() {
     }
   }, [materialOptions, defaultMaterialId]);
 
+  const [filteredCount, setFilteredCount] = useState(0)
+  const [filteredTotalQuantity, setFilteredTotalQuantity] = useState(0)
+
+  // Update filtered counts when cache changes
+  useEffect(() => {
+    if (nameFilter || typeFilter || productSetFilter || paintedByFilter) {
+      getAllMinis().then(result => {
+        setFilteredCount(result.data.length)
+        setFilteredTotalQuantity(result.totalQuantity)
+      })
+    } else {
+      setFilteredCount(0)
+      setFilteredTotalQuantity(0)
+    }
+  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, getAllMinis])
+
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
     return (
@@ -898,21 +914,33 @@ export default function MiniatureOverview() {
             View and manage your miniature collection
           </PageHeaderSubText>
         </PageHeaderTextGroup>
-        <PageHeaderBigNumber
+        <div className="flex items-center gap-2">
+          <PageHeaderBigNumber
             icon={FaDiceD6}
-          number={totalMinis}
-          text="Unique Miniatures"
+            number={totalMinis}
+            text="Unique Miniatures"
+            suffix={
+              filteredCount > 0 ? (
+                <span className="text-yellow-500 ml-1">({filteredCount})</span>
+              ) : null
+            }
           />
           <PageHeaderBigNumber
-          icon={FaDiceD6}
+            icon={FaDiceD6}
             number={totalQuantity}
-          text="Total Miniatures"
-        />
-        <PageHeaderBigNumber
-          icon={FaDiceD6}
-          number={stats.inUseCount || 0}
-          text={`In Use`}
+            text="Total Miniatures"
+            suffix={
+              filteredTotalQuantity > 0 ? (
+                <span className="text-yellow-500 ml-1">({filteredTotalQuantity})</span>
+              ) : null
+            }
           />
+          <PageHeaderBigNumber
+            icon={FaDiceD6}
+            number={stats.inUseCount || 0}
+            text="In Use"
+          />
+        </div>
       </PageHeader>
 
       <div className="grid grid-cols-12 gap-4">

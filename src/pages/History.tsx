@@ -427,11 +427,13 @@ export default function History() {
             View changes made to miniatures. Showing last 100 entries only.
           </UI.PageHeaderSubText>
         </UI.PageHeaderTextGroup>
-        <UI.PageHeaderBigNumber
-          icon={FaDiceD6}
-          number={totalQuantity}
-          text="Total Quantity"
-        />
+        <div className="flex items-center gap-2">
+          <UI.PageHeaderBigNumber
+            icon={FaDiceD6}
+            number={totalQuantity}
+            text="Total Quantity"
+          />
+        </div>
       </UI.PageHeader>
 
       <div className="bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">

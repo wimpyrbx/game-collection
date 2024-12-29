@@ -21,6 +21,8 @@ export { TableRow } from './TableRow'
 export { Pagination } from './Pagination'
 export { PageTransition } from './PageTransition'
 export { DndQuote } from './DndQuote'
+export { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from './PageHeader'
+export type { PageHeaderBigNumberProps } from './PageHeader'
 export interface SearchInputProps {
   value: string
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void
