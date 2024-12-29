@@ -753,8 +753,11 @@ export default function MiniatureOverview() {
       const totalCount = allMinis?.length || 0;
       setTotalMinis(totalCount);
 
-      // If we just added a new miniature, find its position in the sorted list
-      if (!selectedMini?.id && miniatureData?.name && allMinis) {
+      // If we just added a new miniature and there are no filters active,
+      // find its position in the sorted list
+      if (!selectedMini?.id && miniatureData?.name && allMinis && 
+          !nameFilter && !typeFilter && !productSetFilter && 
+          !paintedByFilter && !allTypesFilter && selectedTagFilters.length === 0) {
         const miniatureName = miniatureData.name.toLowerCase();
         const miniatureIndex = allMinis.findIndex(mini => 
           mini.name.toLowerCase() >= miniatureName
@@ -763,10 +766,6 @@ export default function MiniatureOverview() {
         // Calculate which page this index falls on
         const targetPage = Math.floor(Math.max(0, miniatureIndex) / itemsPerPage) + 1;
         setCurrentPage(targetPage);
-      } else {
-        // If we're editing, stay on current page
-        const updatedMinis = await getPageMinis(currentPage);
-        setMinis(updatedMinis);
       }
       
       // Update total quantity
@@ -774,10 +773,34 @@ export default function MiniatureOverview() {
       
       // Refresh images
       refreshImages();
+
+      // Re-apply filters and update counts
+      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
+        const result = await getAllMinis();
+        setFilteredCount(result.data.length);
+        setFilteredTotalQuantity(result.totalQuantity);
+        
+        // Calculate the correct page for the filtered results
+        const filteredIndex = result.data.findIndex(mini => 
+          mini.id === (miniatureData?.id || selectedMini?.id)
+        );
+        if (filteredIndex !== -1) {
+          const newPage = Math.floor(filteredIndex / itemsPerPage) + 1;
+          setCurrentPage(newPage);
+        }
+        
+        // Get the specific page of filtered results
+        const updatedMinis = await getPageMinis(currentPage);
+        setMinis(updatedMinis);
+      } else {
+        // If no filters, just get the current page
+        const updatedMinis = await getPageMinis(currentPage);
+        setMinis(updatedMinis);
+      }
       
       if (selectedMini?.id) {
-        const updatedMini = await getPageMinis(currentPage);
-        const found = updatedMini.find(mini => mini.id === selectedMini.id);
+        const updatedMinis = await getPageMinis(currentPage);
+        const found = updatedMinis.find(mini => mini.id === selectedMini.id);
         if (found) {
           setSelectedMini(found);
         }
@@ -813,13 +836,24 @@ export default function MiniatureOverview() {
       invalidateCache()
       
       // Refresh all data in a single batch
-      const [updatedMinis] = await Promise.all([
+      const [updatedMinis, { count: newTotalCount }] = await Promise.all([
         getPageMinis(currentPage),
-        getTotalQuantity()
-      ])
+        supabase.from('minis').select('*', { count: 'exact', head: true })
+      ]);
 
       // Update states
       setMinis(updatedMinis)
+      setTotalMinis(newTotalCount || 0)
+      
+      // Update filtered counts if filters are active
+      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
+        const result = await getAllMinis();
+        setFilteredCount(result.data.length);
+        setFilteredTotalQuantity(result.totalQuantity);
+      }
+
+      // Update total quantity
+      await getTotalQuantity();
       
       // Force refresh of images
       refreshImages()
@@ -904,16 +938,26 @@ export default function MiniatureOverview() {
 
   // Update filtered counts when cache changes
   useEffect(() => {
-    if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
-      getAllMinis().then(result => {
-        setFilteredCount(result.data.length)
-        setFilteredTotalQuantity(result.totalQuantity)
-      })
-    } else {
-      setFilteredCount(0)
-      setFilteredTotalQuantity(0)
-    }
-  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, getAllMinis])
+    const updateFilteredCounts = async () => {
+      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
+        const result = await getAllMinis();
+        setFilteredCount(result.data.length);
+        setFilteredTotalQuantity(result.totalQuantity);
+        
+        // If we have filtered results but are on a page beyond the filtered count,
+        // adjust the current page
+        const maxPage = Math.ceil(result.data.length / itemsPerPage);
+        if (currentPage > maxPage) {
+          setCurrentPage(1);
+        }
+      } else {
+        setFilteredCount(0);
+        setFilteredTotalQuantity(0);
+      }
+    };
+
+    updateFilteredCounts();
+  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, selectedTagFilters, getAllMinis, itemsPerPage]);
 
   // Add effect to load available tags
   useEffect(() => {
@@ -1717,7 +1761,7 @@ export default function MiniatureOverview() {
             <div className="mt-4">
               <UI.Pagination
                 currentPage={currentPage}
-                totalItems={totalMinis || 0}
+                totalItems={filteredCount > 0 ? filteredCount : (totalMinis || 0)}
                 itemsPerPage={itemsPerPage}
                 onPageChange={(page) => {
                   setCurrentPage(page)
