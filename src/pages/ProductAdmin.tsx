@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
-import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui/pageheader/PageHeader'
 import { FaBuilding, FaList, FaListAlt, FaArchive, FaExclamationTriangle } from 'react-icons/fa'
 
 import { useProductAdmin } from '../hooks/useProductAdmin'
@@ -431,23 +431,21 @@ export default function ProductAdmin() {
           <PageHeaderText>Product Companies, Lines and Sets</PageHeaderText>
           <PageHeaderSubText>Manage your collection of product companies, lines, and sets</PageHeaderSubText>
         </PageHeaderTextGroup>
-        <div className="flex items-center gap-2">
-          <PageHeaderBigNumber
-            icon={FaArchive}
-            number={state.overallTotals.companies}
-            text="Total Companies"
-          />
-          <PageHeaderBigNumber
-            icon={FaList}
-            number={state.overallTotals.lines}
-            text="Total Product Lines"
-          />
-          <PageHeaderBigNumber
-            icon={FaListAlt}
-            number={state.overallTotals.sets}
-            text="Total Product Sets"
-          />
-        </div>
+        <PageHeaderBigNumber
+          icon={FaArchive}
+          number={state.overallTotals.companies}
+          text="Total Companies"
+        />
+        <PageHeaderBigNumber
+          icon={FaList}
+          number={state.overallTotals.lines}
+          text="Total Product Lines"
+        />
+        <PageHeaderBigNumber
+          icon={FaListAlt}
+          number={state.overallTotals.sets}
+          text="Total Product Sets"
+        />
       </PageHeader>
 
       <div className="grid grid-cols-12 gap-4">

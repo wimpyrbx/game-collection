@@ -5,6 +5,7 @@ import { FaHistory, FaDiceD20, FaDiceD6 } from 'react-icons/fa'
 import { useLocation } from 'react-router-dom'
 import type { AuditLog } from '../types/audit'
 import { getMiniImagePath } from '../utils/imageUtils'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui/pageheader/PageHeader'
 
 interface ReferenceData {
   baseSizes: { id: number; base_size_name: string }[];
@@ -388,14 +389,13 @@ export default function History() {
   useEffect(() => {
     const fetchTotalQuantity = async () => {
       try {
-        const { data, error } = await supabase
-          .from('minis')
-          .select('quantity')
+        const { count, error } = await supabase
+          .from('audit_logs')
+          .select('*', { count: 'exact', head: true })
         
         if (error) throw error
         
-        const total = data.reduce((sum, mini) => sum + (mini.quantity || 0), 0)
-        setTotalQuantity(total)
+        setTotalQuantity(count || 0)
       } catch (error) {
         console.error('Error fetching total quantity:', error)
       }
@@ -415,26 +415,24 @@ export default function History() {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-2 h-[88vh]">
-      <UI.PageHeader bgColor="none">
-        <UI.PageHeaderTextGroup>
-          <UI.PageHeaderText>
+      <PageHeader bgColor="none">
+        <PageHeaderTextGroup>
+          <PageHeaderText>
             <div className="flex items-center gap-2">
               <FaHistory className="w-6 h-6" />
               History
             </div>
-          </UI.PageHeaderText>
-          <UI.PageHeaderSubText>
+          </PageHeaderText>
+          <PageHeaderSubText>
             View changes made to miniatures. Showing last 100 entries only.
-          </UI.PageHeaderSubText>
-        </UI.PageHeaderTextGroup>
-        <div className="flex items-center gap-2">
-          <UI.PageHeaderBigNumber
-            icon={FaDiceD6}
-            number={totalQuantity}
-            text="Total Quantity"
-          />
-        </div>
-      </UI.PageHeader>
+          </PageHeaderSubText>
+        </PageHeaderTextGroup>
+        <PageHeaderBigNumber
+          icon={FaDiceD6}
+          number={totalQuantity}
+          text="Total Entries"
+        />
+      </PageHeader>
 
       <div className="bg-gray-900/50 border border-gray-800 rounded-lg overflow-hidden">
         <table className="w-full">

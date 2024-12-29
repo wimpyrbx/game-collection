@@ -4,7 +4,7 @@ import { useMinis } from '../hooks/useMinis'
 import * as UI from '../components/ui'
 import { ShowItems } from '../components/ShowItems'
 import type { Mini } from '../types/mini'
-import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber, type PageHeaderBigNumberProps } from '../components/ui'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui/pageheader'
 import { getMiniImagePath, getCompanyLogoPath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 import { useNotifications } from '../contexts/NotificationContext'
@@ -19,6 +19,13 @@ import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { debounce } from 'lodash'
+import { TagInput } from '../components/ui/input/TagInput'
+
+// Add interface for tag
+interface Tag {
+  id: number;
+  name: string;
+}
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -455,6 +462,11 @@ export default function MiniatureOverview() {
   const [immediateTypeFilter, setImmediateTypeFilter] = useState('')
   const [immediateProductSetFilter, setImmediateProductSetFilter] = useState('')
   const [immediatePaintedByFilter, setImmediatePaintedByFilter] = useState('')
+  const [immediateAllTypesFilter, setImmediateAllTypesFilter] = useState('')
+  const [allTypesFilter, setAllTypesFilter] = useState('')
+  const [selectedTagFilters, setSelectedTagFilters] = useState<Array<{ id: number; name: string }>>([])
+  const [tagInput, setTagInput] = useState('')
+  const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([])
 
   // Create debounced setters
   const debouncedSetNameFilter = useMemo(
@@ -477,6 +489,11 @@ export default function MiniatureOverview() {
     []
   )
 
+  const debouncedSetAllTypesFilter = useMemo(
+    () => debounce((value: string) => setAllTypesFilter(value), 300),
+    []
+  )
+
   // Combine filters into a single search string
   useEffect(() => {
     const filters: string[] = []
@@ -490,13 +507,19 @@ export default function MiniatureOverview() {
     if (typeFilter) {
       filters.push(`type:${typeFilter}`)
     }
+    if (allTypesFilter) {
+      filters.push(`alltype:${allTypesFilter}`)
+    }
     if (paintedByFilter) {
       filters.push(`paintedby:${paintedByFilter}`)
+    }
+    if (selectedTagFilters.length > 0) {
+      filters.push(`tags:${selectedTagFilters.map(t => t.name).join(',')}`)
     }
 
     const combinedSearch = filters.join(' AND ')
     setInternalSearchTerm(combinedSearch)
-  }, [nameFilter, productSetFilter, typeFilter, paintedByFilter, setInternalSearchTerm])
+  }, [nameFilter, productSetFilter, typeFilter, allTypesFilter, paintedByFilter, selectedTagFilters, setInternalSearchTerm])
 
   // Initialize default values for base size and painted by
   useEffect(() => {
@@ -874,7 +897,7 @@ export default function MiniatureOverview() {
 
   // Update filtered counts when cache changes
   useEffect(() => {
-    if (nameFilter || typeFilter || productSetFilter || paintedByFilter) {
+    if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
       getAllMinis().then(result => {
         setFilteredCount(result.data.length)
         setFilteredTotalQuantity(result.totalQuantity)
@@ -883,7 +906,28 @@ export default function MiniatureOverview() {
       setFilteredCount(0)
       setFilteredTotalQuantity(0)
     }
-  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, getAllMinis])
+  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, getAllMinis])
+
+  // Add effect to load available tags
+  useEffect(() => {
+    const loadTags = async () => {
+      const { data: tags, error } = await supabase
+        .from('tags')
+        .select('id, name')
+        .order('name')
+      
+      if (error) {
+        console.error('Error loading tags:', error)
+        return
+      }
+
+      if (tags) {
+        setAvailableTags(tags)
+      }
+    }
+
+    loadTags()
+  }, [])
 
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
@@ -914,33 +958,26 @@ export default function MiniatureOverview() {
             View and manage your miniature collection
           </PageHeaderSubText>
         </PageHeaderTextGroup>
-        <div className="flex items-center gap-2">
-          <PageHeaderBigNumber
-            icon={FaDiceD6}
-            number={totalMinis}
-            text="Unique Miniatures"
-            suffix={
-              filteredCount > 0 ? (
-                <span className="text-yellow-500 ml-1">({filteredCount})</span>
-              ) : null
-            }
-          />
-          <PageHeaderBigNumber
-            icon={FaDiceD6}
-            number={totalQuantity}
-            text="Total Miniatures"
-            suffix={
-              filteredTotalQuantity > 0 ? (
-                <span className="text-yellow-500 ml-1">({filteredTotalQuantity})</span>
-              ) : null
-            }
-          />
-          <PageHeaderBigNumber
-            icon={FaDiceD6}
-            number={stats.inUseCount || 0}
-            text="In Use"
-          />
-        </div>
+        <PageHeaderBigNumber
+          icon={FaDiceD6}
+          number={totalMinis}
+          text="Unique Miniatures"
+          filteredCount={filteredCount > 0 ? filteredCount : undefined}
+          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0)}
+        />
+        <PageHeaderBigNumber
+          icon={FaDiceD6}
+          number={totalQuantity}
+          text="Total Miniatures"
+          filteredCount={filteredTotalQuantity > 0 ? filteredTotalQuantity : undefined}
+          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0)}
+        />
+        <PageHeaderBigNumber
+          icon={FaDiceD6}
+          number={stats.inUseCount || 0}
+          text="In Use"
+          isFiltering={false}
+        />
       </PageHeader>
 
       <div className="grid grid-cols-12 gap-4">
@@ -1250,7 +1287,7 @@ export default function MiniatureOverview() {
 
                 {/* Type Filter */}
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Type:</label>
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Main Type:</label>
                   <div className="relative">
                     <UI.SearchInput
                       value={immediateTypeFilter}
@@ -1260,14 +1297,44 @@ export default function MiniatureOverview() {
                         debouncedSetTypeFilter(value)
                         setCurrentPage(1)
                       }}
-                      placeholder="Miniature type..."
-                      className="w-[150px]"
+                      placeholder="Main type..."
+                      className="w-[100px]"
                     />
                     {immediateTypeFilter && (
                       <button
                         onClick={() => {
                           setImmediateTypeFilter('')
                           setTypeFilter('')
+                          setCurrentPage(1)
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                      >
+                        <FaTimesCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Add All Types Filter */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">All Types:</label>
+                  <div className="relative">
+                    <UI.SearchInput
+                      value={immediateAllTypesFilter}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setImmediateAllTypesFilter(value)
+                        debouncedSetAllTypesFilter(value)
+                        setCurrentPage(1)
+                      }}
+                      placeholder="All types..."
+                      className="w-[100px]"
+                    />
+                    {immediateAllTypesFilter && (
+                      <button
+                        onClick={() => {
+                          setImmediateAllTypesFilter('')
+                          setAllTypesFilter('')
                           setCurrentPage(1)
                         }}
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
@@ -1291,7 +1358,7 @@ export default function MiniatureOverview() {
                         setCurrentPage(1)
                       }}
                       placeholder="Product set..."
-                      className="w-[200px]"
+                      className="w-[100px]"
                     />
                     {immediateProductSetFilter && (
                       <button
@@ -1319,7 +1386,7 @@ export default function MiniatureOverview() {
                       debouncedSetPaintedByFilter(value)
                       setCurrentPage(1)
                     }}
-                    className="w-[150px] bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 h-10"
+                    className="w-[90px] bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 h-10"
                   >
                     <option value="">All</option>
                     {paintedByOptions.map((option) => (
@@ -1328,6 +1395,63 @@ export default function MiniatureOverview() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Add Tag Filter */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Tags:</label>
+                  <div className="relative flex items-center gap-2">
+                    <div className="w-[75px]">
+                      <TagInput
+                        value={tagInput}
+                        onChange={setTagInput}
+                        placeholder="Add tags..."
+                        availableTags={availableTags.filter(tag => !selectedTagFilters.some(st => st.id === tag.id))}
+                        onTagSelect={(tag: Tag) => {
+                          setSelectedTagFilters(prev => [...prev, tag])
+                          setCurrentPage(1)
+                        }}
+                        renderDropdown={(filteredTags: Tag[]) => (
+                          <div className="absolute z-50 w-full mt-1 max-h-60 overflow-auto bg-gray-800 border border-gray-700 rounded-md shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                            {filteredTags.map((tag: Tag) => (
+                              <button
+                                key={tag.id}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-200 hover:bg-gray-700"
+                                onClick={() => {
+                                  setSelectedTagFilters(prev => [...prev, tag])
+                                  setTagInput('')
+                                  setCurrentPage(1)
+                                }}
+                              >
+                                {tag.name}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      />
+                    </div>
+                    {selectedTagFilters.length > 0 && (
+                      <div className="flex flex-wrap gap-1 items-center">
+                        {selectedTagFilters.map(tag => (
+                          <div
+                            key={tag.id}
+                            className="flex items-center gap-1 px-2 py-1 bg-gray-700 text-gray-200 text-xs rounded-full border border-gray-600"
+                          >
+                            {tag.name}
+                            <button
+                              onClick={() => {
+                                setSelectedTagFilters(prev => prev.filter(t => t.id !== tag.id))
+                                setCurrentPage(1)
+                              }}
+                              className="text-gray-400 hover:text-gray-300"
+                            >
+                              <FaTimesCircle className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Reset Filters Button */}
@@ -1340,10 +1464,14 @@ export default function MiniatureOverview() {
                       setImmediateTypeFilter('')
                       setImmediateProductSetFilter('')
                       setImmediatePaintedByFilter('')
+                      setImmediateAllTypesFilter('')
                       setNameFilter('')
                       setTypeFilter('')
                       setProductSetFilter('')
                       setPaintedByFilter('')
+                      setAllTypesFilter('')
+                      setSelectedTagFilters([])
+                      setTagInput('')
                       setCurrentPage(1)
                     }}
                     className="text-sm py-2"
@@ -1381,10 +1509,11 @@ export default function MiniatureOverview() {
                             className={`
                               ${mini.in_use ? 'bg-red-900/50' : 'bgRow'} 
                               group
-                              hover:bgRowHover hover:-translate-y-[1px]
+                              hover:bgRowHover hover:-translate-x-[2px]
                               hover:shadow-[0_0_12px_rgba(0,0,0,0.3)] hover:relative hover:z-10
                               transition-all duration-200 ease-in-out transform
                               cursor-pointer
+
                             `}
                             onClick={() => handleEdit(mini, index)}
                           >
@@ -1402,7 +1531,7 @@ export default function MiniatureOverview() {
                     </table>
                   </div>
                 ) : viewMode === 'grid' ? (
-                  <div className="grid grid-cols-4 auto-rows-fr gap-2 h-[calc(94vh-22rem)] overflow-y-auto p-5">
+                  <div className="grid grid-cols-4 auto-rows-fr gap-2 h-[calc(94vh-25rem)] overflow-y-none p-3 pr-0 pb-0">
                     {minis.map((mini, index) => {
                       const originalPath = `${getMiniImagePath(mini.id ?? 0, 'original')}?t=${imageTimestamp}`
                       const company = mini.product_sets?.product_line?.company?.name

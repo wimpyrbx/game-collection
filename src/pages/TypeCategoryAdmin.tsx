@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNotifications } from '../contexts/NotificationContext'
 import { useAdminPagination, useAdminSearch, useAdminLoading } from '../hooks'
 import * as UI from '../components/ui'
-import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui'
+import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui/pageheader/PageHeader'
 import { FaArchive, FaSchlix, FaShareAltSquare, FaUsersCog, FaExclamationTriangle } from 'react-icons/fa'
 
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'

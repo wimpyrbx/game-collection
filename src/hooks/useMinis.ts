@@ -285,6 +285,20 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
               return mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue) || false
             }
 
+            if (term.startsWith('tags:')) {
+              const searchValues = term.substring(5).toLowerCase().split(',')
+              return searchValues.every(tag => 
+                mini.tags?.some(t => t.tag.name.toLowerCase() === tag.trim())
+              )
+            }
+
+            if (term.startsWith('alltype:')) {
+              const searchValue = term.substring(8).toLowerCase()
+              return mini.types?.some(t => 
+                t.type.name.toLowerCase().includes(searchValue)
+              ) || false
+            }
+
             // If no prefix, search everywhere (fallback)
             const searchValue = term.toLowerCase()
             return (
@@ -293,7 +307,8 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
               mini.product_sets?.name?.toLowerCase().includes(searchValue) ||
               mini.product_sets?.product_line?.name?.toLowerCase().includes(searchValue) ||
               mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchValue) ||
-              mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue)
+              mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue) ||
+              mini.tags?.some(t => t.tag.name.toLowerCase().includes(searchValue))
             )
           })
         })

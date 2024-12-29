@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react'
 import { IconType } from 'react-icons'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface PageHeaderProps {
   children: ReactNode
@@ -92,6 +93,9 @@ interface PageHeaderBigNumberProps {
   text: string
   className?: string
   iconClassName?: string
+  suffix?: React.ReactNode
+  filteredCount?: number
+  isFiltering?: boolean
 }
 
 export function PageHeaderBigNumber({ 
@@ -99,14 +103,34 @@ export function PageHeaderBigNumber({
   number,
   text,
   className = '',
-  iconClassName = 'text-gray-200'
+  iconClassName = 'text-gray-200',
+  suffix,
+  filteredCount,
+  isFiltering = false
 }: PageHeaderBigNumberProps) {
   return (
     <div className={`flex items-center gap-3 px-4 py-2 bg-white/10 rounded-lg ${className}`}>
       <Icon className={`w-8 h-8 ${iconClassName}`} />
       <div className="flex flex-col min-w-[100px]">
         <span className="text-sm text-gray-300 text-right font-bold italic">{text}</span>
-        <span className="text-2xl font-bold text-white text-right">{number}</span>
+        <div className="text-2xl font-bold text-white text-right flex items-center justify-end">
+          {isFiltering && filteredCount !== undefined && (
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={isFiltering ? 'filtering' : 'not-filtering'}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ delay: 0.5, type: "spring", stiffness: 200, damping: 10 }}
+                className="text-yellow-500 text-sm mr-1"
+              >
+                ({filteredCount})
+              </motion.span>
+            </AnimatePresence>
+          )}
+          {number}
+          {suffix}
+        </div>
       </div>
     </div>
   )
