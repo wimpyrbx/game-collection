@@ -442,7 +442,7 @@ export default function MiniatureOverview() {
   }
 
   // Add new state variables at the top of the component
-  const [defaultProductSetId, setDefaultProductSetId] = useState<number | null>(null)
+  const [, setDefaultProductSetId] = useState<number | null>(null)
   const [defaultLocation, setDefaultLocation] = useState('')
   const [defaultBaseSizeId, setDefaultBaseSizeId] = useState<number | null>(null)
   const [defaultPaintedById, setDefaultPaintedById] = useState<number | null>(null)
@@ -661,6 +661,10 @@ export default function MiniatureOverview() {
     const defaultPaintedBy = paintedByOptions.find(p => p.id === defaultPaintedById);
     const defaultBaseSize = baseSizeOptions.find(b => b.id === defaultBaseSizeId);
     const defaultType = typeCategoryAdmin.miniTypes.find(t => t.id === defaultTypeId);
+    const defaultProductSet = selectedProductSet ? {
+      id: selectedProductSet,
+      name: productSearchTerm
+    } : null;
 
     // Initialize with empty miniature data for new entries
     const newMini: Mini = {
@@ -670,7 +674,7 @@ export default function MiniatureOverview() {
       quantity: 1,
       painted_by_id: defaultPaintedById || 0,
       base_size_id: defaultBaseSizeId || 0,
-      product_set_id: defaultProductSetId || null,
+      product_set_id: selectedProductSet || null,
       material_id: defaultMaterialId || null,
       types: defaultType ? [{
         mini_id: 0, // This will be set when the miniature is created
@@ -694,7 +698,10 @@ export default function MiniatureOverview() {
         id: defaultBaseSizeId || 0,
         base_size_name: 'Medium'
       },
-      product_sets: undefined
+      product_sets: defaultProductSet ? {
+        id: defaultProductSet.id,
+        name: defaultProductSet.name
+      } : undefined
     };
 
     setSelectedMini(newMini);
