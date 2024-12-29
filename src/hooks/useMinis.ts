@@ -249,27 +249,53 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
       if (error) throw error
 
+      // Store total count before filtering
+      const totalCount = data?.length || 0
+      setTotalMinis(totalCount)
+      
       // Filter data if there's a search term
       let filteredData = data || []
       if (internalSearchTerm) {
-        const searchLower = internalSearchTerm.toLowerCase()
+        const searchTerms = internalSearchTerm.split(' AND ')
         filteredData = filteredData.filter((mini) => {
-          // Search in name
-          if (mini.name.toLowerCase().includes(searchLower)) return true
-          
-          // Search in types
-          if (mini.types?.some(t => t.type.name.toLowerCase().includes(searchLower))) return true
-          
-          // Search in product sets
-          if (mini.product_sets?.name?.toLowerCase().includes(searchLower)) return true
-          
-          // Search in product lines
-          if (mini.product_sets?.product_line?.name?.toLowerCase().includes(searchLower)) return true
-          
-          // Search in companies
-          if (mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchLower)) return true
-          
-          return false
+          return searchTerms.every(term => {
+            if (term.startsWith('name:')) {
+              const searchValue = term.substring(5).toLowerCase()
+              return mini.name.toLowerCase().includes(searchValue)
+            }
+            
+            if (term.startsWith('type:')) {
+              const searchValue = term.substring(5).toLowerCase()
+              return mini.types?.some(t => 
+                !t.proxy_type && t.type.name.toLowerCase().includes(searchValue)
+              ) || false
+            }
+            
+            if (term.startsWith('productset:')) {
+              const searchValue = term.substring(11).toLowerCase()
+              return (
+                mini.product_sets?.name?.toLowerCase().includes(searchValue) ||
+                mini.product_sets?.product_line?.name?.toLowerCase().includes(searchValue) ||
+                mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchValue)
+              ) || false
+            }
+            
+            if (term.startsWith('paintedby:')) {
+              const searchValue = term.substring(10).toLowerCase()
+              return mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue) || false
+            }
+
+            // If no prefix, search everywhere (fallback)
+            const searchValue = term.toLowerCase()
+            return (
+              mini.name.toLowerCase().includes(searchValue) ||
+              mini.types?.some(t => t.type.name.toLowerCase().includes(searchValue)) ||
+              mini.product_sets?.name?.toLowerCase().includes(searchValue) ||
+              mini.product_sets?.product_line?.name?.toLowerCase().includes(searchValue) ||
+              mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchValue) ||
+              mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue)
+            )
+          })
         })
       }
 
@@ -296,57 +322,47 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       console.error('Error fetching all data:', error)
       throw error
     }
-  }, [internalSearchTerm])
+  }, [internalSearchTerm, setTotalMinis])
 
   // Add loadData function
   const loadData = useCallback(async () => {
     try {
-      // console.log('Loading data for page:', currentPage, 'pageSize:', pageSize)
       setLoading(true)
       setError(null)
 
       // Try to use cache first
       if (isCacheValid()) {
-        // console.log('Using cache')
         const startIndex = (currentPage - 1) * pageSize
         const endIndex = Math.min(startIndex + pageSize, globalCache!.minis.length)
         const pageData = globalCache!.minis.slice(startIndex, endIndex)
         
         setMinis(pageData.map(mini => transformMini(mini)))
-        setTotalMinis(globalCache!.minis.length)
+        // Don't update totalMinis here since it should stay as total unfiltered count
         setTotalQuantity(globalCache!.totalQuantity)
         setLoading(false)
         return
       }
 
-      // console.log('Cache invalid, fetching fresh data')
       const { data, totalQuantity, totalCount } = await fetchAllData()
 
       // Ensure we have valid data
       if (!data || data.length === 0) {
-        // console.log('No data found')
         setMinis([])
-        setTotalMinis(0)
+        // Don't update totalMinis here either
         setTotalQuantity(0)
         setLoading(false)
         return
       }
 
-      // console.log('Total minis:', totalCount)
-      // Update total counts
-      setTotalMinis(totalCount)
+      // Don't update totalMinis with filtered count
       setTotalQuantity(totalQuantity)
 
       // Calculate current page data
       const startIndex = (currentPage - 1) * pageSize
       const endIndex = Math.min(startIndex + pageSize, totalCount)
       const pageData = data.slice(startIndex, endIndex)
-
-      // console.log(`Page data for page ${currentPage}: startIndex=${startIndex}, endIndex=${endIndex}, length=${pageData.length}`)
       
-      // Update minis for current page
       const transformedMinis = pageData.map((mini: SupabaseMini) => transformMini(mini))
-      // console.log('Transformed minis length:', transformedMinis.length)
       setMinis(transformedMinis)
       setLoading(false)
 
@@ -506,21 +522,6 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     }
   }
 
-  // Modify getAllMinis to use global cache
-  const getAllMinis = async (): Promise<Mini[]> => {
-    try {
-      if (isCacheValid()) {
-        return globalCache!.minis.map(mini => transformMini(mini))
-      }
-
-      const { data } = await fetchAllData()
-      return (data || []).map((mini: SupabaseMini) => transformMini(mini))
-    } catch (error) {
-      console.error('Error in getAllMinis:', error)
-      return []
-    }
-  }
-
   // Add getTotalQuantity function
   const getTotalQuantity = useCallback(async () => {
     try {
@@ -598,12 +599,16 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     setSearchTerm: handleSearch,
     refreshData: loadData,
     getPageMinis,
-    getAllMinis,
-    getTotalQuantity,
     setMinis,
+    getTotalQuantity: async () => {
+      const { totalQuantity } = await fetchAllData()
+      return totalQuantity
+    },
     invalidateCache,
     handleDelete,
-    setTotalMinis
+    setTotalMinis,
+    setInternalSearchTerm,
+    getAllMinis: fetchAllData
   }
 } 
 

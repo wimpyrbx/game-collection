@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle, FaMinusCircle, FaPlusCircle } from 'react-icons/fa'
 import { useMinis } from '../hooks/useMinis'
-import { useAdminSearch } from '../hooks'
 import * as UI from '../components/ui'
 import { ShowItems } from '../components/ShowItems'
 import type { Mini } from '../types/mini'
@@ -19,6 +18,7 @@ import { supabase } from '../lib/supabase'
 import { useTypeCategoryAdmin } from '../hooks/useTypeCategoryAdmin'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
+import { debounce } from 'lodash'
 
 // Preload images for a given array of minis
 const preloadImages = (minis: Mini[]) => {
@@ -32,7 +32,6 @@ const preloadImages = (minis: Mini[]) => {
 
 export default function MiniatureOverview() {
   const { viewMode, setViewMode, isLoading: viewModeLoading } = useViewMode()
-  const miniSearch = useAdminSearch({ searchFields: ['name'] })
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [selectedMini, setSelectedMini] = useState<Mini | undefined>(undefined)
   const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
@@ -89,19 +88,20 @@ export default function MiniatureOverview() {
   } = useMiniatureReferenceData()
 
   const {
-    minis, 
-    loading, 
-    error, 
-    totalMinis, 
+    minis,
+    loading,
+    error,
+    totalMinis,
     getPageMinis,
-    getAllMinis, 
-    setMinis, 
+    getAllMinis,
+    setMinis,
     getTotalQuantity,
     currentPage,
     setCurrentPage,
     invalidateCache,
-    setTotalMinis
-  } = useMinis(itemsPerPage, miniSearch.searchTerm)
+    setTotalMinis,
+    setInternalSearchTerm,
+  } = useMinis(itemsPerPage);
 
   const { showSuccess, showError } = useNotifications()
 
@@ -166,7 +166,7 @@ export default function MiniatureOverview() {
         try {
           const allMinisData = await getAllMinis();
           if (mounted) {
-            setAllMinis(allMinisData);
+            setAllMinis(allMinisData.data as Mini[]);
           }
         } catch (error) {
           console.error('Error loading all minis:', error);
@@ -442,7 +442,61 @@ export default function MiniatureOverview() {
   const [productSearchTerm, setProductSearchTerm] = useState('')
   const [showProductDropdown, setShowProductDropdown] = useState(false)
   const [defaultTypeId, setDefaultTypeId] = useState<number | null>(null)
-  const [showPreDefinedFields, setShowPreDefinedFields] = useState(true)
+  const [showPreDefinedFields, setShowPreDefinedFields] = useState(false)
+  const [selectedTypes, setSelectedTypes] = useState<number[]>([])
+  const [selectedProductSet, setSelectedProductSet] = useState<number | null>(null)
+  const [productSetFilter, setProductSetFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState('')
+  const [paintedByFilter, setPaintedByFilter] = useState('')
+  const [nameFilter, setNameFilter] = useState('')
+
+  // Add state for immediate values
+  const [immediateNameFilter, setImmediateNameFilter] = useState('')
+  const [immediateTypeFilter, setImmediateTypeFilter] = useState('')
+  const [immediateProductSetFilter, setImmediateProductSetFilter] = useState('')
+  const [immediatePaintedByFilter, setImmediatePaintedByFilter] = useState('')
+
+  // Create debounced setters
+  const debouncedSetNameFilter = useMemo(
+    () => debounce((value: string) => setNameFilter(value), 300),
+    []
+  )
+
+  const debouncedSetTypeFilter = useMemo(
+    () => debounce((value: string) => setTypeFilter(value), 300),
+    []
+  )
+
+  const debouncedSetProductSetFilter = useMemo(
+    () => debounce((value: string) => setProductSetFilter(value), 300),
+    []
+  )
+
+  const debouncedSetPaintedByFilter = useMemo(
+    () => debounce((value: string) => setPaintedByFilter(value), 300),
+    []
+  )
+
+  // Combine filters into a single search string
+  useEffect(() => {
+    const filters: string[] = []
+
+    if (nameFilter) {
+      filters.push(`name:${nameFilter}`)
+    }
+    if (productSetFilter) {
+      filters.push(`productset:${productSetFilter}`)
+    }
+    if (typeFilter) {
+      filters.push(`type:${typeFilter}`)
+    }
+    if (paintedByFilter) {
+      filters.push(`paintedby:${paintedByFilter}`)
+    }
+
+    const combinedSearch = filters.join(' AND ')
+    setInternalSearchTerm(combinedSearch)
+  }, [nameFilter, productSetFilter, typeFilter, paintedByFilter, setInternalSearchTerm])
 
   // Initialize default values for base size and painted by
   useEffect(() => {
@@ -846,7 +900,7 @@ export default function MiniatureOverview() {
         </PageHeaderTextGroup>
         <PageHeaderBigNumber
             icon={FaDiceD6}
-          number={totalMinis || 0}
+          number={totalMinis}
           text="Unique Miniatures"
           />
           <PageHeaderBigNumber
@@ -954,8 +1008,8 @@ export default function MiniatureOverview() {
                                   onChange={(e) => {
                                     setProductSearchTerm(e.target.value)
                                     setShowProductDropdown(true)
-                                    if (defaultProductSetId) {
-                                      setDefaultProductSetId(null)
+                                    if (selectedProductSet) {
+                                      setSelectedProductSet(null)
                                     }
                                   }}
                                   onFocus={() => setShowProductDropdown(true)}
@@ -981,7 +1035,7 @@ export default function MiniatureOverview() {
                                             className="w-full text-left px-3 py-2 hover:bg-gray-700 text-xs"
                                             onMouseDown={(e) => {
                                               e.preventDefault()
-                                          setDefaultProductSetId(product.id)
+                                          setSelectedProductSet(product.id)
                                               setProductSearchTerm(`${product.company} - ${product.line} - ${product.set}`)
                                           setShowProductDropdown(false)
                                         }}
@@ -995,10 +1049,10 @@ export default function MiniatureOverview() {
                                   </div>,
                                   document.body
                                 )}
-                                {defaultProductSetId && (
+                                {selectedProductSet && (
                                   <button
                                     onClick={() => {
-                                      setDefaultProductSetId(null)
+                                      setSelectedProductSet(null)
                                       setProductSearchTerm('')
                                     }}
                                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
@@ -1075,8 +1129,8 @@ export default function MiniatureOverview() {
                                   onChange={(e) => {
                                         setTypeSearchTermClassic(e.target.value)
                                         setShowTypeDropdownClassic(true)
-                                        if (selectedTypeClassic) {
-                                          setSelectedTypeClassic(null)
+                                        if (selectedTypes.length > 0) {
+                                          setSelectedTypes([])
                                         }
                                       }}
                                       onFocus={() => setShowTypeDropdownClassic(true)}
@@ -1133,27 +1187,150 @@ export default function MiniatureOverview() {
               </UI.CardHeaderRightSide>
             </UI.CardHeader>
 
-            <UI.CardBody>
-              <div className="mb-4">
-                <UI.SearchInput
-                  value={miniSearch.searchTerm}
-                  onChange={(e) => {
-                    miniSearch.handleSearch(e.target.value)
-                    // Only update page when the debounced search term changes
-                    if (miniSearch.debouncedSearchTerm !== e.target.value) {
+            <UI.CardBody className="pl-0">
+              {/* Filter Section */}
+              <div className="flex flex-wrap gap-1">
+                {/* Name Search */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-4 pr-3">Name:</label>
+                  <div className="relative">
+                    <UI.SearchInput
+                      value={immediateNameFilter}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setImmediateNameFilter(value)
+                        debouncedSetNameFilter(value)
+                        setCurrentPage(1)
+                      }}
+                      placeholder="Miniature name..."
+                      className="w-[200px]"
+                    />
+                    {immediateNameFilter && (
+                      <button
+                        onClick={() => {
+                          setImmediateNameFilter('')
+                          setNameFilter('')
+                          setCurrentPage(1)
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                      >
+                        <FaTimesCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Type Filter */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Type:</label>
+                  <div className="relative">
+                    <UI.SearchInput
+                      value={immediateTypeFilter}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setImmediateTypeFilter(value)
+                        debouncedSetTypeFilter(value)
+                        setCurrentPage(1)
+                      }}
+                      placeholder="Miniature type..."
+                      className="w-[150px]"
+                    />
+                    {immediateTypeFilter && (
+                      <button
+                        onClick={() => {
+                          setImmediateTypeFilter('')
+                          setTypeFilter('')
+                          setCurrentPage(1)
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                      >
+                        <FaTimesCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Product Set Filter */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Product Set:</label>
+                  <div className="relative">
+                    <UI.SearchInput
+                      value={immediateProductSetFilter}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setImmediateProductSetFilter(value)
+                        debouncedSetProductSetFilter(value)
+                        setCurrentPage(1)
+                      }}
+                      placeholder="Product set..."
+                      className="w-[200px]"
+                    />
+                    {immediateProductSetFilter && (
+                      <button
+                        onClick={() => {
+                          setImmediateProductSetFilter('')
+                          setProductSetFilter('')
+                          setCurrentPage(1)
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                      >
+                        <FaTimesCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Painted By Filter */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Painted By:</label>
+                  <select
+                    value={immediatePaintedByFilter}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      setImmediatePaintedByFilter(value)
+                      debouncedSetPaintedByFilter(value)
                       setCurrentPage(1)
-                    }
-                  }}
-                  placeholder="Search miniatures..."
-                  className="w-full"
-                />
+                    }}
+                    className="w-[150px] bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 h-10"
+                  >
+                    <option value="">All</option>
+                    {paintedByOptions.map((option) => (
+                      <option key={option.id} value={option.painted_by_name}>
+                        {option.painted_by_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Reset Filters Button */}
+                <div className="flex items-center ml-auto pr-0">
+                  <UI.Button
+                    variant="btnPrimary"
+                    size="sm"
+                    onClick={() => {
+                      setImmediateNameFilter('')
+                      setImmediateTypeFilter('')
+                      setImmediateProductSetFilter('')
+                      setImmediatePaintedByFilter('')
+                      setNameFilter('')
+                      setTypeFilter('')
+                      setProductSetFilter('')
+                      setPaintedByFilter('')
+                      setCurrentPage(1)
+                    }}
+                    className="text-sm py-2"
+                  >
+                    Reset Filters
+                  </UI.Button>
+                </div>
               </div>
 
+              {/* Content Section */}
               <div className={loading ? 'opacity-50 pointer-events-none' : ''}>
                 {minis.length === 0 ? (
                   <UI.EmptyTableState icon={<FaDiceD6 />} message="No miniatures found" />
                 ) : viewMode === 'table' ? (
-                  <div className="overflow-x-auto overflow-y-auto h-[calc(92vh-23rem)]">
+                  <div className="overflow-x-auto overflow-y-auto h-[calc(90vh-23rem)] mt-4">
                     <table className="w-full divide-y divide-[#333333]">
                       <thead className="sticky top-0 z-10">
                         <tr>
