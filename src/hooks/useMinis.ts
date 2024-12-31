@@ -234,25 +234,32 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
   const fetchAllData = useCallback(async () => {
     try {
+      // First get the total count
+      const { count, error: countError } = await supabase
+        .from('minis')
+        .select('*', { count: 'exact', head: true })
+
+      if (countError) throw countError
+      
+      // Store total count
+      const totalCount = count || 0
+      setTotalMinis(totalCount)
+
+      // Then fetch all data
       type SupabaseResponse = {
         data: SupabaseMini[] | null
         error: any
       }
 
-      // Always fetch fresh data for pagination changes
       const result = await (supabase
         .from('minis')
         .select(MINIATURE_QUERY)
         .order('name') as unknown as Promise<SupabaseResponse>)
 
-      const { data, error } = await result
+      const { data, error } = result
 
       if (error) throw error
 
-      // Store total count before filtering
-      const totalCount = data?.length || 0
-      setTotalMinis(totalCount)
-      
       // Filter data if there's a search term
       let filteredData = data || []
       if (internalSearchTerm) {
