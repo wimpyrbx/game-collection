@@ -11,7 +11,7 @@ interface AdminTableSectionProps<T> {
   onAdd?: () => void
   onEdit?: (item: T) => void
   onDelete?: (item: T) => void
-  loading?: boolean
+  loading: boolean
   addButtonLabel?: string
   addButtonDisabled?: boolean
   emptyMessage?: string
@@ -33,6 +33,7 @@ interface AdminTableSectionProps<T> {
   columnHeaders?: string[]
   getItemColumns?: (item: T) => string[]
   getItemName?: (item: T) => string
+  headerButtons?: React.ReactNode
 }
 
 export default function AdminTableSection<T extends { id: number }>({
@@ -56,7 +57,8 @@ export default function AdminTableSection<T extends { id: number }>({
   useTable = false,
   columnHeaders = [],
   getItemColumns,
-  getItemName
+  getItemName,
+  headerButtons
 }: AdminTableSectionProps<T>) {
   return (
     <div className="flex flex-col gap-2">
@@ -83,6 +85,7 @@ export default function AdminTableSection<T extends { id: number }>({
             </div>
           </div>
           <UI.CardHeaderRightSide>
+            {headerButtons}
             {onAdd && (
               <UI.Button 
                 variant="btnSuccess"
