@@ -995,14 +995,21 @@ export default function MiniatureOverview() {
   // Update filtered counts when cache changes
   useEffect(() => {
     const updateFilteredCounts = async () => {
-      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
+      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages) {
         const result = await getAllMinis();
-        setFilteredCount(result.data.length);
-        setFilteredTotalQuantity(result.totalQuantity);
+        let filteredData = result.data;
+        
+        // Apply missing images filter after getting the data
+        if (showMissingImages) {
+          filteredData = filteredData.filter(mini => !mini.has_image);
+        }
+        
+        setFilteredCount(filteredData.length);
+        setFilteredTotalQuantity(filteredData.reduce((sum, mini) => sum + (mini.quantity || 0), 0));
         
         // If we have filtered results but are on a page beyond the filtered count,
         // adjust the current page
-        const maxPage = Math.ceil(result.data.length / itemsPerPage);
+        const maxPage = Math.ceil(filteredData.length / itemsPerPage);
         if (currentPage > maxPage) {
           setCurrentPage(1);
         }
@@ -1013,7 +1020,7 @@ export default function MiniatureOverview() {
     };
 
     updateFilteredCounts();
-  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, selectedTagFilters, getAllMinis, itemsPerPage]);
+  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, selectedTagFilters, showMissingImages, getAllMinis, itemsPerPage]);
 
   // Add effect to load available tags
   useEffect(() => {
@@ -1104,15 +1111,15 @@ export default function MiniatureOverview() {
           icon={FaDiceD6}
           number={loading ? '-' : totalMinis}
           text="Unique Miniatures"
-          filteredCount={filteredCount > 0 ? filteredCount : undefined}
-          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0)}
+          filteredCount={filteredCount}
+          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages)}
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
           number={loading ? '-' : totalQuantity}
           text="Total Miniatures"
-          filteredCount={filteredTotalQuantity > 0 ? filteredTotalQuantity : undefined}
-          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0)}
+          filteredCount={filteredTotalQuantity > 0 || showMissingImages ? filteredTotalQuantity : undefined}
+          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages)}
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}

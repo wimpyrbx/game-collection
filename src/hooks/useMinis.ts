@@ -716,33 +716,24 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     // Don't invalidate cache, we want to filter locally
   }, [])
 
+  const getCachedTotal = useCallback(() => {
+    return globalCache?.minis.length || 0;
+  }, [globalCache]);
+
   return {
     minis,
     loading,
     error,
-    currentPage,
-    totalPages: Math.max(1, Math.ceil(totalMinis / pageSize)),
-    totalMinis,
-    totalQuantity,
-    setCurrentPage: (page: number) => {
-      const maxPage = Math.max(1, Math.ceil(totalMinis / pageSize))
-      const validPage = Math.max(1, Math.min(page, maxPage))
-      setCurrentPage(validPage)
-    },
-    searchTerm: internalSearchTerm,
-    setSearchTerm: handleSearch,
-    refreshData: loadData,
+    totalMinis: getCachedTotal(),
     getPageMinis,
+    getAllMinis: fetchAllData,
     setMinis,
-    getTotalQuantity: async () => {
-      const { totalQuantity } = await fetchAllData()
-      return totalQuantity
-    },
+    getTotalQuantity,
+    currentPage,
+    setCurrentPage,
     invalidateCache,
-    handleDelete,
     setTotalMinis,
     setInternalSearchTerm,
-    getAllMinis: fetchAllData,
     showMissingImages,
     setShowMissingImages: setShowMissingImagesAndInvalidate
   }
