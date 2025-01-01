@@ -33,6 +33,7 @@ interface SupabaseMini {
   product_set_id: number | null
   material_id: number | null
   in_use: string | null
+  has_image: boolean
   types: SupabaseMiniType[]
   painted_by: {
     id: number
@@ -86,6 +87,7 @@ const transformMini = (item: SupabaseMini): Mini => ({
   product_set_id: item.product_set_id,
   material_id: item.material_id,
   in_use: item.in_use,
+  has_image: item.has_image,
   types: item.types?.map((t: SupabaseMiniType) => ({
     mini_id: t.mini_id,
     type_id: t.type_id,
@@ -132,6 +134,7 @@ const MINIATURE_QUERY = `
   product_set_id,
   material_id,
   in_use,
+  has_image,
   types:mini_to_types(
     mini_id,
     type_id,
@@ -183,15 +186,22 @@ const MINIATURE_QUERY = `
 
 let globalCache: Cache | null = null
 
+type SupabaseResponse = {
+  data: SupabaseMini[] | null
+  error: any
+}
+
 export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   const [minis, setMinis] = useState<Mini[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [totalMinis, setTotalMinis] = useState(0)
   const [totalQuantity, setTotalQuantity] = useState(0)
   const [internalSearchTerm, setInternalSearchTerm] = useState<string | null>(searchTerm || null)
+  const [showMissingImages, setShowMissingImages] = useState(false)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
+  const isLoadingRef = useRef(false)
 
   // Update search term with debounce
   useEffect(() => {
@@ -222,46 +232,140 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
   const isCacheValid = useCallback(() => {
     if (!globalCache) return false
-    
-    // Cache is invalid if it's older than CACHE_DURATION
-    if (Date.now() - globalCache.timestamp > CACHE_DURATION) return false
-    
-    // Cache is invalid if search terms don't match
-    if (globalCache.searchTerm !== internalSearchTerm) return false
-    
-    return true
-  }, [internalSearchTerm])
+    return Date.now() - globalCache.timestamp <= CACHE_DURATION
+  }, [])
 
   const fetchAllData = useCallback(async () => {
     try {
-      // First get the total count
-      const { count, error: countError } = await supabase
-        .from('minis')
-        .select('*', { count: 'exact', head: true })
+      // If we have valid cache, use it and just apply filters
+      if (isCacheValid() && globalCache) {
+        // console.log('Using cached data for filtering')
+        let filteredData = [...globalCache.minis]
 
+        // Apply search filters
+        if (internalSearchTerm) {
+          const searchTerms = internalSearchTerm.split(' AND ')
+          filteredData = filteredData.filter((mini) => {
+            return searchTerms.every(term => {
+              if (term.startsWith('name:')) {
+                const searchValue = term.substring(5).toLowerCase()
+                return mini.name.toLowerCase().includes(searchValue)
+              }
+              
+              if (term.startsWith('type:')) {
+                const searchValue = term.substring(5).toLowerCase()
+                return mini.types?.some(t => 
+                  !t.proxy_type && t.type.name.toLowerCase().includes(searchValue)
+                ) || false
+              }
+              
+              if (term.startsWith('productset:')) {
+                const searchValue = term.substring(11).toLowerCase()
+                return (
+                  mini.product_sets?.name?.toLowerCase().includes(searchValue) ||
+                  mini.product_sets?.product_line?.name?.toLowerCase().includes(searchValue) ||
+                  mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchValue)
+                ) || false
+              }
+              
+              if (term.startsWith('paintedby:')) {
+                const searchValue = term.substring(10).toLowerCase()
+                return mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue) || false
+              }
+
+              if (term.startsWith('tags:')) {
+                const searchValues = term.substring(5).toLowerCase().split(',')
+                return searchValues.every(tag => 
+                  mini.tags?.some(t => t.tag.name.toLowerCase() === tag.trim())
+                )
+              }
+
+              if (term.startsWith('alltype:')) {
+                const searchValue = term.substring(8).toLowerCase()
+                return mini.types?.some(t => 
+                  t.type.name.toLowerCase().includes(searchValue)
+                ) || false
+              }
+
+              // If no prefix, search everywhere (fallback)
+              const searchValue = term.toLowerCase()
+              return (
+                mini.name.toLowerCase().includes(searchValue) ||
+                mini.types?.some(t => t.type.name.toLowerCase().includes(searchValue)) ||
+                mini.product_sets?.name?.toLowerCase().includes(searchValue) ||
+                mini.product_sets?.product_line?.name?.toLowerCase().includes(searchValue) ||
+                mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchValue) ||
+                mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue) ||
+                mini.tags?.some(t => t.tag.name.toLowerCase().includes(searchValue))
+              )
+            })
+          })
+        }
+
+        // Apply missing images filter
+        if (showMissingImages) {
+          filteredData = filteredData.filter(mini => !mini.has_image)
+        }
+
+        const totalQuantitySum = filteredData.reduce((acc: number, curr: { quantity: number }) => 
+          acc + (curr.quantity || 0), 0
+        )
+
+        return {
+          data: filteredData.map(mini => transformMini(mini)),
+          totalQuantity: totalQuantitySum,
+          totalCount: filteredData.length
+        }
+      }
+
+      // If no valid cache, fetch from Supabase
+      // console.log('No valid cache, fetching from Supabase')
+      
+      // First get the total count
+      // console.log('Supabase Query: Fetching total count of minis')
+      let countQuery = supabase.from('minis').select('*', { count: 'exact', head: true })
+      
+      const { count, error: countError } = await countQuery
       if (countError) throw countError
       
       // Store total count
       const totalCount = count || 0
       setTotalMinis(totalCount)
 
-      // Then fetch all data
-      type SupabaseResponse = {
-        data: SupabaseMini[] | null
-        error: any
+      // Build the data query
+      // console.log('Supabase Query: Fetching all minis data')
+      let dataQuery = supabase.from('minis').select(MINIATURE_QUERY).order('name')
+
+      // Get all data in chunks to handle large datasets
+      let allData: SupabaseMini[] = []
+      let page = 0
+      const chunkSize = 1000
+      
+      while (true) {
+        // console.log(`Supabase Query: Fetching minis chunk ${page + 1} (${page * chunkSize} - ${(page + 1) * chunkSize - 1})`)
+        const result = await dataQuery
+          .range(page * chunkSize, (page + 1) * chunkSize - 1) as unknown as SupabaseResponse
+
+        const { data, error } = result
+        if (error) throw error
+        if (!data || data.length === 0) break
+
+        allData = [...allData, ...data]
+        if (data.length < chunkSize) break
+        page++
       }
 
-      const result = await (supabase
-        .from('minis')
-        .select(MINIATURE_QUERY)
-        .order('name') as unknown as Promise<SupabaseResponse>)
+      // Store the raw data in cache before filtering
+      globalCache = {
+        minis: allData,
+        totalQuantity: allData.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+        timestamp: Date.now(),
+        searchTerm: null
+      }
 
-      const { data, error } = result
+      // Now apply filters to the cached data
+      let filteredData = [...allData]
 
-      if (error) throw error
-
-      // Filter data if there's a search term
-      let filteredData = data || []
       if (internalSearchTerm) {
         const searchTerms = internalSearchTerm.split(' AND ')
         filteredData = filteredData.filter((mini) => {
@@ -321,21 +425,16 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         })
       }
 
-      // Calculate total quantity
+      if (showMissingImages) {
+        filteredData = filteredData.filter(mini => !mini.has_image)
+      }
+
       const totalQuantitySum = filteredData.reduce((acc: number, curr: { quantity: number }) => 
         acc + (curr.quantity || 0), 0
       )
 
-      // Update global cache
-      globalCache = {
-        minis: filteredData,
-        totalQuantity: totalQuantitySum,
-        timestamp: Date.now(),
-        searchTerm: internalSearchTerm
-      }
-
       return {
-        data: filteredData,
+        data: filteredData.map(mini => transformMini(mini)),
         totalQuantity: totalQuantitySum,
         totalCount: filteredData.length
       }
@@ -344,56 +443,59 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       console.error('Error fetching all data:', error)
       throw error
     }
-  }, [internalSearchTerm, setTotalMinis])
+  }, [internalSearchTerm, showMissingImages, setTotalMinis, isCacheValid])
 
   // Add loadData function
   const loadData = useCallback(async () => {
     try {
+      // If we're already loading, don't start another load
+      if (isLoadingRef.current) return;
+      
+      isLoadingRef.current = true
       setLoading(true)
       setError(null)
 
-      // Try to use cache first
-      if (isCacheValid()) {
-        const startIndex = (currentPage - 1) * pageSize
-        const endIndex = Math.min(startIndex + pageSize, globalCache!.minis.length)
-        const pageData = globalCache!.minis.slice(startIndex, endIndex)
-        
-        setMinis(pageData.map(mini => transformMini(mini)))
-        // Don't update totalMinis here since it should stay as total unfiltered count
-        setTotalQuantity(globalCache!.totalQuantity)
-        setLoading(false)
-        return
-      }
-
+      // console.log('Loading data for page', currentPage)
+      // Get filtered data either from cache or from Supabase
       const { data, totalQuantity, totalCount } = await fetchAllData()
 
       // Ensure we have valid data
       if (!data || data.length === 0) {
         setMinis([])
-        // Don't update totalMinis here either
         setTotalQuantity(0)
         setLoading(false)
+        isLoadingRef.current = false
         return
       }
 
-      // Don't update totalMinis with filtered count
       setTotalQuantity(totalQuantity)
+      setTotalMinis(totalCount)
 
       // Calculate current page data
       const startIndex = (currentPage - 1) * pageSize
       const endIndex = Math.min(startIndex + pageSize, totalCount)
       const pageData = data.slice(startIndex, endIndex)
       
-      const transformedMinis = pageData.map((mini: SupabaseMini) => transformMini(mini))
-      setMinis(transformedMinis)
+      setMinis(pageData)
       setLoading(false)
+      isLoadingRef.current = false
 
     } catch (err) {
       console.error('Error loading data:', err)
       setError(err instanceof Error ? err : new Error('Unknown error'))
       setLoading(false)
+      isLoadingRef.current = false
     }
-  }, [currentPage, pageSize, fetchAllData, isCacheValid])
+  }, [currentPage, pageSize, fetchAllData, setTotalMinis])
+
+  // Remove other useEffects that trigger loadData and consolidate into one
+  useEffect(() => {
+    // Initial load
+    loadData()
+  }, [currentPage, internalSearchTerm, showMissingImages]) // Only keep the essential dependencies
+
+  // Remove the effect that watches minis.length
+  // Remove any other effects that might trigger data loading
 
   // Add invalidateCache function
   const invalidateCache = useCallback(() => {
@@ -477,6 +579,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
           updateTimeoutRef.current = setTimeout(async () => {
             try {
+              console.log('Supabase Query: Fetching updated mini data after real-time update')
               const { data: updatedMini } = await (supabase
                 .from('minis')
                 .select(MINIATURE_QUERY)
@@ -487,11 +590,11 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
               if (updatedMini) {
                 // Update the UI optimistically
-                setMinis(prev => {
+                setMinis((prev: Mini[]) => {
                   const index = prev.findIndex(m => m.id === updatedMini.id)
                   if (index === -1) return prev
                   const newMinis = [...prev]
-                  newMinis[index] = transformMini(updatedMini)
+                  newMinis[index] = transformMini(updatedMini as SupabaseMini)
                   return newMinis
                 })
               }
@@ -523,12 +626,12 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   // Modify getPageMinis to use global cache
   const getPageMinis = async (pageNum: number): Promise<Mini[]> => {
     try {
-      if (isCacheValid()) {
+      if (isCacheValid() && globalCache) {
         const startIndex = (pageNum - 1) * pageSize
         const endIndex = startIndex + pageSize
-        return globalCache!.minis
+        return globalCache.minis
           .slice(startIndex, endIndex)
-          .map(mini => transformMini(mini))
+          .map((item) => transformMini(item as SupabaseMini))
       }
 
       // If cache is invalid, fetch all data again
@@ -537,7 +640,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       const endIndex = startIndex + pageSize
       return (data || [])
         .slice(startIndex, endIndex)
-        .map((mini: SupabaseMini) => transformMini(mini))
+        .map((item) => transformMini(item as SupabaseMini))
     } catch (error) {
       console.error('Error in getPageMinis:', error)
       return []
@@ -564,10 +667,13 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     }
   }, [debouncedSearch])
 
-  // Remove duplicate effects and keep only one main effect
+  // Add effect to refresh data when filters change
   useEffect(() => {
     loadData()
+  }, [currentPage, internalSearchTerm, showMissingImages]) // Add showMissingImages to dependencies
 
+  // Remove duplicate effects and keep only one main effect
+  useEffect(() => {
     return () => {
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current)
@@ -577,7 +683,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       }
       debouncedSearch.cancel()
     }
-  }, [currentPage, internalSearchTerm, loadData]) // Add loadData to dependencies
+  }, []) // Empty dependency array for cleanup
 
   const handleDelete = async (miniId: number) => {
     try {
@@ -603,6 +709,12 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       showError('Failed to delete miniature')
     }
   }
+
+  // Update setShowMissingImages to NOT invalidate cache
+  const setShowMissingImagesAndInvalidate = useCallback((value: boolean) => {
+    setShowMissingImages(value)
+    // Don't invalidate cache, we want to filter locally
+  }, [])
 
   return {
     minis,
@@ -630,7 +742,9 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     handleDelete,
     setTotalMinis,
     setInternalSearchTerm,
-    getAllMinis: fetchAllData
+    getAllMinis: fetchAllData,
+    showMissingImages,
+    setShowMissingImages: setShowMissingImagesAndInvalidate
   }
 } 
 

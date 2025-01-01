@@ -18,6 +18,7 @@ interface CacheEntry<T> {
 
 class CacheManager<T> {
   private cache = new Map<string, CacheEntry<T>>()
+  private allData: T[] = [] // Store all data for local filtering
   
   getCacheKey(page: number, searchTerm: string | null): string {
     return `${page}-${searchTerm || ''}`
@@ -44,8 +45,17 @@ class CacheManager<T> {
     })
   }
 
+  setAllData(data: T[]) {
+    this.allData = data
+  }
+
+  getAllData() {
+    return this.allData
+  }
+
   clear(): void {
     this.cache.clear()
+    this.allData = []
   }
 }
 
@@ -109,23 +119,29 @@ const transformData = (rawItem: any): Mini => ({
   quantity: rawItem.quantity,
   created_at: rawItem.created_at,
   updated_at: rawItem.updated_at,
-  painted_by_id: rawItem.painted_by.id,
-  base_size_id: rawItem.base_size.id,
-  product_set_id: rawItem.product_set?.id || null,
-  material_id: rawItem.material?.id || null,
+  painted_by_id: rawItem.painted_by_id,
+  base_size_id: rawItem.base_size_id,
+  product_set_id: rawItem.product_set_id,
+  material_id: rawItem.material_id,
   in_use: rawItem.in_use,
+  has_image: rawItem.has_image || false,
   painted_by: rawItem.painted_by,
-  base_sizes: rawItem.base_size,
+  base_sizes: rawItem.base_sizes,
   material: rawItem.material,
-  product_sets: rawItem.product_set,
-  types: rawItem.types.map((t: any) => ({
+  product_sets: rawItem.product_sets,
+  types: (rawItem.types || []).map((t: any) => ({
     mini_id: t.mini_id,
     type_id: t.type_id,
     proxy_type: t.proxy_type,
     type: {
       id: t.type.id,
       name: t.type.name,
-      categories: t.type.categories.map((c: any) => c.category)
+      categories: t.type.categories.map((c: any) => ({
+        category: {
+          id: c.category.id,
+          name: c.category.name
+        }
+      }))
     }
   })),
   tags: (rawItem.tags || []).map((t: any) => ({ tag: t.tag }))
@@ -163,85 +179,75 @@ export function useMiniatureOverview(pageSize: number = 10) {
   const loadPageData = useCallback(async (
     page: number,
     search: string | null = null,
-    forceRefresh: boolean = false
+    forceRefresh: boolean = false,
+    showMissingImages: boolean = false
   ) => {
     try {
-      const cachedData = !forceRefresh && miniCache.current.get(page, search)
-      if (cachedData) {
-        return cachedData
+      // If we have all data cached and it's not a force refresh, filter locally
+      if (!forceRefresh && miniCache.current.getAllData().length > 0) {
+        let filteredData = miniCache.current.getAllData()
+        
+        // Apply filters locally
+        if (search?.trim()) {
+          filteredData = filteredData.filter(mini => 
+            mini.name.toLowerCase().includes(search.trim()!.toLowerCase())
+          )
+        }
+        
+        if (showMissingImages) {
+          filteredData = filteredData.filter(mini => !mini.has_image)
+        }
+
+        // Calculate pagination
+        const totalCount = filteredData.length
+        const from = (page - 1) * pageSize
+        const to = Math.min(from + pageSize, totalCount)
+        const pagedData = filteredData.slice(from, to)
+
+        return {
+          data: pagedData,
+          totalCount,
+          page,
+          searchTerm: search
+        }
       }
 
+      // If we don't have cached data or need a refresh, fetch from the database
       let query = supabase
         .from('minis')
         .select(MINIATURE_QUERY, { count: 'exact' })
         .order('name')
 
-      if (search?.trim()) {
-        query = query.ilike('name', `%${search.trim()}%`)
-      }
-
-      const from = (page - 1) * pageSize
-      const to = from + pageSize - 1
-      query = query.range(from, to)
-
-      const { data, count, error } = await query as unknown as {
-        data: Array<{
-          id: number
-          name: string
-          description: string | null
-          location: string
-          quantity: number
-          created_at: string
-          updated_at: string
-          in_use: string | null
-          painted_by: { id: number; painted_by_name: string }
-          base_size: { id: number; base_size_name: string }
-          product_set?: {
-            id: number
-            name: string
-            product_line?: {
-              id: number
-              name: string
-              company?: {
-                id: number
-                name: string
-              }
-            }
-          }
-          types: Array<{
-            mini_id: number
-            type_id: number
-            proxy_type: boolean
-            type: {
-              id: number
-              name: string
-              categories: Array<{
-                category: {
-                  id: number
-                  name: string
-                }
-              }>
-            }
-          }>
-          tags?: Array<{
-            tag: {
-              id: number
-              name: string
-            }
-          }>
-        }>
-        count: number
-        error: any
-      }
+      const { data, error } = await query
 
       if (error) throw error
 
       const transformedData = (data || []).map(transformData)
-      miniCache.current.set(page, search, transformedData, count || 0)
+      
+      // Store all data for local filtering
+      miniCache.current.setAllData(transformedData)
+
+      // Apply filters locally for the current page
+      let filteredData = transformedData
+      if (search?.trim()) {
+        filteredData = filteredData.filter(mini => 
+          mini.name.toLowerCase().includes(search.trim()!.toLowerCase())
+        )
+      }
+      
+      if (showMissingImages) {
+        filteredData = filteredData.filter(mini => !mini.has_image)
+      }
+
+      // Calculate pagination
+      const totalFilteredCount = filteredData.length
+      const from = (page - 1) * pageSize
+      const to = Math.min(from + pageSize, totalFilteredCount)
+      const pagedData = filteredData.slice(from, to)
 
       return {
-        data: transformedData,
-        totalCount: count || 0,
+        data: pagedData,
+        totalCount: totalFilteredCount,
         page,
         searchTerm: search
       }

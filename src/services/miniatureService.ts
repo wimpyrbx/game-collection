@@ -23,6 +23,157 @@ interface MiniatureData {
   tags?: MiniatureTag[]
 }
 
+// Add MINIATURE_QUERY constant at the top of the file
+const MINIATURE_QUERY = `
+  id,
+  name,
+  description,
+  quantity,
+  location,
+  created_at,
+  updated_at,
+  painted_by_id,
+  base_size_id,
+  product_set_id,
+  material_id,
+  in_use,
+  has_image,
+  types:mini_to_types(
+    mini_id,
+    type_id,
+    proxy_type,
+    type:mini_types(
+      id,
+      name,
+      categories:type_to_categories(
+        category:mini_categories(
+          id,
+          name
+        )
+      )
+    )
+  ),
+  painted_by(
+    id, 
+    painted_by_name
+  ),
+  base_sizes:base_size_id(
+    id,
+    base_size_name
+  ),
+  material:material_id(
+    id,
+    material_name
+  ),
+  product_sets:product_set_id(
+    id,
+    name,
+    product_line:product_line_id(
+      id,
+      name,
+      company:company_id(
+        id,
+        name
+      )
+    )
+  ),
+  tags:mini_to_tags(
+    tag:tags(
+      id,
+      name
+    )
+  )
+`
+
+// Add function to update has_image status
+const updateHasImage = async (miniId: number, hasImage: boolean) => {
+  console.log('Updating has_image status:', { miniId, hasImage })
+  
+  // Update in Supabase
+  const { data, error } = await supabase
+    .from('minis')
+    .update({ has_image: hasImage })
+    .eq('id', miniId)
+    .select(MINIATURE_QUERY)
+    .single()
+  
+  if (error) {
+    console.error('Error updating has_image status:', error)
+    throw error
+  }
+  
+  console.log('Successfully updated has_image status:', data)
+  return data
+}
+
+// Modify uploadMiniatureImage to handle has_image update
+export const uploadMiniatureImage = async (miniId: number, file: File, type: string = 'original') => {
+  const formData = new FormData()
+  formData.append('image', file)
+  formData.append('miniId', miniId.toString())
+  formData.append('type', type)
+
+  console.log('Uploading image:', {
+    miniId,
+    fileName: file.name,
+    fileSize: file.size,
+    fileType: file.type
+  })
+
+  try {
+    const response = await fetch('/miniatures/phpscripts/uploadImage.php', {
+      method: 'POST',
+      body: formData
+    })
+
+    const responseText = await response.text()
+    console.log('Upload response:', {
+      status: response.status,
+      statusText: response.statusText,
+      responseText
+    })
+
+    if (!response.ok) {
+      throw new Error(responseText || 'Failed to upload image')
+    }
+
+    // Try to parse the response as JSON
+    let jsonResponse
+    try {
+      jsonResponse = JSON.parse(responseText)
+      console.log('Parsed response:', jsonResponse)
+    } catch (e) {
+      console.error('Failed to parse response as JSON:', e)
+    }
+
+    // If upload was successful, update has_image to true
+    return await updateHasImage(miniId, true)
+  } catch (error) {
+    console.error('Image upload error:', error)
+    throw error
+  }
+}
+
+// Modify deleteMiniatureImage to handle has_image update
+export const deleteMiniatureImage = async (miniId: number) => {
+  const formData = new FormData()
+  formData.append('id', miniId.toString())
+
+  const response = await fetch('/miniatures/phpscripts/deleteImage.php', {
+    method: 'POST',
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Image delete failed:', errorText)
+    throw new Error(errorText || 'Failed to delete image')
+  }
+
+  // If delete was successful, update has_image to false
+  return await updateHasImage(miniId, false)
+}
+
 export async function createMiniature(data: Partial<MiniatureData>) {
   try {
     // First create the miniature without types to get its ID

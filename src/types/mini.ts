@@ -1,5 +1,5 @@
 export interface Mini {
-  id?: number
+  id: number
   name: string
   description: string | null
   location: string
@@ -11,6 +11,7 @@ export interface Mini {
   product_set_id: number | null
   material_id: number | null
   in_use: string | null
+  has_image: boolean
   image_path?: string
   types: Array<{
     mini_id: number
@@ -58,6 +59,11 @@ export interface Mini {
       name: string
     }
   }>
+}
+
+// Type for creating a new miniature (omits server-generated fields)
+export type NewMini = Omit<Mini, 'id' | 'created_at' | 'updated_at' | 'in_use'> & {
+  in_use?: string | null
 }
 
 export interface Material {

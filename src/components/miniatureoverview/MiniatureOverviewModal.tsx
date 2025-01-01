@@ -6,7 +6,7 @@ import { HiOutlineArrowSmallLeft, HiOutlineArrowSmallRight } from 'react-icons/h
 import type { Mini, MiniType } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath, getCompanyLogoPath } from '../../utils/imageUtils'
-import { createMiniature, updateMiniature, deleteImage } from '../../services/miniatureService'
+import { createMiniature, updateMiniature, uploadMiniatureImage, deleteMiniatureImage } from '../../services/miniatureService'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { supabase } from '../../lib/supabase'
 import { TagInput } from '../ui/input/TagInput'
@@ -221,7 +221,8 @@ export function MiniatureOverviewModal({
     getProductSetsByProductLine
   } = useMiniatureReferenceData()
 
-  const isEditMode = !!miniData
+  // Update isEditMode to check for valid ID
+  const isEditMode = !!miniData && !!miniData.id && miniData.id > 0
 
   // Add ref for type search input
   const typeSearchInputRef = useRef<HTMLInputElement>(null)
@@ -489,23 +490,8 @@ export function MiniatureOverviewModal({
 
         // Handle image upload if there's a new image
         if (imageFile) {
-          const formData = new FormData()
-          formData.append('image', imageFile)
-          formData.append('miniId', (newMiniId || miniData?.id || '').toString())
-          
           try {
-            const response = await fetch('/miniatures/phpscripts/uploadImage.php', {
-              method: 'POST',
-              body: formData
-            })
-            
-            const responseData = await response.json()
-            
-            if (!response.ok) {
-              console.error('Image upload failed:', responseData)
-              throw new Error(responseData.error || 'Failed to upload image')
-            }
-
+            await uploadMiniatureImage(newMiniId || miniData?.id || 0, imageFile)
             imageUploaded = true
             showSuccess('Image uploaded successfully')
 
@@ -516,7 +502,7 @@ export function MiniatureOverviewModal({
                 await AuditService.logImageOperation(
                   user.id,
                   miniId,
-                  imageExists ? 'IMAGE_REPLACE' : 'IMAGE_UPLOAD',
+                  imageExists ? 'IMAGE_UPLOAD' : 'IMAGE_UPLOAD',
                   getMiniImagePath(miniId, 'original'),
                   imageExists ? getMiniImagePath(miniId, 'original') : undefined
                 )
@@ -679,6 +665,11 @@ export function MiniatureOverviewModal({
           }
         }))
       }))
+
+      // If we removed all types, reset the type search term
+      if (newTypes.length === 0) {
+        setTypeSearchTerm('')
+      }
 
       return newTypes
     })
@@ -1024,7 +1015,7 @@ export function MiniatureOverviewModal({
     };
   }, [tagInput]);
 
-  // Add useEffect to reset search fields when miniId changes
+  // Add useEffect to reset search when miniId changes
   useEffect(() => {
     let mounted = true;
 
@@ -1148,7 +1139,7 @@ export function MiniatureOverviewModal({
     try {
       if (miniData?.id) {
         const oldImageUrl = getMiniImagePath(miniData.id, 'original')
-        await deleteImage(miniData.id)
+        await deleteMiniatureImage(miniData.id)
         setImageExists(false)
         if (onImageUpload) {
           onImageUpload()
@@ -1233,7 +1224,7 @@ export function MiniatureOverviewModal({
   return (
     <UI.Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-[800px]">
       {/* Update navigation buttons to only show when editing */}
-      {miniData?.id && onPrevious && (
+      {isEditMode && miniData?.id && onPrevious && (
         <button
           onClick={handlePrevious}
           disabled={!hasPrevious}
@@ -1244,7 +1235,7 @@ export function MiniatureOverviewModal({
         </button>
       )}
       
-      {miniData?.id && onNext && (
+      {isEditMode && miniData?.id && onNext && (
         <button
           onClick={handleNext}
           disabled={!hasNext}
@@ -1267,7 +1258,7 @@ export function MiniatureOverviewModal({
               </h2>
             </div>
             <div className="flex items-center gap-4 p-0">
-              {miniData?.id && miniData?.created_at && (
+              {isEditMode && miniData?.id && miniData?.created_at && (
                 <div className="italic text-right text-xs text-gray-400">
                   ID: <span className="text-gray-300">{miniData.id}</span>
                   <br />

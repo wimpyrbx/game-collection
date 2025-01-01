@@ -58,8 +58,11 @@ export function Sidebar() {
 
         {/* User Info & Logout */}
         <div className="p-4 border-t border-gray-700">
-          <div className="mb-4 px-4 text-sm text-gray-300 truncate">
-            {user?.email}
+          {/*<div className="mb-4">
+            <ImageStatusChecker />
+          </div>*/}
+          <div className="mb-4 px-2 text-sm text-gray-300 truncate">
+            User: <span className="font-bold text-green-600">{user?.email}</span>
           </div>
           <button
             onClick={handleSignOut}

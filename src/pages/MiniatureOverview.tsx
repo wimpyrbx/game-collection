@@ -3,7 +3,7 @@ import { FaTable, FaDiceD6, FaThLarge, FaDiceD20, FaTimesCircle, FaMinusCircle, 
 import { useMinis } from '../hooks/useMinis'
 import * as UI from '../components/ui'
 import { ShowItems } from '../components/ShowItems'
-import type { Mini } from '../types/mini'
+import type { Mini, NewMini } from '../types/mini'
 import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, PageHeaderBigNumber } from '../components/ui/pageheader'
 import { getMiniImagePath, getCompanyLogoPath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
@@ -108,6 +108,8 @@ export default function MiniatureOverview() {
     invalidateCache,
     setTotalMinis,
     setInternalSearchTerm,
+    showMissingImages,
+    setShowMissingImages
   } = useMinis(itemsPerPage);
 
   const { showSuccess, showError } = useNotifications()
@@ -117,12 +119,7 @@ export default function MiniatureOverview() {
     inUsePercentage: '0'
   })
 
-  // Add useEffect to fetch data
-  useEffect(() => {
-    fetchData();
-  }, [minis.length]); // Re-fetch when minis length changes
-
-  // Preload images for adjacent pages
+  // Keep the preload effect for adjacent pages
   useEffect(() => {
     if (!loading && totalMinis) {
       // Skip preloading on initial load
@@ -241,11 +238,13 @@ export default function MiniatureOverview() {
       }
 
       if (isModalOpen) {
-        // Handle modal navigation
-        if (e.key === 'ArrowLeft' && selectedMiniIndex > 0) {
-          handlePrevious()
-        } else if (e.key === 'ArrowRight' && selectedMiniIndex < allMinis.length - 1) {
-          handleNext()
+        // Handle modal navigation - only in edit mode
+        if (selectedMini?.id && selectedMini.id > 0) {  // Add edit mode check
+          if (e.key === 'ArrowLeft' && selectedMiniIndex > 0) {
+            handlePrevious()
+          } else if (e.key === 'ArrowRight' && selectedMiniIndex < allMinis.length - 1) {
+            handleNext()
+          }
         }
       } else {
         // Handle page navigation
@@ -263,7 +262,7 @@ export default function MiniatureOverview() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [currentPage, totalMinis, isModalOpen, selectedMiniIndex, allMinis.length, handlePrevious, handleNext, itemsPerPage])
+  }, [currentPage, totalMinis, isModalOpen, selectedMiniIndex, allMinis.length, handlePrevious, handleNext, itemsPerPage, selectedMini])
 
   const refreshImages = () => setImageTimestamp(Date.now())
 
@@ -319,6 +318,7 @@ export default function MiniatureOverview() {
           <img
             src={`${getMiniImagePath(mini.id ?? 0, 'thumb')}?t=${imageTimestamp}`}
             alt={mini.name}
+            data-mini-id={mini.id}
             loading="lazy"
             className="w-full h-full object-cover object-[85%_20%] transition-transform duration-500 scale-120 ease-in-out group-hover:scale-150 opacity-60 group-hover:opacity-100"
             onError={(e) => {
@@ -467,6 +467,55 @@ export default function MiniatureOverview() {
   const [selectedTagFilters, setSelectedTagFilters] = useState<Array<{ id: number; name: string }>>([])
   const [tagInput, setTagInput] = useState('')
   const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([])
+
+  // Add separate state for predefined tags
+  const [defaultTagInput, setDefaultTagInput] = useState('')
+  const [defaultTags, setDefaultTags] = useState<Array<{ id: number; name: string }>>([])
+  const [showDefaultTagsDropdown, setShowDefaultTagsDropdown] = useState(false)
+
+  // Add filtered tags for predefined tags
+  const filteredDefaultTags = useMemo(() => {
+    if (!defaultTagInput) return []
+    const searchLower = defaultTagInput.toLowerCase()
+    return availableTags.filter(tag => 
+      tag.name.toLowerCase().includes(searchLower) &&
+      !defaultTags.some(dt => dt.id === tag.id)
+    ).sort((a, b) => a.name.localeCompare(b.name))
+  }, [defaultTagInput, availableTags, defaultTags])
+
+  // Add default tags dropdown
+  const defaultTagsDropdown = showDefaultTagsDropdown && filteredDefaultTags.length > 0 && createPortal(
+    <div className="fixed inset-0 z-[99999]">
+      <div className="fixed inset-0" onClick={() => setShowDefaultTagsDropdown(false)} />
+      <div 
+        className="fixed z-[99999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
+        style={{
+          top: `${tagsInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
+          left: `${tagsInputRef.current?.getBoundingClientRect().left ?? 0}px`,
+          width: `${tagsInputRef.current?.offsetWidth ?? 0}px`,
+          maxHeight: '300px'
+        }}
+      >
+        <div className="flex flex-col">
+          {filteredDefaultTags.map((tag) => (
+            <button
+              key={tag.id}
+              className="w-full text-left px-3 py-2 hover:bg-gray-700 text-xs"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setDefaultTags(prev => [...prev, tag])
+                setDefaultTagInput('')
+                setShowDefaultTagsDropdown(false)
+              }}
+            >
+              <div className="text-xs text-gray-200 truncate">{tag.name}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
 
   // Create debounced setters
   const debouncedSetNameFilter = useMemo(
@@ -667,7 +716,7 @@ export default function MiniatureOverview() {
     } : null;
 
     // Initialize with empty miniature data for new entries
-    const newMini: Mini = {
+    const newMiniData: NewMini = {
       name: '',
       description: '',
       location: defaultLocation,
@@ -676,32 +725,39 @@ export default function MiniatureOverview() {
       base_size_id: defaultBaseSizeId || 0,
       product_set_id: selectedProductSet || null,
       material_id: defaultMaterialId || null,
+      has_image: false,
       types: defaultType ? [{
-        mini_id: 0, // This will be set when the miniature is created
+        mini_id: 0,
         type_id: defaultType.id,
         type: {
           id: defaultType.id,
           name: defaultType.name,
-          categories: []
+          categories: defaultType.categories || []
         },
         proxy_type: false
       }] : [],
-      tags: [],
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      in_use: null,
-      painted_by: defaultPaintedBy || {
-        id: defaultPaintedById || 0,
-        painted_by_name: 'Prepainted'
-      },
-      base_sizes: defaultBaseSize || {
-        id: defaultBaseSizeId || 0,
-        base_size_name: 'Medium'
-      },
+      tags: defaultTags.map(tag => ({
+        tag: {
+          id: tag.id,
+          name: tag.name
+        }
+      })),
+      painted_by: defaultPaintedBy || { id: 0, painted_by_name: '' },
+      base_sizes: defaultBaseSize || { id: 0, base_size_name: '' },
       product_sets: defaultProductSet ? {
         id: defaultProductSet.id,
-        name: defaultProductSet.name
+        name: defaultProductSet.name,
+        product_line: undefined
       } : undefined
+    };
+
+    // Convert to Mini type with temporary values for required fields
+    const newMini: Mini = {
+      ...newMiniData,
+      id: 0, // Temporary ID that will be replaced by the server
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      in_use: null
     };
 
     setSelectedMini(newMini);
@@ -980,6 +1036,42 @@ export default function MiniatureOverview() {
     loadTags()
   }, [])
 
+  // Add product dropdown implementation
+  const productDropdown = showProductDropdown && filteredProducts.length > 0 && createPortal(
+    <div className="fixed inset-0 z-[99999]">
+      <div className="fixed inset-0" onClick={() => setShowProductDropdown(false)} />
+      <div 
+        className="fixed z-[99999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
+        style={{
+          top: `${productSetInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
+          left: `${productSetInputRef.current?.getBoundingClientRect().left ?? 0}px`,
+          width: `${(productSetInputRef.current?.offsetWidth ?? 0) * 2}px`,
+          maxHeight: '300px'
+        }}
+      >
+        <div className="flex flex-col">
+          {filteredProducts.map((product) => (
+            <button
+              key={product.id}
+              className="w-full text-left px-3 py-2 hover:bg-gray-700 text-xs"
+              onMouseDown={(e) => {
+                e.preventDefault()
+                setSelectedProductSet(product.id)
+                setProductSearchTerm(`${product.company} - ${product.line} - ${product.set}`)
+                setDefaultProductSetId(product.id)
+                setShowProductDropdown(false)
+              }}
+            >
+              <div className="text-xs font-medium text-gray-200 truncate">{product.company} - {product.line}</div>
+              <div className="text-xs text-gray-400 truncate">{product.set}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
     return (
@@ -996,8 +1088,7 @@ export default function MiniatureOverview() {
 
   return (
     <>
-
-    <PageHeader bgColor="none">
+      <PageHeader bgColor="none">
         <PageHeaderTextGroup>
           <PageHeaderText>
             <div className="flex items-center gap-2">
@@ -1011,21 +1102,21 @@ export default function MiniatureOverview() {
         </PageHeaderTextGroup>
         <PageHeaderBigNumber
           icon={FaDiceD6}
-          number={totalMinis}
+          number={loading ? '-' : totalMinis}
           text="Unique Miniatures"
           filteredCount={filteredCount > 0 ? filteredCount : undefined}
           isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0)}
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
-          number={totalQuantity}
+          number={loading ? '-' : totalQuantity}
           text="Total Miniatures"
           filteredCount={filteredTotalQuantity > 0 ? filteredTotalQuantity : undefined}
           isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0)}
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
-          number={stats.inUseCount || 0}
+          number={loading ? '-' : stats.inUseCount}
           text="In Use"
           isFiltering={false}
         />
@@ -1091,6 +1182,13 @@ export default function MiniatureOverview() {
                             setDefaultTypeId(null);
                             setTypeSearchTermClassic('');
                             setShowTypeDropdownClassic(false);
+                            setSelectedTypeClassic(null);  // Add this line
+                            setSelectedTypes([]);  // Add this line
+
+                            // Reset default tags
+                            setDefaultTags([]);
+                            setDefaultTagInput('');
+                            setShowDefaultTagsDropdown(false);
                           }
                         }}
                         className="text-gray-400 hover:text-gray-300 focus:outline-none"
@@ -1116,84 +1214,120 @@ export default function MiniatureOverview() {
                             }}
                             className="overflow-hidden origin-left"
                           >
-                            <div className="flex gap-2 py-1 px-0 whitespace-nowrap">
-                              {/* Product Set */}
-                              <div className="relative text-xs" ref={productSetInputRef}>
-                                <UI.SearchInput
-                                  value={productSearchTerm}
-                                  onChange={(e) => {
-                                    setProductSearchTerm(e.target.value)
-                                    setShowProductDropdown(true)
-                                    if (selectedProductSet) {
-                                      setSelectedProductSet(null)
-                                    }
-                                  }}
-                                  onFocus={() => setShowProductDropdown(true)}
-                                  placeholder="Product Set..."
-                                  className="w-32 text-xs"
-                                />
-                                {showProductDropdown && filteredProducts.length > 0 && createPortal(
-                                  <div className="fixed inset-0 z-[99999]">
-                                    <div className="fixed inset-0" onClick={() => setShowProductDropdown(false)} />
-                                    <div 
-                                      className="fixed z-[99999] overflow-y-auto border border-gray-700 rounded-md bg-gray-800 shadow-lg scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"
-                                      style={{
-                                        top: `${productSetInputRef.current?.getBoundingClientRect().bottom ?? 0}px`,
-                                        left: `${productSetInputRef.current?.getBoundingClientRect().left ?? 0}px`,
-                                        width: `${(productSetInputRef.current?.offsetWidth ?? 0) * 2}px`,
-                                        maxHeight: '300px'
+                            <div className="flex items-center gap-4">
+                              {/* Type Inputs - Three Different Approaches */}
+                              <div className="flex gap-4">
+                                {/* Classic Approach */}
+                                <div className="relative group type-dropdown-container z-[99999]">
+                                  <div className="relative" ref={classicInputRef}>
+                                    <UI.SearchInput
+                                      value={typeSearchTermClassic}
+                                      onChange={(e) => {
+                                        setTypeSearchTermClassic(e.target.value)
+                                        setShowTypeDropdownClassic(true)
+                                        if (selectedTypes.length > 0) {
+                                          setSelectedTypes([])
+                                        }
                                       }}
-                                    >
-                                      <div className="flex flex-col">
-                                    {filteredProducts.map((product) => (
+                                      onFocus={() => setShowTypeDropdownClassic(true)}
+                                      placeholder="Type..."
+                                      className="w-32 text-xs"
+                                    />
+                                    {typeDropdownClassic}
+                                    {selectedTypeClassic && (
                                       <button
-                                        key={product.id}
-                                            className="w-full text-left px-3 py-2 hover:bg-gray-700 text-xs"
-                                            onMouseDown={(e) => {
-                                              e.preventDefault()
-                                          setSelectedProductSet(product.id)
-                                              setProductSearchTerm(`${product.company} - ${product.line} - ${product.set}`)
-                                          setShowProductDropdown(false)
+                                        onClick={() => {
+                                          setSelectedTypeClassic(null)
+                                          setTypeSearchTermClassic('')
+                                          setDefaultTypeId(null)
                                         }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
                                       >
-                                            <div className="text-xs font-medium text-gray-200 truncate">{product.company} - {product.line}</div>
-                                            <div className="text-xs text-gray-400 truncate">{product.set}</div>
+                                        <FaTimesCircle className="w-4 h-4" />
                                       </button>
-                                    ))}
+                                    )}
                                   </div>
-                                    </div>
-                                  </div>,
-                                  document.body
-                                )}
-                                {selectedProductSet && (
-                                  <button
-                                    onClick={() => {
-                                      setSelectedProductSet(null)
-                                      setProductSearchTerm('')
-                                    }}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                                  >
-                                    <FaTimesCircle className="w-4 h-4" />
-                                  </button>
-                                )}
+                                </div>
                               </div>
 
-                              {/* Location */}
-                              <div className="relative">
-                                <UI.SearchInput
-                                  value={defaultLocation}
-                                  onChange={(e) => setDefaultLocation(e.target.value)}
-                                  placeholder="Location..."
-                                  className="w-32 text-xs"
-                                />
-                                {defaultLocation && (
-                                  <button
-                                    onClick={() => setDefaultLocation('')}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                                  >
-                                    <FaTimesCircle className="w-4 h-4" />
-                                  </button>
-                                )}
+                              {/* Product Set */}
+                              <div className="relative group product-dropdown-container z-[99999]">
+                                <div className="relative" ref={productSetInputRef}>
+                                  <UI.SearchInput
+                                    value={productSearchTerm}
+                                    onChange={(e) => {
+                                      setProductSearchTerm(e.target.value)
+                                      setShowProductDropdown(true)
+                                      if (selectedProductSet) {
+                                        setSelectedProductSet(null)
+                                      }
+                                    }}
+                                    onFocus={() => setShowProductDropdown(true)}
+                                    placeholder="Product..."
+                                    className="w-32 text-xs"
+                                  />
+                                  {productDropdown}
+                                  {selectedProductSet && (
+                                    <button
+                                      onClick={() => {
+                                        setSelectedProductSet(null)
+                                        setProductSearchTerm('')
+                                        setDefaultProductSetId(null)
+                                      }}
+                                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                                    >
+                                      <FaTimesCircle className="w-4 h-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Painted By */}
+                              <select
+                                value={defaultPaintedById || ''}
+                                onChange={(e) => setDefaultPaintedById(e.target.value ? Number(e.target.value) : null)}
+                                className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
+                              >
+                                {paintedByOptions.map((painter) => (
+                                  <option key={painter.id} value={painter.id}>
+                                    {painter.painted_by_name.charAt(0).toUpperCase() + painter.painted_by_name.slice(1).toLowerCase()}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Tags */}
+                              <div className="relative group tags-dropdown-container z-[99999]">
+                                <div className="relative" ref={tagsInputRef}>
+                                  <UI.SearchInput
+                                    value={defaultTagInput}
+                                    onChange={(e) => {
+                                      setDefaultTagInput(e.target.value)
+                                      setShowDefaultTagsDropdown(true)
+                                    }}
+                                    onFocus={() => setShowDefaultTagsDropdown(true)}
+                                    placeholder="Tags..."
+                                    className="w-32 text-xs"
+                                  />
+                                  {defaultTagsDropdown}
+                                  <div className="flex flex-wrap gap-1 mt-1 absolute w-full">
+                                    {defaultTags.map(tag => (
+                                      <div
+                                        key={tag.id}
+                                        className="flex items-center gap-1 px-2 py-1 bg-gray-700 text-gray-200 text-xs rounded-full border border-gray-600"
+                                      >
+                                        {tag.name}
+                                        <button
+                                          onClick={() => {
+                                            setDefaultTags(prev => prev.filter(t => t.id !== tag.id))
+                                          }}
+                                          className="text-gray-400 hover:text-gray-300"
+                                        >
+                                          <FaTimesCircle className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
                               </div>
 
                               {/* Base Size */}
@@ -1205,19 +1339,6 @@ export default function MiniatureOverview() {
                                 {baseSizeOptions.map((size) => (
                                   <option key={size.id} value={size.id}>
                                     {size.base_size_name.charAt(0).toUpperCase() + size.base_size_name.slice(1).toLowerCase()}
-                                  </option>
-                                ))}
-                              </select>
-
-                              {/* Painted By */}
-                              <select
-                                value={defaultPaintedById || ''}
-                                onChange={(e) => setDefaultPaintedById(e.target.value ? Number(e.target.value) : null)}
-                                className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
-                              >
-                                {paintedByOptions.map((painter) => (
-                                  <option key={painter.id} value={painter.id}>
-                                    {painter.painted_by_name.charAt(0).toUpperCase() + painter.painted_by_name.slice(1).toLowerCase()}
                                   </option>
                                 ))}
                               </select>
@@ -1235,39 +1356,13 @@ export default function MiniatureOverview() {
                                 ))}
                               </select>
 
-                              {/* Type Inputs - Three Different Approaches */}
-                              <div className="flex gap-4">
-                                {/* Classic Approach */}
-                                <div className="relative group type-dropdown-container z-[99999]">
-                                  <div className="relative" ref={classicInputRef}>
-                                <UI.SearchInput
-                                      value={typeSearchTermClassic}
-                                  onChange={(e) => {
-                                        setTypeSearchTermClassic(e.target.value)
-                                        setShowTypeDropdownClassic(true)
-                                        if (selectedTypes.length > 0) {
-                                          setSelectedTypes([])
-                                        }
-                                      }}
-                                      onFocus={() => setShowTypeDropdownClassic(true)}
-                                  placeholder="Type..."
-                                  className="w-32 text-xs"
-                                />
-                                    {typeDropdownClassic}
-                                    {selectedTypeClassic && (
-                                  <button
-                                    onClick={() => {
-                                          setSelectedTypeClassic(null)
-                                          setTypeSearchTermClassic('')
-                                    }}
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
-                                  >
-                                    <FaTimesCircle className="w-4 h-4" />
-                                  </button>
-                                )}
-                                  </div>
-                                </div>
-                              </div>
+                              {/* Location */}
+                              <UI.SearchInput
+                                value={defaultLocation}
+                                onChange={(e) => setDefaultLocation(e.target.value)}
+                                placeholder="Location..."
+                                className="w-32 text-xs"
+                              />
                             </div>
                           </motion.div>
                         )}
@@ -1318,8 +1413,8 @@ export default function MiniatureOverview() {
                         debouncedSetNameFilter(value)
                         setCurrentPage(1)
                       }}
-                      placeholder="Miniature name..."
-                      className="w-[200px]"
+                      placeholder="Name..."
+                      className="w-[80px]"
                     />
                     {immediateNameFilter && (
                       <button
@@ -1349,7 +1444,7 @@ export default function MiniatureOverview() {
                         setCurrentPage(1)
                       }}
                       placeholder="Main type..."
-                      className="w-[100px]"
+                      className="w-[80px]"
                     />
                     {immediateTypeFilter && (
                       <button
@@ -1379,7 +1474,7 @@ export default function MiniatureOverview() {
                         setCurrentPage(1)
                       }}
                       placeholder="All types..."
-                      className="w-[100px]"
+                      className="w-[80px]"
                     />
                     {immediateAllTypesFilter && (
                       <button
@@ -1398,7 +1493,7 @@ export default function MiniatureOverview() {
 
                 {/* Product Set Filter */}
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Product Set:</label>
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Product:</label>
                   <div className="relative">
                     <UI.SearchInput
                       value={immediateProductSetFilter}
@@ -1428,7 +1523,7 @@ export default function MiniatureOverview() {
 
                 {/* Painted By Filter */}
                 <div className="flex items-center">
-                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Painted By:</label>
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Paint:</label>
                   <select
                     value={immediatePaintedByFilter}
                     onChange={(e) => {
@@ -1505,8 +1600,22 @@ export default function MiniatureOverview() {
                   </div>
                 </div>
 
-                {/* Reset Filters Button */}
-                <div className="flex items-center ml-auto pr-0">
+                {/* Reset Filters Button and Missing Images Filter */}
+                <div className="flex items-center ml-auto pr-0 gap-4">
+                  {/* Missing Images Filter */}
+                  <label className="flex items-center gap-2 text-sm text-gray-400">
+                    <input
+                      type="checkbox"
+                      checked={showMissingImages}
+                      onChange={(e) => {
+                        setShowMissingImages(e.target.checked)
+                        setCurrentPage(1)
+                      }}
+                      className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-500 bg-gray-700 focus:ring-blue-500"
+                    />
+                    Missing Images
+                  </label>
+
                   <UI.Button
                     variant="btnPrimary"
                     size="sm"
@@ -1523,6 +1632,7 @@ export default function MiniatureOverview() {
                       setAllTypesFilter('')
                       setSelectedTagFilters([])
                       setTagInput('')
+                      setShowMissingImages(false)
                       setCurrentPage(1)
                     }}
                     className="text-sm py-2"
@@ -1537,7 +1647,7 @@ export default function MiniatureOverview() {
                 {minis.length === 0 ? (
                   <UI.EmptyTableState icon={<FaDiceD6 />} message="No miniatures found" />
                 ) : viewMode === 'table' ? (
-                  <div className="overflow-x-auto overflow-y-auto h-[calc(90vh-23rem)] mt-4">
+                  <div className="overflow-x-auto overflow-y-auto h-[calc(92vh-23rem)] mt-4">
                     <table className="w-full divide-y divide-[#333333]">
                       <thead className="sticky top-0 z-10">
                         <tr>
@@ -1617,7 +1727,8 @@ export default function MiniatureOverview() {
                             <img
                               src={originalPath}
                               alt={mini.name}
-                              className="w-full h-full object-cover object-[85%_20%] transition-transform duration-500 scale-120 ease-in-out group-hover:scale-150 group-hover:translate-x-5 opacity-60 group-hover:opacity-100"
+                              data-mini-id={mini.id}
+                              className="w-full h-full object-cover object-[85%_20%] transition-transform duration-500 scale-120 ease-in-out group-hover:scale-150 opacity-60 group-hover:opacity-100"
                               onError={(e) => {
                                 e.currentTarget.onerror = null
                                 e.currentTarget.style.display = 'none'
