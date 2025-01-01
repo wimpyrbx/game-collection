@@ -1316,25 +1316,27 @@ export default function MiniatureOverview() {
                                     className="w-32 text-xs"
                                   />
                                   {defaultTagsDropdown}
-                                  <div className="flex flex-wrap gap-1 mt-1 absolute w-full">
-                                    {defaultTags.map(tag => (
-                                      <div
-                                        key={tag.id}
-                                        className="flex items-center gap-1 px-2 py-1 bg-gray-700 text-gray-200 text-xs rounded-full border border-gray-600"
-                                      >
-                                        {tag.name}
-                                        <button
-                                          onClick={() => {
-                                            setDefaultTags(prev => prev.filter(t => t.id !== tag.id))
-                                          }}
-                                          className="text-gray-400 hover:text-gray-300"
-                                        >
-                                          <FaTimesCircle className="w-3 h-3" />
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
                                 </div>
+                                {defaultTags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 fixed border border-gray-600 bg-gray-800 p-2 mt-[-65px] animate-fade-in">
+                                  {defaultTags.map(tag => (
+                                    <div
+                                      key={tag.id}
+                                      className="flex items-center gap-1 px-2 py-1 bg-gray-700 text-gray-200 text-xs rounded-full border border-gray-600"
+                                    >
+                                      {tag.name}
+                                      <button
+                                        onClick={() => {
+                                          setDefaultTags(prev => prev.filter(t => t.id !== tag.id))
+                                        }}
+                                        className="text-gray-400 hover:text-gray-300"
+                                      >
+                                        <FaTimesCircle className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                                )}
                               </div>
 
                               {/* Base Size */}

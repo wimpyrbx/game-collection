@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseMonitor'
 import type { Mini } from '../types/mini'
 import debounce from 'lodash/debounce'
-import { deleteMiniature } from '../services/miniatureService'
 
 interface SupabaseMiniType {
   mini_id: number
@@ -532,7 +531,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
         // If no cache or no search term, fetch new data
         const { data, totalQuantity, totalCount } = await fetchAllData()
-        
+
         const startIndex = (currentPage - 1) * pageSize
         const endIndex = startIndex + pageSize
         const pageData = data.slice(startIndex, endIndex)
@@ -547,13 +546,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         setLoading(false)
       }
     }, SEARCH_DEBOUNCE)
-  ).current
-
-  // Update search term handler
-  const handleSearch = useCallback((term: string | null) => {
-    setInternalSearchTerm(term)
-    debouncedSearch(term)
-  }, [debouncedSearch])
+  )
 
   // Setup real-time subscription
   useEffect(() => {
@@ -663,7 +656,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   // Clean up the debounced function on unmount
   useEffect(() => {
     return () => {
-      debouncedSearch.cancel()
+      debouncedSearch.current.cancel()
     }
   }, [debouncedSearch])
 
@@ -681,34 +674,9 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       if (subscriptionRef.current) {
         subscriptionRef.current()
       }
-      debouncedSearch.cancel()
+      debouncedSearch.current.cancel()
     }
   }, []) // Empty dependency array for cleanup
-
-  const handleDelete = async (miniId: number) => {
-    try {
-      await deleteMiniature(miniId)
-      
-      // Invalidate cache to force a fresh fetch
-      invalidateCache()
-      
-      // Refresh the minis list
-      const updatedMinis = await getPageMinis(currentPage)
-      if (updatedMinis) {
-        // Force a re-render by updating the state
-        setMinis(updatedMinis)
-        // Update total quantity
-        await getTotalQuantity()
-        // Force refresh of images
-        refreshImages()
-      }
-      
-      showSuccess('Miniature deleted successfully')
-    } catch (error) {
-      console.error('Error deleting miniature:', error)
-      showError('Failed to delete miniature')
-    }
-  }
 
   // Update setShowMissingImages to NOT invalidate cache
   const setShowMissingImagesAndInvalidate = useCallback((value: boolean) => {
@@ -717,14 +685,15 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   }, [])
 
   const getCachedTotal = useCallback(() => {
-    return globalCache?.minis.length || 0;
-  }, [globalCache]);
+    return globalCache?.minis.length || totalMinis;
+  }, [globalCache, totalMinis]);
 
   return {
     minis,
     loading,
     error,
     totalMinis: getCachedTotal(),
+    totalQuantity,
     getPageMinis,
     getAllMinis: fetchAllData,
     setMinis,
@@ -738,17 +707,3 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     setShowMissingImages: setShowMissingImagesAndInvalidate
   }
 } 
-
-function refreshImages() {
-  throw new Error('Function not implemented.')
-}
-
-
-function showSuccess(_arg0: string) {
-  throw new Error('Function not implemented.')
-}
-
-
-function showError(_arg0: string) {
-  throw new Error('Function not implemented.')
-}

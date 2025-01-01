@@ -20,6 +20,15 @@ module.exports = {
         'table-action-delete': 'var(--color-table-action-delete)',
         'table-action-delete-hover': 'var(--color-table-action-delete-hover)',
       },
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(-10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        }
+      },
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-in-out forwards'
+      }
     },
   },
   plugins: [
