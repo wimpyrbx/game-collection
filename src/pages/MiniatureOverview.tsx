@@ -8,8 +8,7 @@ import { PageHeader, PageHeaderText, PageHeaderSubText, PageHeaderTextGroup, Pag
 import { getMiniImagePath, getCompanyLogoPath } from '../utils/imageUtils'
 import { MiniatureOverviewModal } from '../components/miniatureoverview/MiniatureOverviewModal'
 import { useNotifications } from '../contexts/NotificationContext'
-import { deleteMiniature, getMiniature, updateMiniatureInUse } from '../services/miniatureService'
-import { Switch } from '../components/ui'
+import { getMiniature } from '../services/miniatureService'
 import { useMiniatureReferenceData } from '../hooks/useMiniatureReferenceData'
 import { useViewMode } from '../hooks/useViewMode'
 import { AuditService } from '../services/auditService'
@@ -49,8 +48,14 @@ export default function MiniatureOverview() {
   const initialLoadRef = useRef(true)
   const { user } = useAuth()
   const typeCategoryAdmin = useTypeCategoryAdmin()
-  const referenceData = useMiniatureReferenceData();
-  const materialOptions = referenceData.materials || [];
+  const {
+    paintedByOptions,
+    baseSizeOptions,
+    companies,
+    getProductLinesByCompany,
+    getProductSetsByProductLine,
+    materials: materialOptions = []
+  } = useMiniatureReferenceData()
   const [defaultMaterialId, setDefaultMaterialId] = useState<number | null>(null);
 
   // Add refs for dropdown positioning
@@ -87,14 +92,6 @@ export default function MiniatureOverview() {
   }, [selectedTypeClassic, typeSearchTermClassic, typeCategoryAdmin.miniTypes])
 
   const {
-    paintedByOptions,
-    baseSizeOptions,
-    companies,
-    getProductLinesByCompany,
-    getProductSetsByProductLine,
-  } = useMiniatureReferenceData()
-
-  const {
     minis,
     loading,
     error,
@@ -103,11 +100,8 @@ export default function MiniatureOverview() {
     getPageMinis,
     getAllMinis,
     setMinis,
-    getTotalQuantity,
     currentPage,
     setCurrentPage,
-    invalidateCache,
-    setTotalMinis,
     setInternalSearchTerm,
     showMissingImages,
     setShowMissingImages,
@@ -284,26 +278,6 @@ export default function MiniatureOverview() {
     { title: 'QTY', className: 'text-center w-20' },
     { title: 'In Use', className: 'text-center w-20' }
   ]
-
-  const handleInUseToggle = async (miniId: number, checked: boolean) => {
-    try {
-      const oldMiniature = await getMiniature(miniId);
-      await handleUpdateInUse(miniId, checked);
-      const newMiniature = await getMiniature(miniId);
-      
-      if (user?.id && oldMiniature && newMiniature) {
-        await AuditService.logMiniatureUpdate(
-          user.id,
-          miniId,
-          oldMiniature,
-          newMiniature
-        );
-      }
-    } catch (error) {
-      console.error('Error updating in_use status:', error);
-      showError('Failed to update status');
-    }
-  };
 
   const getItemColumns = (mini: Mini) => {
     // Get the main type (proxy_type = false)
@@ -864,10 +838,6 @@ export default function MiniatureOverview() {
     setSelectedMini(undefined)
   }
 
-  const handleDeleteMiniature = async (miniId: number) => {
-    await handleDelete(miniId)
-  }
-
   const handlePreviousMini = () => {
     handlePrevious()
   }
@@ -878,7 +848,11 @@ export default function MiniatureOverview() {
 
   const hasPreviousMini = selectedMiniIndex > 0
   const hasNextMini = selectedMiniIndex < allMinis.length - 1
-  const selectedMiniId = selectedMini?.id
+
+  // Add useEffect to fetch stats
+  useEffect(() => {
+    fetchData();
+  }, [minis]); // Re-fetch when minis change
 
   const fetchData = async () => {
     try {
@@ -1001,15 +975,15 @@ export default function MiniatureOverview() {
           icon={FaDiceD6}
           number={loading ? '-' : totalMinis}
           text="Unique Miniatures"
-          filteredCount={nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages ? filteredCount : undefined}
-          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages)}
+          filteredCount={isFiltering ? filteredCount : undefined}
+          isFiltering={isFiltering}
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
           number={loading ? '-' : totalQuantity}
           text="Total Miniatures"
-          filteredCount={nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages ? filteredTotalQuantity : undefined}
-          isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages)}
+          filteredCount={isFiltering ? filteredTotalQuantity : undefined}
+          isFiltering={isFiltering}
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}

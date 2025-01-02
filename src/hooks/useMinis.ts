@@ -2,12 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseMonitor'
 import type { Mini } from '../types/mini'
 import debounce from 'lodash/debounce'
-import { createMiniature, updateMiniature, deleteMiniature, updateMiniatureInUse, getMiniature } from '../services/miniatureService'
-import type { MiniatureType, MiniatureTag, MiniatureData } from '../services/miniatureService'
-import { useOptimisticMinis } from './useOptimisticMinis'
-
-// Debugging
-const enabledDebug = true
+import { createMiniature, updateMiniature, deleteMiniature } from '../services/miniatureService'
+import type { MiniatureData } from '../services/miniatureService'
 
 interface SupabaseMiniType {
   mini_id: number
@@ -960,37 +956,33 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   };
 
   const handleUpdateInUse = async (miniId: number, inUse: boolean) => {
-    // Find the mini to update
-    const miniToUpdate = minis.find(m => m.id === miniId);
-    if (!miniToUpdate) return;
-
     try {
-      // Optimistically update UI
-      setMinis(prevMinis => {
-        const index = prevMinis.findIndex(m => m.id === miniId);
-        if (index === -1) return prevMinis;
-        const newMinis = [...prevMinis];
-        newMinis[index] = {
-          ...newMinis[index],
-          in_use: inUse ? new Date().toISOString() : null
-        };
-        return newMinis;
-      });
+      const { data, error } = await supabase
+        .from('minis')
+        .update({ in_use: inUse ? new Date().toISOString() : null })
+        .eq('id', miniId)
+        .select()
+        .single()
 
-      // Perform actual API call
-      await updateMiniatureInUse(miniId, inUse);
+      if (error) {
+        throw error
+      }
+
+      if (data) {
+        // Update the cache with the new data
+        const updatedMinis = minis.map(mini =>
+          mini.id === miniId ? { ...mini, in_use: inUse ? new Date().toISOString() : null } : mini
+        )
+        setMinis(updatedMinis)
+        updateViewsFromCache()
+      }
+
+      return data
     } catch (error) {
-      // Revert optimistic update on error
-      setMinis(prevMinis => {
-        const index = prevMinis.findIndex(m => m.id === miniId);
-        if (index === -1) return prevMinis;
-        const newMinis = [...prevMinis];
-        newMinis[index] = miniToUpdate;
-        return newMinis;
-      });
-      throw error;
+      console.error('Error updating in_use status:', error)
+      throw error
     }
-  };
+  }
 
   // Update subscription handler to be more strict about skipping our own changes
   useEffect(() => {
@@ -1028,12 +1020,12 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
                   }
                 } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
                   const { data: updatedMini } = await supabase
-                    .from('minis')
-                    .select(MINIATURE_QUERY)
+                .from('minis')
+                .select(MINIATURE_QUERY)
                     .eq('id', payload.new.id)
                     .single() as unknown as { data: SupabaseMini | null };
 
-                  if (updatedMini) {
+              if (updatedMini) {
                     if (index !== -1) {
                       updatedMinis[index] = updatedMini;
                     } else {
@@ -1095,7 +1087,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         const startIndex = (pageNum - 1) * pageSize;
         const endIndex = startIndex + pageSize;
         return filteredData
-          .slice(startIndex, endIndex)
+        .slice(startIndex, endIndex)
           .map(item => transformMini(item));
       }
 
@@ -1169,75 +1161,6 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     setShowMissingImages(value)
     // Don't invalidate cache, we want to filter locally
   }, [])
-
-  const getCachedTotal = useCallback(() => {
-    return globalCache?.minis.length || totalMinis;
-  }, [globalCache, totalMinis]);
-
-  // Add optimistic update helpers
-  const optimisticallyUpdateMinis = (updatedMini: Mini) => {
-    setMinis(prevMinis => {
-      const index = prevMinis.findIndex(m => m.id === updatedMini.id);
-      if (index === -1) return prevMinis;
-      const newMinis = [...prevMinis];
-      newMinis[index] = updatedMini;
-      return newMinis;
-    });
-  };
-
-  const optimisticallyAddMini = (newMini: Mini) => {
-    setMinis(prevMinis => {
-      // Insert the new mini in the correct alphabetical position
-      const index = prevMinis.findIndex(m => m.name.toLowerCase() > newMini.name.toLowerCase());
-      const newMinis = [...prevMinis];
-      if (index === -1) {
-        newMinis.push(newMini);
-      } else {
-        newMinis.splice(index, 0, newMini);
-      }
-      return newMinis;
-    });
-    setTotalMinis(prev => prev + 1);
-    setTotalQuantity(prev => prev + (newMini.quantity || 0));
-  };
-
-  const optimisticallyDeleteMini = (miniId: number, quantity: number) => {
-    setMinis(prevMinis => prevMinis.filter(m => m.id !== miniId));
-    setTotalMinis(prev => prev - 1);
-    setTotalQuantity(prev => prev - quantity);
-  };
-
-  const optimisticallyUpdateInUse = (miniId: number, inUse: boolean) => {
-    setMinis(prevMinis => {
-      const index = prevMinis.findIndex(m => m.id === miniId);
-      if (index === -1) return prevMinis;
-      const newMinis = [...prevMinis];
-      newMinis[index] = {
-        ...newMinis[index],
-        in_use: inUse ? new Date().toISOString() : null
-      };
-      return newMinis;
-    });
-  };
-
-  // Add function to recalculate cache totals
-  const recalculateCacheTotals = useCallback(() => {
-    if (!globalCache) return;
-    
-    // Calculate total quantity from cache
-    const totalQuantitySum = globalCache.minis.reduce((acc, curr) => {
-      const quantity = Number(curr.quantity);
-      return acc + (isNaN(quantity) ? 0 : quantity);
-    }, 0);
-
-    // Update cache with new totals
-    globalCache = {
-      ...globalCache,
-      totalQuantity: totalQuantitySum
-    };
-
-    return totalQuantitySum;
-  }, []);
 
   return {
     minis,

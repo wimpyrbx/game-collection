@@ -6,7 +6,7 @@ import { HiOutlineArrowSmallLeft, HiOutlineArrowSmallRight } from 'react-icons/h
 import type { Mini, MiniType } from '../../types/mini'
 import { useMiniatureReferenceData } from '../../hooks/useMiniatureReferenceData'
 import { getMiniImagePath, getCompanyLogoPath } from '../../utils/imageUtils'
-import { createMiniature, updateMiniature, uploadMiniatureImage, deleteMiniatureImage } from '../../services/miniatureService'
+import { uploadMiniatureImage, deleteMiniatureImage } from '../../services/miniatureService'
 import { useNotifications } from '../../contexts/NotificationContext'
 import { supabase } from '../../lib/supabase'
 import { TagInput } from '../ui/input/TagInput'
