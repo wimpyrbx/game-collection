@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabaseMonitor'
 import type { Mini } from '../types/mini'
 import debounce from 'lodash/debounce'
+import { createMiniature, updateMiniature, deleteMiniature, updateMiniatureInUse, getMiniature } from '../services/miniatureService'
+import type { MiniatureType, MiniatureTag, MiniatureData } from '../services/miniatureService'
+import { useOptimisticMinis } from './useOptimisticMinis'
+
+// Debugging
+const enabledDebug = true
 
 interface SupabaseMiniType {
   mini_id: number
@@ -192,15 +198,20 @@ type SupabaseResponse = {
 
 export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   const [minis, setMinis] = useState<Mini[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
-  const [currentPage, setCurrentPage] = useState(1)
   const [totalMinis, setTotalMinis] = useState(0)
   const [totalQuantity, setTotalQuantity] = useState(0)
+  const [currentPage, setCurrentPage] = useState(1)
   const [internalSearchTerm, setInternalSearchTerm] = useState<string | null>(searchTerm || null)
   const [showMissingImages, setShowMissingImages] = useState(false)
+  const [filteredCount, setFilteredCount] = useState(0)
+  const [filteredTotalQuantity, setFilteredTotalQuantity] = useState(0)
   const searchTimeoutRef = useRef<NodeJS.Timeout>()
   const isLoadingRef = useRef(false)
+
+  // Add flag to track our own changes
+  const ourChangeRef = useRef<number | null>(null);
 
   // Update search term with debounce
   useEffect(() => {
@@ -306,22 +317,18 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
           filteredData = filteredData.filter(mini => !mini.has_image)
         }
 
-        const totalQuantitySum = filteredData.reduce((acc: number, curr: { quantity: number }) => 
-          acc + (curr.quantity || 0), 0
-        )
-
         return {
           data: filteredData.map(mini => transformMini(mini)),
-          totalQuantity: totalQuantitySum,
+          totalQuantity: globalCache.totalQuantity,
           totalCount: filteredData.length
         }
       }
 
       // If no valid cache, fetch from Supabase
-      // console.log('No valid cache, fetching from Supabase')
+      console.log('No valid cache, fetching from Supabase')
       
       // First get the total count
-      // console.log('Supabase Query: Fetching total count of minis')
+      console.log('Supabase Query: Fetching total count of minis')
       let countQuery = supabase.from('minis').select('*', { count: 'exact', head: true })
       
       const { count, error: countError } = await countQuery
@@ -329,38 +336,64 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       
       // Store total count
       const totalCount = count || 0
+      console.log('Total count from Supabase:', totalCount)
       setTotalMinis(totalCount)
 
       // Build the data query
-      // console.log('Supabase Query: Fetching all minis data')
+      console.log('Supabase Query: Fetching all minis data')
       let dataQuery = supabase.from('minis').select(MINIATURE_QUERY).order('name')
 
       // Get all data in chunks to handle large datasets
       let allData: SupabaseMini[] = []
       let page = 0
-      const chunkSize = 1000
+      const chunkSize = 1000 // Use smaller chunks to ensure we don't hit limits
+      let hasMore = true
+      let totalQuantitySum = 0
       
-      while (true) {
-        // console.log(`Supabase Query: Fetching minis chunk ${page + 1} (${page * chunkSize} - ${(page + 1) * chunkSize - 1})`)
+      while (hasMore) {
+        console.log(`Fetching chunk ${page + 1} (${page * chunkSize} - ${(page + 1) * chunkSize - 1})`)
+        const from = page * chunkSize
+        const to = from + chunkSize - 1
+        
         const result = await dataQuery
-          .range(page * chunkSize, (page + 1) * chunkSize - 1) as unknown as SupabaseResponse
+          .range(from, to) as unknown as SupabaseResponse
 
         const { data, error } = result
         if (error) throw error
-        if (!data || data.length === 0) break
+        if (!data || data.length === 0) {
+          hasMore = false
+          break
+        }
+
+        // Add up quantities as we go through chunks
+        const chunkQuantity = data.reduce((acc, curr) => {
+          const quantity = Number(curr.quantity)
+          return acc + (isNaN(quantity) ? 0 : quantity)
+        }, 0)
+        totalQuantitySum += chunkQuantity
+        console.log(`Chunk ${page + 1} quantity sum:`, chunkQuantity)
 
         allData = [...allData, ...data]
-        if (data.length < chunkSize) break
+        console.log(`Total entries so far:`, allData.length)
+        hasMore = data.length === chunkSize // If we got less than chunkSize, we're done
         page++
       }
 
-      // Store the raw data in cache before filtering
+      console.log('Final data fetch complete:', {
+        totalEntries: allData.length,
+        totalQuantity: totalQuantitySum
+      })
+
+      // Store the raw data in cache with correct total quantity
       globalCache = {
         minis: allData,
-        totalQuantity: allData.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+        totalQuantity: allData.reduce((acc, curr) => {
+          const quantity = Number(curr.quantity);
+          return acc + (isNaN(quantity) ? 0 : quantity);
+        }, 0),
         timestamp: Date.now(),
         searchTerm: null
-      }
+      };
 
       // Now apply filters to the cached data
       let filteredData = [...allData]
@@ -428,10 +461,6 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         filteredData = filteredData.filter(mini => !mini.has_image)
       }
 
-      const totalQuantitySum = filteredData.reduce((acc: number, curr: { quantity: number }) => 
-        acc + (curr.quantity || 0), 0
-      )
-
       return {
         data: filteredData.map(mini => transformMini(mini)),
         totalQuantity: totalQuantitySum,
@@ -444,48 +473,167 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     }
   }, [internalSearchTerm, showMissingImages, setTotalMinis, isCacheValid])
 
-  // Add loadData function
+  // Add function to update views from cache
+  const updateViewsFromCache = useCallback(() => {
+    if (!globalCache) {
+      console.log('updateViewsFromCache: No global cache available');
+      return;
+    }
+
+    console.log('updateViewsFromCache: Starting update with cache size:', globalCache.minis.length);
+
+    // Calculate total counts first (unfiltered)
+    const totalCount = globalCache.minis.length;
+    const totalQuantity = globalCache.minis.reduce((acc, curr) => {
+      const quantity = Number(curr.quantity);
+      return acc + (isNaN(quantity) ? 0 : quantity);
+    }, 0);
+
+    // Get initial data
+    let filteredData = [...globalCache.minis];
+    
+    // Apply all filters in sequence
+    if (internalSearchTerm) {
+      console.log('Applying filters:', internalSearchTerm);
+      
+      // Split the search term into individual filters
+      const filterTerms = internalSearchTerm.split(' AND ').map(term => term.trim()).filter(Boolean);
+      console.log('Filter terms:', filterTerms);
+
+      // Apply each filter term sequentially
+      filterTerms.forEach(term => {
+        if (term.startsWith('name:')) {
+          const name = term.replace('name:', '').trim().toLowerCase();
+          console.log('Applying name filter:', name);
+          filteredData = filteredData.filter(mini => 
+            mini.name.toLowerCase().includes(name)
+          );
+        }
+        else if (term.startsWith('type:')) {
+          const type = term.replace('type:', '').trim().toLowerCase();
+          console.log('Applying type filter:', type);
+          filteredData = filteredData.filter(mini => 
+            mini.types?.some(t => !t.proxy_type && t.type.name.toLowerCase().includes(type))
+          );
+        }
+        else if (term.startsWith('alltype:')) {
+          const type = term.replace('alltype:', '').trim().toLowerCase();
+          console.log('Applying alltype filter:', type);
+          filteredData = filteredData.filter(mini => 
+            mini.types?.some(t => t.type.name.toLowerCase().includes(type))
+          );
+        }
+        else if (term.startsWith('productset:')) {
+          const productSet = term.replace('productset:', '').trim().toLowerCase();
+          console.log('Applying productset filter:', productSet);
+          filteredData = filteredData.filter(mini => 
+            mini.product_sets?.name?.toLowerCase().includes(productSet) ||
+            mini.product_sets?.product_line?.name?.toLowerCase().includes(productSet) ||
+            mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(productSet)
+          );
+        }
+        else if (term.startsWith('paintedby:')) {
+          const paintedBy = term.replace('paintedby:', '').trim().toLowerCase();
+          console.log('Applying paintedby filter:', paintedBy);
+          filteredData = filteredData.filter(mini => 
+            mini.painted_by?.painted_by_name.toLowerCase().includes(paintedBy)
+          );
+        }
+        else if (term.startsWith('tags:')) {
+          const tags = term.replace('tags:', '').split(',').map(t => t.trim().toLowerCase());
+          console.log('Applying tags filter:', tags);
+          filteredData = filteredData.filter(mini => 
+            tags.every(tag => mini.tags?.some(t => t.tag?.name.toLowerCase() === tag))
+          );
+        }
+        
+        console.log('After applying filter:', term, 'count:', filteredData.length);
+      });
+    }
+
+    // Apply missing images filter last
+    if (showMissingImages) {
+      console.log('Applying missing images filter');
+      filteredData = filteredData.filter(mini => !mini.has_image);
+      console.log('After missing images filter count:', filteredData.length);
+    }
+
+    // Sort filtered data
+    filteredData.sort((a, b) => a.name.localeCompare(b.name));
+
+    // Calculate filtered totals
+    const filteredCount = filteredData.length;
+    const filteredQuantity = filteredData.reduce((acc, curr) => {
+      const quantity = Number(curr.quantity);
+      return acc + (isNaN(quantity) ? 0 : quantity);
+    }, 0);
+
+    console.log('Final counts:', {
+      total: totalCount,
+      filtered: filteredCount,
+      totalQuantity,
+      filteredQuantity
+    });
+
+    // Update state
+    setTotalMinis(totalCount);
+    setTotalQuantity(totalQuantity);
+    setFilteredCount(filteredCount);
+    setFilteredTotalQuantity(filteredQuantity);
+
+    // Apply pagination
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = Math.min(startIndex + pageSize, filteredData.length);
+    const paginatedData = filteredData.slice(startIndex, endIndex);
+
+    // Update displayed minis
+    setMinis(paginatedData.map(item => transformMini(item)));
+
+    // Reset page if needed
+    const maxPage = Math.ceil(filteredCount / pageSize);
+    if (currentPage > maxPage && maxPage > 0) {
+      setCurrentPage(1);
+    }
+  }, [globalCache, internalSearchTerm, showMissingImages, currentPage, pageSize, setCurrentPage]);
+
+  // Update loadData to use the new totals
   const loadData = useCallback(async () => {
     try {
-      // If we're already loading, don't start another load
       if (isLoadingRef.current) return;
       
-      isLoadingRef.current = true
-      setLoading(true)
-      setError(null)
+      isLoadingRef.current = true;
+      setLoading(true);
+      setError(null);
 
-      // console.log('Loading data for page', currentPage)
-      // Get filtered data either from cache or from Supabase
-      const { data, totalQuantity, totalCount } = await fetchAllData()
-
-      // Ensure we have valid data
-      if (!data || data.length === 0) {
-        setMinis([])
-        setTotalQuantity(0)
-        setLoading(false)
-        isLoadingRef.current = false
-        return
+      // If cache is invalid, fetch from Supabase
+      if (!isCacheValid() || !globalCache) {
+        const { data } = await fetchAllData();
+        if (!data) {
+          setMinis([]);
+          setTotalQuantity(0);
+          setTotalMinis(0);
+          setLoading(false);
+          isLoadingRef.current = false;
+          return;
+        }
       }
 
-      setTotalQuantity(totalQuantity)
-      setTotalMinis(totalCount)
+      // Use updateViewsFromCache to handle filtering and pagination
+      if (globalCache) {
+        console.log('loadData: Calling updateViewsFromCache');
+        updateViewsFromCache();
+      }
 
-      // Calculate current page data
-      const startIndex = (currentPage - 1) * pageSize
-      const endIndex = Math.min(startIndex + pageSize, totalCount)
-      const pageData = data.slice(startIndex, endIndex)
-      
-      setMinis(pageData)
-      setLoading(false)
-      isLoadingRef.current = false
+      setLoading(false);
+      isLoadingRef.current = false;
 
     } catch (err) {
-      console.error('Error loading data:', err)
-      setError(err instanceof Error ? err : new Error('Unknown error'))
-      setLoading(false)
-      isLoadingRef.current = false
+      console.error('Error loading data:', err);
+      setError(err instanceof Error ? err : new Error('Unknown error'));
+      setLoading(false);
+      isLoadingRef.current = false;
     }
-  }, [currentPage, pageSize, fetchAllData, setTotalMinis])
+  }, [currentPage, pageSize, internalSearchTerm, showMissingImages, isCacheValid, fetchAllData, updateViewsFromCache]);
 
   // Remove other useEffects that trigger loadData and consolidate into one
   useEffect(() => {
@@ -506,51 +654,347 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   const debouncedSearch = useRef(
     debounce(async (term: string | null) => {
       try {
-        setLoading(true)
-        setError(null)
+        setLoading(true);
+        setError(null);
 
-        // If we have valid cache and a search term, try to filter cached data first
-        if (isCacheValid() && globalCache?.minis) {
-          if (term) {
-            const searchLower = term.toLowerCase()
-            const filteredMinis = globalCache.minis.filter(mini => {
-              if (mini.name.toLowerCase().includes(searchLower)) return true
-              if (mini.types?.some(t => t.type.name.toLowerCase().includes(searchLower))) return true
-              if (mini.product_sets?.name?.toLowerCase().includes(searchLower)) return true
-              if (mini.product_sets?.product_line?.name?.toLowerCase().includes(searchLower)) return true
-              if (mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchLower)) return true
-              return false
-            })
-            setMinis(filteredMinis.map(mini => transformMini(mini)))
-            setTotalMinis(filteredMinis.length)
-            setTotalQuantity(filteredMinis.reduce((acc, curr) => acc + (curr.quantity || 0), 0))
-            setLoading(false)
-            return
+        // If cache is invalid, fetch from Supabase
+        if (!isCacheValid() || !globalCache) {
+          const { data } = await fetchAllData();
+          if (!data) {
+            setMinis([]);
+            setTotalQuantity(0);
+            setLoading(false);
+            return;
           }
         }
 
-        // If no cache or no search term, fetch new data
-        const { data, totalQuantity, totalCount } = await fetchAllData()
+        // Use cache for filtering
+        if (globalCache) {
+          let filteredData = [...globalCache.minis];
 
-        const startIndex = (currentPage - 1) * pageSize
-        const endIndex = startIndex + pageSize
-        const pageData = data.slice(startIndex, endIndex)
-        
-        setMinis(pageData.map((mini: SupabaseMini) => transformMini(mini)))
-        setTotalMinis(totalCount)
-        setTotalQuantity(totalQuantity)
+          if (term) {
+            const searchTerms = term.split(' AND ');
+            filteredData = filteredData.filter((mini) => {
+              return searchTerms.every(term => {
+                if (term.startsWith('name:')) {
+                  const searchValue = term.substring(5).toLowerCase();
+                  return mini.name.toLowerCase().includes(searchValue);
+                }
+                if (term.startsWith('type:')) {
+                  const searchValue = term.substring(5).toLowerCase();
+                  return mini.types?.some(t => 
+                    !t.proxy_type && t.type.name.toLowerCase().includes(searchValue)
+                  ) || false;
+                }
+                if (term.startsWith('productset:')) {
+                  const searchValue = term.substring(11).toLowerCase();
+                  return (
+                    mini.product_sets?.name?.toLowerCase().includes(searchValue) ||
+                    mini.product_sets?.product_line?.name?.toLowerCase().includes(searchValue) ||
+                    mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchValue)
+                  ) || false;
+                }
+                if (term.startsWith('paintedby:')) {
+                  const searchValue = term.substring(10).toLowerCase();
+                  return mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue) || false;
+                }
+                if (term.startsWith('tags:')) {
+                  const searchValues = term.substring(5).toLowerCase().split(',');
+                  return searchValues.every(tag => 
+                    mini.tags?.some(t => t.tag.name.toLowerCase() === tag.trim())
+                  );
+                }
+                if (term.startsWith('alltype:')) {
+                  const searchValue = term.substring(8).toLowerCase();
+                  return mini.types?.some(t => 
+                    t.type.name.toLowerCase().includes(searchValue)
+                  ) || false;
+                }
+                const searchValue = term.toLowerCase();
+                return (
+                  mini.name.toLowerCase().includes(searchValue) ||
+                  mini.types?.some(t => t.type.name.toLowerCase().includes(searchValue)) ||
+                  mini.product_sets?.name?.toLowerCase().includes(searchValue) ||
+                  mini.product_sets?.product_line?.name?.toLowerCase().includes(searchValue) ||
+                  mini.product_sets?.product_line?.company?.name?.toLowerCase().includes(searchValue) ||
+                  mini.painted_by?.painted_by_name.toLowerCase().includes(searchValue) ||
+                  mini.tags?.some(t => t.tag.name.toLowerCase().includes(searchValue))
+                );
+              });
+            });
+          }
+
+          // Apply missing images filter
+          if (showMissingImages) {
+            filteredData = filteredData.filter(mini => !mini.has_image);
+          }
+
+          // Update totals
+          const totalQuantitySum = filteredData.reduce((acc: number, curr: { quantity: number }) => 
+            acc + (curr.quantity || 0), 0
+          );
+
+          // Apply pagination
+          const startIndex = (currentPage - 1) * pageSize;
+          const endIndex = startIndex + pageSize;
+          const pageData = filteredData.slice(startIndex, endIndex);
+          
+          setMinis(pageData.map(mini => transformMini(mini)));
+          setTotalMinis(filteredData.length);
+          setTotalQuantity(totalQuantitySum);
+        }
       } catch (err) {
-        console.error('Error loading data:', err)
-        setError(err instanceof Error ? err : new Error('Unknown error'))
+        console.error('Error loading data:', err);
+        setError(err instanceof Error ? err : new Error('Unknown error'));
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
     }, SEARCH_DEBOUNCE)
-  )
+  );
 
-  // Setup real-time subscription
+  // Update handleAdd to be the single source of truth for inserts
+  const handleAdd = async (miniatureData: Partial<Mini>) => {
+    console.log('handleAdd: Starting add operation');
+    // Create a temporary ID for optimistic update
+    const tempId = -Date.now();
+    const tempMini: Mini = {
+      ...miniatureData as Mini,
+      id: tempId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      in_use: null,
+      painted_by: {
+        id: miniatureData.painted_by_id || 0,
+        painted_by_name: ''
+      },
+      base_sizes: {
+        id: miniatureData.base_size_id || 0,
+        base_size_name: ''
+      },
+      product_sets: miniatureData.product_set_id ? {
+        id: miniatureData.product_set_id,
+        name: ''
+      } : undefined,
+      has_image: false
+    };
+
+    try {
+      // Do optimistic update first
+      if (globalCache) {
+        console.log('handleAdd: Adding to cache with temp ID:', tempId);
+        // Add to cache
+        globalCache.minis.push(tempMini as unknown as SupabaseMini);
+        // Sort the cache by name to maintain consistent ordering
+        globalCache.minis.sort((a, b) => a.name.localeCompare(b.name));
+        console.log('handleAdd: Cache size after adding temp mini:', globalCache.minis.length);
+        // Update views and totals
+        updateViewsFromCache();
+      } else {
+        console.log('handleAdd: No global cache available for optimistic update');
+      }
+
+      // Transform data for API
+      const transformedData: Partial<MiniatureData> = {
+        name: miniatureData.name,
+        description: miniatureData.description,
+        location: miniatureData.location,
+        quantity: miniatureData.quantity,
+        painted_by_id: miniatureData.painted_by_id,
+        base_size_id: miniatureData.base_size_id,
+        product_set_id: miniatureData.product_set_id,
+        material_id: miniatureData.material_id,
+        types: miniatureData.types?.map(t => ({
+          type_id: t.type_id,
+          proxy_type: t.proxy_type
+        })),
+        tags: miniatureData.tags?.map(t => ({
+          id: t.tag.id,
+          name: t.tag.name
+        }))
+      };
+
+      // Set flag to prevent subscription from processing our own change
+      ourChangeRef.current = tempId;
+      console.log('handleAdd: Set ourChangeRef to temp ID:', tempId);
+
+      // Perform the single API call
+      const newMini = await createMiniature(transformedData);
+      console.log('handleAdd: Created mini with real ID:', newMini.id);
+
+      // Update flag with real ID
+      if (newMini) {
+        ourChangeRef.current = newMini.id;
+        console.log('handleAdd: Updated ourChangeRef to real ID:', newMini.id);
+      }
+
+      // Get the complete mini data
+      const { data: fullMini } = await supabase
+        .from('minis')
+        .select(MINIATURE_QUERY)
+        .eq('id', newMini.id)
+        .single() as unknown as { data: SupabaseMini | null };
+
+      if (fullMini && globalCache) {
+        console.log('handleAdd: Replacing temp mini with full data');
+        // Replace the temporary mini with the real one
+        const index = globalCache.minis.findIndex(m => m.id === tempId);
+        if (index !== -1) {
+          globalCache.minis[index] = fullMini;
+          // Sort again to maintain order
+          globalCache.minis.sort((a, b) => a.name.localeCompare(b.name));
+          console.log('handleAdd: Cache updated with full mini data');
+          // Update views and totals
+          updateViewsFromCache();
+        } else {
+          console.log('handleAdd: Could not find temp mini in cache');
+        }
+      } else {
+        console.log('handleAdd: No full mini data or cache available');
+      }
+
+      // Keep flag a bit longer to ensure subscription doesn't process
+      setTimeout(() => {
+        if (ourChangeRef.current === newMini.id) {
+          ourChangeRef.current = null;
+          console.log('handleAdd: Cleared ourChangeRef');
+        }
+      }, 2000);
+
+      return newMini;
+    } catch (error) {
+      console.log('handleAdd: Error occurred, reverting optimistic update');
+      // Revert optimistic update on error
+      if (globalCache) {
+        globalCache.minis = globalCache.minis.filter(m => m.id !== tempId);
+        console.log('handleAdd: Removed temp mini from cache');
+        // Update views and totals after removing the failed entry
+        updateViewsFromCache();
+      }
+      console.error('Error in handleAdd:', error);
+      ourChangeRef.current = null;
+      throw error;
+    }
+  };
+
+  // Update handleEdit to use updateViewsFromCache
+  const handleEdit = async (miniId: number, miniatureData: Partial<Mini>) => {
+    const currentMini = minis.find(m => m.id === miniId);
+    if (!currentMini) throw new Error('Mini not found');
+
+    try {
+      const optimisticMini: Mini = {
+        ...currentMini,
+        ...miniatureData as Partial<Mini>,
+        updated_at: new Date().toISOString()
+      };
+
+      // Update cache first
+      if (globalCache) {
+        const index = globalCache.minis.findIndex(m => m.id === miniId);
+        if (index !== -1) {
+          globalCache.minis[index] = optimisticMini as unknown as SupabaseMini;
+          // Update views and pagination
+          updateViewsFromCache();
+        }
+      }
+
+      // Transform data and perform API call
+      const transformedData: Partial<MiniatureData> = {
+        name: miniatureData.name,
+        description: miniatureData.description,
+        location: miniatureData.location,
+        quantity: miniatureData.quantity,
+        painted_by_id: miniatureData.painted_by_id,
+        base_size_id: miniatureData.base_size_id,
+        product_set_id: miniatureData.product_set_id,
+        material_id: miniatureData.material_id,
+        types: miniatureData.types?.map(t => ({
+          type_id: t.type_id,
+          proxy_type: t.proxy_type
+        })),
+        tags: miniatureData.tags?.map(t => ({
+          id: t.tag.id,
+          name: t.tag.name
+        }))
+      };
+
+      await updateMiniature(miniId, transformedData);
+    } catch (error) {
+      // Revert cache update on error
+      if (globalCache) {
+        const index = globalCache.minis.findIndex(m => m.id === miniId);
+        if (index !== -1) {
+          globalCache.minis[index] = currentMini as unknown as SupabaseMini;
+          // Update views and pagination
+          updateViewsFromCache();
+        }
+      }
+      throw error;
+    }
+  };
+
+  // Update handleDelete to use updateViewsFromCache
+  const handleDelete = async (miniId: number) => {
+    const miniToDelete = minis.find(m => m.id === miniId);
+    if (!miniToDelete) throw new Error('Mini not found');
+
+    try {
+      // Update cache first
+      if (globalCache) {
+        globalCache.minis = globalCache.minis.filter(m => m.id !== miniId);
+        // Update views and pagination
+        updateViewsFromCache();
+      }
+
+      // Perform API call
+      await deleteMiniature(miniId);
+    } catch (error) {
+      // Revert cache update on error
+      if (globalCache) {
+        globalCache.minis.push(miniToDelete as unknown as SupabaseMini);
+        // Update views and pagination
+        updateViewsFromCache();
+      }
+      throw error;
+    }
+  };
+
+  const handleUpdateInUse = async (miniId: number, inUse: boolean) => {
+    // Find the mini to update
+    const miniToUpdate = minis.find(m => m.id === miniId);
+    if (!miniToUpdate) return;
+
+    try {
+      // Optimistically update UI
+      setMinis(prevMinis => {
+        const index = prevMinis.findIndex(m => m.id === miniId);
+        if (index === -1) return prevMinis;
+        const newMinis = [...prevMinis];
+        newMinis[index] = {
+          ...newMinis[index],
+          in_use: inUse ? new Date().toISOString() : null
+        };
+        return newMinis;
+      });
+
+      // Perform actual API call
+      await updateMiniatureInUse(miniId, inUse);
+    } catch (error) {
+      // Revert optimistic update on error
+      setMinis(prevMinis => {
+        const index = prevMinis.findIndex(m => m.id === miniId);
+        if (index === -1) return prevMinis;
+        const newMinis = [...prevMinis];
+        newMinis[index] = miniToUpdate;
+        return newMinis;
+      });
+      throw error;
+    }
+  };
+
+  // Update subscription handler to be more strict about skipping our own changes
   useEffect(() => {
-    if (subscriptionRef.current) return
+    if (subscriptionRef.current) return;
 
     const subscription = supabase
       .channel('minis-changes')
@@ -562,96 +1006,138 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
           table: 'minis'
         },
         async (payload: { eventType: string; new: any; old: any }) => {
-          // Clear cache on any change
-          globalCache = null
+          // Skip if this is our own change
+          if (ourChangeRef.current === payload.new?.id || ourChangeRef.current === -payload.new?.id) {
+            console.log('Skipping our own change:', payload.new?.id);
+            return;
+          }
 
-          // Debounce updates to prevent rapid re-renders
           if (updateTimeoutRef.current) {
-            clearTimeout(updateTimeoutRef.current)
+            clearTimeout(updateTimeoutRef.current);
           }
 
           updateTimeoutRef.current = setTimeout(async () => {
             try {
-              console.log('Supabase Query: Fetching updated mini data after real-time update')
-              const { data: updatedMini } = await (supabase
-                .from('minis')
-                .select(MINIATURE_QUERY)
-                .eq('id', payload.new.id) as unknown as Promise<{ 
-                  data: SupabaseMini | null 
-                  error: any 
-                }>)
+              if (globalCache) {
+                let updatedMinis = [...globalCache.minis];
+                const index = updatedMinis.findIndex(m => m.id === payload.new?.id);
 
-              if (updatedMini) {
-                // Update the UI optimistically
-                setMinis((prev: Mini[]) => {
-                  const index = prev.findIndex(m => m.id === updatedMini.id)
-                  if (index === -1) return prev
-                  const newMinis = [...prev]
-                  newMinis[index] = transformMini(updatedMini as SupabaseMini)
-                  return newMinis
-                })
+                if (payload.eventType === 'DELETE') {
+                  if (index !== -1) {
+                    updatedMinis.splice(index, 1);
+                  }
+                } else if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+                  const { data: updatedMini } = await supabase
+                    .from('minis')
+                    .select(MINIATURE_QUERY)
+                    .eq('id', payload.new.id)
+                    .single() as unknown as { data: SupabaseMini | null };
+
+                  if (updatedMini) {
+                    if (index !== -1) {
+                      updatedMinis[index] = updatedMini;
+                    } else {
+                      updatedMinis.push(updatedMini);
+                    }
+                  }
+                }
+
+                // Update cache
+                globalCache = {
+                  ...globalCache,
+                  minis: updatedMinis,
+                  timestamp: Date.now()
+                };
+
+                // Update views and pagination
+                updateViewsFromCache();
               }
-
-              // Refresh total quantity
-              const { totalQuantity: newTotal } = await fetchAllData()
-              setTotalQuantity(newTotal)
             } catch (err) {
-              console.error('Error handling real-time update:', err)
+              console.error('Error handling real-time update:', err);
             }
-          }, 100)
+          }, 100);
         }
       )
-      .subscribe()
+      .subscribe();
 
     subscriptionRef.current = () => {
-      subscription.unsubscribe()
-      subscriptionRef.current = null
-    }
+      subscription.unsubscribe();
+      subscriptionRef.current = null;
+    };
 
     return () => {
-      subscriptionRef.current?.()
+      subscriptionRef.current?.();
       if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current)
+        clearTimeout(updateTimeoutRef.current);
       }
-    }
-  }, [])
+    };
+  }, [currentPage, pageSize, internalSearchTerm, showMissingImages]);
 
-  // Modify getPageMinis to use global cache
+  // Update getPageMinis to use only cache
   const getPageMinis = async (pageNum: number): Promise<Mini[]> => {
     try {
-      if (isCacheValid() && globalCache) {
-        const startIndex = (pageNum - 1) * pageSize
-        const endIndex = startIndex + pageSize
-        return globalCache.minis
-          .slice(startIndex, endIndex)
-          .map((item) => transformMini(item as SupabaseMini))
+      if (!isCacheValid() || !globalCache) {
+        const { data } = await fetchAllData();
+        if (!data) return [];
       }
 
-      // If cache is invalid, fetch all data again
-      const { data } = await fetchAllData()
-      const startIndex = (pageNum - 1) * pageSize
-      const endIndex = startIndex + pageSize
-      return (data || [])
-        .slice(startIndex, endIndex)
-        .map((item) => transformMini(item as SupabaseMini))
-    } catch (error) {
-      console.error('Error in getPageMinis:', error)
-      return []
-    }
-  }
+      if (globalCache) {
+        let filteredData = [...globalCache.minis];
 
-  // Add getTotalQuantity function
+        // Apply current filters
+        if (internalSearchTerm) {
+          // ... (same filtering logic as in loadData)
+        }
+        if (showMissingImages) {
+          filteredData = filteredData.filter(mini => !mini.has_image);
+        }
+
+        const startIndex = (pageNum - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        return filteredData
+          .slice(startIndex, endIndex)
+          .map(item => transformMini(item));
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Error in getPageMinis:', error);
+      return [];
+    }
+  };
+
+  // Update getTotalQuantity to use only cache
   const getTotalQuantity = useCallback(async () => {
     try {
-      const { data } = await fetchAllData()
-      const totalQuantitySum = data?.reduce((acc: any, curr: { quantity: any }) => acc + (curr.quantity || 0), 0) || 0
-      setTotalQuantity(totalQuantitySum)
-      return totalQuantitySum
+      if (!isCacheValid() || !globalCache) {
+        const { data } = await fetchAllData();
+        if (!data) return 0;
+      }
+
+      if (globalCache) {
+        let filteredData = [...globalCache.minis];
+
+        // Apply current filters
+        if (internalSearchTerm) {
+          // ... (same filtering logic as in loadData)
+        }
+        if (showMissingImages) {
+          filteredData = filteredData.filter(mini => !mini.has_image);
+        }
+
+        const totalQuantitySum = filteredData.reduce((acc: number, curr: { quantity: number }) => 
+          acc + (curr.quantity || 0), 0
+        );
+        setTotalQuantity(totalQuantitySum);
+        return totalQuantitySum;
+      }
+
+      return 0;
     } catch (error) {
-      console.error('Error getting total quantity:', error)
-      return 0
+      console.error('Error getting total quantity:', error);
+      return 0;
     }
-  }, [fetchAllData])
+  }, [internalSearchTerm, showMissingImages, isCacheValid, fetchAllData]);
 
   // Clean up the debounced function on unmount
   useEffect(() => {
@@ -688,11 +1174,76 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     return globalCache?.minis.length || totalMinis;
   }, [globalCache, totalMinis]);
 
+  // Add optimistic update helpers
+  const optimisticallyUpdateMinis = (updatedMini: Mini) => {
+    setMinis(prevMinis => {
+      const index = prevMinis.findIndex(m => m.id === updatedMini.id);
+      if (index === -1) return prevMinis;
+      const newMinis = [...prevMinis];
+      newMinis[index] = updatedMini;
+      return newMinis;
+    });
+  };
+
+  const optimisticallyAddMini = (newMini: Mini) => {
+    setMinis(prevMinis => {
+      // Insert the new mini in the correct alphabetical position
+      const index = prevMinis.findIndex(m => m.name.toLowerCase() > newMini.name.toLowerCase());
+      const newMinis = [...prevMinis];
+      if (index === -1) {
+        newMinis.push(newMini);
+      } else {
+        newMinis.splice(index, 0, newMini);
+      }
+      return newMinis;
+    });
+    setTotalMinis(prev => prev + 1);
+    setTotalQuantity(prev => prev + (newMini.quantity || 0));
+  };
+
+  const optimisticallyDeleteMini = (miniId: number, quantity: number) => {
+    setMinis(prevMinis => prevMinis.filter(m => m.id !== miniId));
+    setTotalMinis(prev => prev - 1);
+    setTotalQuantity(prev => prev - quantity);
+  };
+
+  const optimisticallyUpdateInUse = (miniId: number, inUse: boolean) => {
+    setMinis(prevMinis => {
+      const index = prevMinis.findIndex(m => m.id === miniId);
+      if (index === -1) return prevMinis;
+      const newMinis = [...prevMinis];
+      newMinis[index] = {
+        ...newMinis[index],
+        in_use: inUse ? new Date().toISOString() : null
+      };
+      return newMinis;
+    });
+  };
+
+  // Add function to recalculate cache totals
+  const recalculateCacheTotals = useCallback(() => {
+    if (!globalCache) return;
+    
+    // Calculate total quantity from cache
+    const totalQuantitySum = globalCache.minis.reduce((acc, curr) => {
+      const quantity = Number(curr.quantity);
+      return acc + (isNaN(quantity) ? 0 : quantity);
+    }, 0);
+
+    // Update cache with new totals
+    globalCache = {
+      ...globalCache,
+      totalQuantity: totalQuantitySum
+    };
+
+    return totalQuantitySum;
+  }, []);
+
   return {
     minis,
     loading,
     error,
-    totalMinis: getCachedTotal(),
+    totalMinis,
     totalQuantity,
     getPageMinis,
     getAllMinis: fetchAllData,
@@ -704,6 +1255,12 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     setTotalMinis,
     setInternalSearchTerm,
     showMissingImages,
-    setShowMissingImages: setShowMissingImagesAndInvalidate
+    setShowMissingImages: setShowMissingImagesAndInvalidate,
+    handleAdd,
+    handleEdit,
+    handleDelete,
+    handleUpdateInUse,
+    filteredCount,
+    filteredTotalQuantity
   }
 } 

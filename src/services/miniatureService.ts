@@ -1,16 +1,16 @@
 import { supabase } from '../lib/supabaseMonitor'
 
-interface MiniatureType {
+export interface MiniatureType {
   type_id: number
   proxy_type: boolean
 }
 
-interface MiniatureTag {
+export interface MiniatureTag {
   id: number
   name: string
 }
 
-interface MiniatureData {
+export interface MiniatureData {
   name: string
   description: string | null
   location: string

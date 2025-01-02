@@ -20,9 +20,8 @@ import { createPortal } from 'react-dom'
 interface MiniatureOverviewModalProps {
   isOpen: boolean
   onClose: () => void
-  miniId?: number
   miniData?: Mini
-  onSave: (data: Partial<Mini>) => Promise<void>
+  onSave: (miniatureData: Partial<Mini>) => Promise<Mini | undefined>
   onDelete?: (miniId: number) => Promise<void>
   isLoading?: boolean
   onPrevious?: () => void
@@ -383,8 +382,6 @@ export function MiniatureOverviewModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    // console.log('Submit handler started, user:', user)
-    
     if (!validateForm()) {
       return
     }
@@ -436,101 +433,8 @@ export function MiniatureOverviewModal({
       }
 
       let imageUploaded = false;
-      let newMiniId: number | undefined;
 
       try {
-        // Save miniature data first before handling image upload
-        if (isEditMode && miniData?.id) {
-          // console.log('Updating existing miniature:', miniData.id)
-          // Store old state before update
-          const oldState = {
-            ...miniData,
-            types: miniData.types || [],
-            tags: miniData.tags || []
-          }
-          
-          await updateMiniature(miniData.id, miniatureData)
-          
-          // Log the update if there's a user
-          if (user?.id) {
-            // console.log('Logging miniature update:', {
-            //   userId: user.id,
-            //   miniatureId: miniData.id,
-            //   oldState,
-            //   newState: miniatureData
-            // })
-            await AuditService.logMiniatureUpdate(
-              user.id,
-              miniData.id,
-              oldState,
-              miniatureData
-            )
-          } else {
-            console.log('No user ID available for audit logging')
-          }
-        } else {
-          // console.log('Creating new miniature')
-          const newMini = await createMiniature(miniatureData)
-          if (newMini?.id) {
-            newMiniId = newMini.id
-            // Log the creation if there's a user
-            if (user?.id) {
-              // console.log('Logging miniature creation:', {
-              //   userId: user.id,
-              //   miniature: newMini
-              // })
-              await AuditService.logMiniatureCreate(user.id, newMini)
-            } else {
-              console.log('No user ID available for audit logging')
-            }
-          } else {
-            throw new Error('Failed to get ID for new miniature')
-          }
-        }
-
-        // Handle image upload if there's a new image
-        if (imageFile) {
-          try {
-            await uploadMiniatureImage(newMiniId || miniData?.id || 0, imageFile)
-            imageUploaded = true
-            showSuccess('Image uploaded successfully')
-
-            // Log the image operation if there's a user
-            if (user?.id) {
-              const miniId = newMiniId || miniData?.id
-              if (miniId) {
-                await AuditService.logImageOperation(
-                  user.id,
-                  miniId,
-                  imageExists ? 'IMAGE_UPLOAD' : 'IMAGE_UPLOAD',
-                  getMiniImagePath(miniId, 'original'),
-                  imageExists ? getMiniImagePath(miniId, 'original') : undefined
-                )
-              }
-            }
-
-            // Force a re-render of the image by updating the image existence state
-            setImageExists(false)  // Reset first
-            setTimeout(() => {
-              setImageExists(true)
-              // Verify the image exists
-              const img = new Image()
-              img.onload = () => {
-                setImageExists(true)
-              }
-              img.onerror = () => {
-                console.error('Failed to load new image after upload')
-                setImageExists(false)
-              }
-              img.src = getMiniImagePath(newMiniId || miniData?.id || 0, 'original')
-            }, 100)
-          } catch (error) {
-            console.error('Error uploading image:', error)
-            showError(error instanceof Error ? error.message : 'Failed to upload image')
-          }
-        }
-
-        setPendingTags([])
         // Transform tags to match expected type before saving
         const transformedMiniatureData = {
           ...miniatureData,
@@ -542,7 +446,50 @@ export function MiniatureOverviewModal({
             }
           }))
         }
-        await onSave(transformedMiniatureData)
+
+        // Save miniature data through the onSave callback
+        const savedMini = await onSave(transformedMiniatureData);
+        
+        // Handle image upload if there's a new image and we have a saved mini
+        if (imageFile && savedMini?.id) {
+          try {
+            await uploadMiniatureImage(savedMini.id, imageFile)
+            imageUploaded = true
+            showSuccess('Image uploaded successfully')
+
+            // Log the image operation if there's a user
+            if (user?.id) {
+              await AuditService.logImageOperation(
+                user.id,
+                savedMini.id,
+                imageExists ? 'IMAGE_UPLOAD' : 'IMAGE_UPLOAD',
+                getMiniImagePath(savedMini.id, 'original'),
+                imageExists ? getMiniImagePath(savedMini.id, 'original') : undefined
+              )
+            }
+
+            // Force a re-render of the image
+            setImageExists(false)
+            setTimeout(() => {
+              setImageExists(true)
+              // Verify the image exists
+              const img = new Image()
+              img.onload = () => {
+                setImageExists(true)
+              }
+              img.onerror = () => {
+                console.error('Failed to load new image after upload')
+                setImageExists(false)
+              }
+              img.src = getMiniImagePath(savedMini.id, 'original')
+            }, 100)
+          } catch (error) {
+            console.error('Error uploading image:', error)
+            showError(error instanceof Error ? error.message : 'Failed to upload image')
+          }
+        }
+
+        setPendingTags([])
 
         // If we uploaded an image, notify the parent to refresh
         if (imageUploaded) {

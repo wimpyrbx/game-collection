@@ -3,6 +3,9 @@ import { supabase } from '../lib/supabaseMonitor'
 import type { Mini } from '../types/mini'
 import debounce from 'lodash/debounce'
 
+// Debugging
+const enabledDebug = true
+
 // Cache configuration
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 const SEARCH_DEBOUNCE = 500 // 500ms debounce for search
@@ -217,6 +220,10 @@ export function useMiniatureOverview(pageSize: number = 10) {
         .from('minis')
         .select(MINIATURE_QUERY, { count: 'exact' })
         .order('name')
+      
+      if (enabledDebug) {
+        console.log('---------------Query:', query)
+      }
 
       const { data, error } = await query
 
@@ -286,6 +293,10 @@ export function useMiniatureOverview(pageSize: number = 10) {
         .eq('id', selectedId)
         .single()
 
+      if (enabledDebug) {
+        console.log('---------------Selected Mini:', selectedMini)
+      }
+
       const { data: windowedData } = await supabase
         .from('minis')
         .select(MINIATURE_QUERY)
@@ -294,6 +305,10 @@ export function useMiniatureOverview(pageSize: number = 10) {
           Math.max(0, selectedIndex - WINDOW_SIZE),
           selectedIndex + WINDOW_SIZE
         )
+
+      if (enabledDebug) {
+        console.log('---------------Windowed Data:', windowedData)
+      }
 
       setModalData({
         selectedMini: selectedMini ? transformData(selectedMini) : null,
@@ -331,6 +346,9 @@ export function useMiniatureOverview(pageSize: number = 10) {
         () => {
           // Invalidate cache and refresh data
           miniCache.current.clear()
+          if (enabledDebug) {
+            console.log('---------------Cleared cache')
+          }
           loadPageData(currentPage, searchTerm, true)
             .then(({ data, totalCount }) => {
               setMinis(data)

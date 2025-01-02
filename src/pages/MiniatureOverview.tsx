@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { debounce } from 'lodash'
 import { TagInput } from '../components/ui/input/TagInput'
+import { OptimisticSwitch } from '../components/ui/OptimisticSwitch'
 
 // Add interface for tag
 interface Tag {
@@ -44,7 +45,6 @@ export default function MiniatureOverview() {
   const [selectedMiniIndex, setSelectedMiniIndex] = useState(-1)
   const [allMinis, setAllMinis] = useState<Mini[]>([])
   const [imageTimestamp, setImageTimestamp] = useState(() => Date.now())
-  const [totalQuantity, setTotalQuantity] = useState(0)
   const itemsPerPage = 12
   const initialLoadRef = useRef(true)
   const { user } = useAuth()
@@ -99,6 +99,7 @@ export default function MiniatureOverview() {
     loading,
     error,
     totalMinis,
+    totalQuantity,
     getPageMinis,
     getAllMinis,
     setMinis,
@@ -109,7 +110,13 @@ export default function MiniatureOverview() {
     setTotalMinis,
     setInternalSearchTerm,
     showMissingImages,
-    setShowMissingImages
+    setShowMissingImages,
+    handleAdd: handleAddMini,
+    handleEdit: handleEditMini,
+    handleDelete: handleDeleteMini,
+    handleUpdateInUse,
+    filteredCount,
+    filteredTotalQuantity
   } = useMinis(itemsPerPage);
 
   const { showSuccess, showError } = useNotifications()
@@ -278,6 +285,26 @@ export default function MiniatureOverview() {
     { title: 'In Use', className: 'text-center w-20' }
   ]
 
+  const handleInUseToggle = async (miniId: number, checked: boolean) => {
+    try {
+      const oldMiniature = await getMiniature(miniId);
+      await handleUpdateInUse(miniId, checked);
+      const newMiniature = await getMiniature(miniId);
+      
+      if (user?.id && oldMiniature && newMiniature) {
+        await AuditService.logMiniatureUpdate(
+          user.id,
+          miniId,
+          oldMiniature,
+          newMiniature
+        );
+      }
+    } catch (error) {
+      console.error('Error updating in_use status:', error);
+      showError('Failed to update status');
+    }
+  };
+
   const getItemColumns = (mini: Mini) => {
     // Get the main type (proxy_type = false)
     const mainType = mini.types?.find(t => !t.proxy_type)
@@ -404,38 +431,11 @@ export default function MiniatureOverview() {
         }}
         className="flex justify-center w-[40px]"
       >
-        <Switch
+        <OptimisticSwitch
           checked={!!mini.in_use}
+          miniId={mini.id}
+          onUpdate={handleUpdateInUse}
           className="!border !border-gray-500"
-          onChange={async (checked) => {
-            try {
-              if (mini.id) {
-                const oldMiniature = await getMiniature(mini.id);
-                await updateMiniatureInUse(mini.id, checked);
-                const newMiniature = await getMiniature(mini.id);
-                
-                if (user?.id && oldMiniature && newMiniature) {
-                  await AuditService.logMiniatureUpdate(
-                    user.id,
-                    mini.id,
-                    oldMiniature,
-                    newMiniature
-                  );
-                }
-                
-                invalidateCache();
-                await fetchData();
-                const [updatedMinis] = await Promise.all([
-                  getPageMinis(currentPage),
-                  getTotalQuantity()
-                ]);
-                setMinis(updatedMinis);
-              }
-            } catch (error) {
-              console.error('Error updating in_use status:', error);
-              showError('Failed to update status');
-            }
-          }}
         />
       </div>
     ]
@@ -521,54 +521,66 @@ export default function MiniatureOverview() {
   const debouncedSetNameFilter = useMemo(
     () => debounce((value: string) => setNameFilter(value), 300),
     []
-  )
+  );
 
   const debouncedSetTypeFilter = useMemo(
     () => debounce((value: string) => setTypeFilter(value), 300),
     []
-  )
+  );
 
   const debouncedSetProductSetFilter = useMemo(
     () => debounce((value: string) => setProductSetFilter(value), 300),
     []
-  )
+  );
 
   const debouncedSetPaintedByFilter = useMemo(
     () => debounce((value: string) => setPaintedByFilter(value), 300),
     []
-  )
+  );
 
   const debouncedSetAllTypesFilter = useMemo(
     () => debounce((value: string) => setAllTypesFilter(value), 300),
     []
-  )
+  );
 
   // Combine filters into a single search string
   useEffect(() => {
-    const filters: string[] = []
+    const filters: string[] = [];
 
-    if (nameFilter) {
-      filters.push(`name:${nameFilter}`)
+    // Only add filters that have values
+    if (nameFilter?.trim()) {
+      filters.push(`name:${nameFilter.trim()}`);
     }
-    if (productSetFilter) {
-      filters.push(`productset:${productSetFilter}`)
+    if (typeFilter?.trim()) {
+      filters.push(`type:${typeFilter.trim()}`);
     }
-    if (typeFilter) {
-      filters.push(`type:${typeFilter}`)
+    if (productSetFilter?.trim()) {
+      filters.push(`productset:${productSetFilter.trim()}`);
     }
-    if (allTypesFilter) {
-      filters.push(`alltype:${allTypesFilter}`)
+    if (paintedByFilter?.trim()) {
+      filters.push(`paintedby:${paintedByFilter.trim()}`);
     }
-    if (paintedByFilter) {
-      filters.push(`paintedby:${paintedByFilter}`)
+    if (allTypesFilter?.trim()) {
+      filters.push(`alltype:${allTypesFilter.trim()}`);
     }
     if (selectedTagFilters.length > 0) {
-      filters.push(`tags:${selectedTagFilters.map(t => t.name).join(',')}`)
+      filters.push(`tags:${selectedTagFilters.map(t => t.name).join(',')}`);
     }
 
-    const combinedSearch = filters.join(' AND ')
-    setInternalSearchTerm(combinedSearch)
-  }, [nameFilter, productSetFilter, typeFilter, allTypesFilter, paintedByFilter, selectedTagFilters, setInternalSearchTerm])
+    const combinedSearch = filters.join(' AND ');
+    
+    // Only update if the search string has actually changed
+    setInternalSearchTerm(prevTerm => {
+      if (prevTerm !== combinedSearch) {
+        console.log('Updating search term:', combinedSearch);
+        return combinedSearch;
+      }
+      return prevTerm;
+    });
+    
+    // Reset to first page when filters change
+    setCurrentPage(1);
+  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, selectedTagFilters, setInternalSearchTerm, setCurrentPage]);
 
   // Initialize default values for base size and painted by
   useEffect(() => {
@@ -790,91 +802,40 @@ export default function MiniatureOverview() {
 
   const handleSave = async (miniatureData?: Partial<Mini>) => {
     try {
-      if (miniatureData) {
-        setSelectedMini(prev => prev ? { ...prev, ...miniatureData } : undefined);
+      if (!miniatureData) return;
+
+      let savedMini: Mini | undefined;
+
+      if (selectedMini?.id) {
+        // Edit existing mini
+        await handleEditMini(selectedMini.id, miniatureData);
+        savedMini = await getMiniature(selectedMini.id);
+      } else {
+        // Add new mini
+        const newMini = await handleAddMini(miniatureData);
+        if (newMini?.id) {
+          savedMini = await getMiniature(newMini.id);
+        }
       }
 
       setIsModalOpen(false);
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Invalidate cache to force fresh data fetch
-      invalidateCache();
-      
-      // Fetch fresh data including new total count
-      const { data: allMinis } = await supabase
-        .from('minis')
-        .select('id, name')
-        .order('name');
-      
-      const totalCount = allMinis?.length || 0;
-      setTotalMinis(totalCount);
+      setSelectedMini(undefined);
 
-      // If we just added a new miniature and there are no filters active,
-      // find its position in the sorted list
-      if (!selectedMini?.id && miniatureData?.name && allMinis && 
-          !nameFilter && !typeFilter && !productSetFilter && 
-          !paintedByFilter && !allTypesFilter && selectedTagFilters.length === 0) {
-        const miniatureName = miniatureData.name.toLowerCase();
-        const miniatureIndex = allMinis.findIndex(mini => 
-          mini.name.toLowerCase() >= miniatureName
-        );
-        
-        // Calculate which page this index falls on
-        const targetPage = Math.floor(Math.max(0, miniatureIndex) / itemsPerPage) + 1;
-        setCurrentPage(targetPage);
-      }
-      
-      // Update total quantity
-      await getTotalQuantity();
-      
       // Refresh images
       refreshImages();
 
-      // Re-apply filters and update counts
-      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
-        const result = await getAllMinis();
-        setFilteredCount(result.data.length);
-        setFilteredTotalQuantity(result.totalQuantity);
-        
-        // Calculate the correct page for the filtered results
-        const filteredIndex = result.data.findIndex(mini => 
-          mini.id === (miniatureData?.id || selectedMini?.id)
-        );
-        if (filteredIndex !== -1) {
-          const newPage = Math.floor(filteredIndex / itemsPerPage) + 1;
-          setCurrentPage(newPage);
-        }
-        
-        // Get the specific page of filtered results
-        const updatedMinis = await getPageMinis(currentPage);
-        setMinis(updatedMinis);
-      } else {
-        // If no filters, just get the current page
-        const updatedMinis = await getPageMinis(currentPage);
-        setMinis(updatedMinis);
-      }
-      
-      if (selectedMini?.id) {
-        const updatedMinis = await getPageMinis(currentPage);
-        const found = updatedMinis.find(mini => mini.id === selectedMini.id);
-        if (found) {
-          setSelectedMini(found);
-        }
-      }
+      return savedMini;
     } catch (error) {
       console.error('Error saving miniature:', error);
       showError('Failed to save miniature');
+      throw error;
     }
   };
-
-  const handleSaveMiniature = async (data: Partial<Mini>) => {
-    await handleSave(data);
-  }
 
   const handleDelete = async (miniId: number) => {
     try {
       // Get the miniature data before deletion for logging
-      const miniatureData = await getMiniature(miniId)
+      const miniatureData = await getMiniature(miniId);
       
       // Log the deletion first if there's a user
       if (user?.id && miniatureData) {
@@ -882,44 +843,21 @@ export default function MiniatureOverview() {
           user.id,
           miniId,
           miniatureData
-        )
+        );
       }
 
-      // Then delete the miniature
-      await deleteMiniature(miniId)
-      
-      // Invalidate the cache to force a fresh fetch
-      invalidateCache()
-      
-      // Refresh all data in a single batch
-      const [updatedMinis, { count: newTotalCount }] = await Promise.all([
-        getPageMinis(currentPage),
-        supabase.from('minis').select('*', { count: 'exact', head: true })
-      ]);
+      // Delete the miniature with optimistic update
+      await handleDeleteMini(miniId);
 
-      // Update states
-      setMinis(updatedMinis)
-      setTotalMinis(newTotalCount || 0)
+      // Refresh images
+      refreshImages();
       
-      // Update filtered counts if filters are active
-      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0) {
-        const result = await getAllMinis();
-        setFilteredCount(result.data.length);
-        setFilteredTotalQuantity(result.totalQuantity);
-      }
-
-      // Update total quantity
-      await getTotalQuantity();
-      
-      // Force refresh of images
-      refreshImages()
-      
-      showSuccess('Miniature deleted successfully')
+      showSuccess('Miniature deleted successfully');
     } catch (error) {
-      console.error('Error deleting miniature:', error)
-      showError('Failed to delete miniature')
+      console.error('Error deleting miniature:', error);
+      showError('Failed to delete miniature');
     }
-  }
+  };
 
   const handleCloseModal = () => {
     setIsModalOpen(false)
@@ -962,24 +900,6 @@ export default function MiniatureOverview() {
     }
   };
 
-  // Add new useEffect to update total quantity when minis change
-  useEffect(() => {
-    const calculateTotalQuantity = async () => {
-      try {
-        const { data } = await supabase.from('minis').select('quantity');
-        const total = (data || []).reduce((sum, mini) => {
-          const quantity = typeof mini.quantity === 'number' ? mini.quantity : 0;
-          return sum + quantity;
-        }, 0);
-        setTotalQuantity(total);
-      } catch (error) {
-        console.error('Error calculating total quantity:', error);
-      }
-    };
-
-    calculateTotalQuantity();
-  }, [minis]);
-
   useEffect(() => {
     if (materialOptions.length > 0) {
       const plasticMaterial = materialOptions.find(m => m.material_name.toLowerCase() === 'plastic');
@@ -988,39 +908,6 @@ export default function MiniatureOverview() {
       }
     }
   }, [materialOptions, defaultMaterialId]);
-
-  const [filteredCount, setFilteredCount] = useState(0)
-  const [filteredTotalQuantity, setFilteredTotalQuantity] = useState(0)
-
-  // Update filtered counts when cache changes
-  useEffect(() => {
-    const updateFilteredCounts = async () => {
-      if (nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages) {
-        const result = await getAllMinis();
-        let filteredData = result.data;
-        
-        // Apply missing images filter after getting the data
-        if (showMissingImages) {
-          filteredData = filteredData.filter(mini => !mini.has_image);
-        }
-        
-        setFilteredCount(filteredData.length);
-        setFilteredTotalQuantity(filteredData.reduce((sum, mini) => sum + (mini.quantity || 0), 0));
-        
-        // If we have filtered results but are on a page beyond the filtered count,
-        // adjust the current page
-        const maxPage = Math.ceil(filteredData.length / itemsPerPage);
-        if (currentPage > maxPage) {
-          setCurrentPage(1);
-        }
-      } else {
-        setFilteredCount(0);
-        setFilteredTotalQuantity(0);
-      }
-    };
-
-    updateFilteredCounts();
-  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, selectedTagFilters, showMissingImages, getAllMinis, itemsPerPage]);
 
   // Add effect to load available tags
   useEffect(() => {
@@ -1079,6 +966,9 @@ export default function MiniatureOverview() {
     document.body
   )
 
+  // Add isFiltering calculation
+  const isFiltering = !!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages);
+
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
     return (
@@ -1111,14 +1001,14 @@ export default function MiniatureOverview() {
           icon={FaDiceD6}
           number={loading ? '-' : totalMinis}
           text="Unique Miniatures"
-          filteredCount={filteredCount}
+          filteredCount={nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages ? filteredCount : undefined}
           isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages)}
         />
         <PageHeaderBigNumber
           icon={FaDiceD6}
           number={loading ? '-' : totalQuantity}
           text="Total Miniatures"
-          filteredCount={filteredTotalQuantity > 0 || showMissingImages ? filteredTotalQuantity : undefined}
+          filteredCount={nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages ? filteredTotalQuantity : undefined}
           isFiltering={!!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages)}
         />
         <PageHeaderBigNumber
@@ -1896,10 +1786,9 @@ export default function MiniatureOverview() {
       <MiniatureOverviewModal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        miniId={selectedMiniId}
         miniData={selectedMini}
-        onSave={handleSaveMiniature}
-        onDelete={handleDeleteMiniature}
+        onSave={handleSave}
+        onDelete={handleDelete}
         isLoading={loading}
         onPrevious={handlePreviousMini}
         onNext={handleNextMini}
