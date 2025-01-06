@@ -546,7 +546,7 @@ export default function MiniatureOverview() {
     // Only update if the search string has actually changed
     setInternalSearchTerm(prevTerm => {
       if (prevTerm !== combinedSearch) {
-        console.log('Updating search term:', combinedSearch);
+        // console.log('Updating search term:', combinedSearch);
         return combinedSearch;
       }
       return prevTerm;

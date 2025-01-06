@@ -1,6 +1,9 @@
 import { supabase } from '../lib/supabase'
 import type { AuditLogChanges, FieldChange } from '../types/audit'
 
+// Define the enum to match the database type
+export type AuditAction = 'MINIATURE_CREATE' | 'MINIATURE_UPDATE' | 'MINIATURE_DELETE' | 'IMAGE_UPLOAD' | 'IMAGE_DELETE' | 'TYPE_ASSIGN' | 'TYPE_UNASSIGN' | 'CATEGORY_ASSIGN' | 'CATEGORY_UNASSIGN';
+
 export class AuditService {
     /**
      * Compare two values and return a FieldChange if they're different
@@ -101,6 +104,7 @@ export class AuditService {
                     miniature: miniatureData
                 }
             })
+            .select()
 
         if (error) {
             console.error('Error creating audit log:', error)
@@ -119,7 +123,6 @@ export class AuditService {
     ): Promise<void> {
         const changes = this.detectChanges(oldState, newState)
         
-        // If no changes detected, don't create a log
         if (!changes) {
             return
         }
@@ -139,6 +142,7 @@ export class AuditService {
                     }
                 }
             })
+            .select()
 
         if (error) {
             console.error('Error creating audit log:', error)
@@ -168,6 +172,7 @@ export class AuditService {
                     }
                 }
             })
+            .select()
 
         if (error) {
             console.error('Error creating audit log:', error)
@@ -180,15 +185,14 @@ export class AuditService {
     static async logImageOperation(
         userId: string,
         miniatureId: number,
-        action: 'IMAGE_UPLOAD' | 'IMAGE_REPLACE' | 'IMAGE_DELETE',
+        action: 'IMAGE_UPLOAD' | 'IMAGE_DELETE',
         newImageUrl?: string,
         oldImageUrl?: string
     ): Promise<void> {
         const changes = {
             image: {
-                from: action === 'IMAGE_DELETE' ? oldImageUrl :
-                     action === 'IMAGE_REPLACE' ? oldImageUrl : null,
-                to: (action === 'IMAGE_UPLOAD' || action === 'IMAGE_REPLACE') ? newImageUrl : null
+                from: action === 'IMAGE_DELETE' ? oldImageUrl : null,
+                to: action === 'IMAGE_UPLOAD' ? newImageUrl : null
             }
         }
 

@@ -4,6 +4,7 @@ import type { Mini } from '../types/mini'
 import debounce from 'lodash/debounce'
 import { createMiniature, updateMiniature, deleteMiniature } from '../services/miniatureService'
 import type { MiniatureData } from '../services/miniatureService'
+import { useAuth } from '../contexts/AuthContext'
 
 interface SupabaseMiniType {
   mini_id: number
@@ -209,6 +210,8 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   // Add flag to track our own changes
   const ourChangeRef = useRef<number | null>(null);
 
+  const { user } = useAuth()
+
   // Update search term with debounce
   useEffect(() => {
     if (searchTimeoutRef.current) {
@@ -321,10 +324,10 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       }
 
       // If no valid cache, fetch from Supabase
-      console.log('No valid cache, fetching from Supabase')
+      // console.log('No valid cache, fetching from Supabase')
       
       // First get the total count
-      console.log('Supabase Query: Fetching total count of minis')
+      // console.log('Supabase Query: Fetching total count of minis')
       let countQuery = supabase.from('minis').select('*', { count: 'exact', head: true })
       
       const { count, error: countError } = await countQuery
@@ -332,11 +335,11 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       
       // Store total count
       const totalCount = count || 0
-      console.log('Total count from Supabase:', totalCount)
+      // console.log('Total count from Supabase:', totalCount)
       setTotalMinis(totalCount)
 
       // Build the data query
-      console.log('Supabase Query: Fetching all minis data')
+      // console.log('Supabase Query: Fetching all minis data')
       let dataQuery = supabase.from('minis').select(MINIATURE_QUERY).order('name')
 
       // Get all data in chunks to handle large datasets
@@ -347,7 +350,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       let totalQuantitySum = 0
       
       while (hasMore) {
-        console.log(`Fetching chunk ${page + 1} (${page * chunkSize} - ${(page + 1) * chunkSize - 1})`)
+        // console.log(`Fetching chunk ${page + 1} (${page * chunkSize} - ${(page + 1) * chunkSize - 1})`)
         const from = page * chunkSize
         const to = from + chunkSize - 1
         
@@ -367,18 +370,18 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
           return acc + (isNaN(quantity) ? 0 : quantity)
         }, 0)
         totalQuantitySum += chunkQuantity
-        console.log(`Chunk ${page + 1} quantity sum:`, chunkQuantity)
+        // console.log(`Chunk ${page + 1} quantity sum:`, chunkQuantity)
 
         allData = [...allData, ...data]
-        console.log(`Total entries so far:`, allData.length)
+        // console.log(`Total entries so far:`, allData.length)
         hasMore = data.length === chunkSize // If we got less than chunkSize, we're done
         page++
       }
 
-      console.log('Final data fetch complete:', {
-        totalEntries: allData.length,
-        totalQuantity: totalQuantitySum
-      })
+      // console.log('Final data fetch complete:', {
+      //   totalEntries: allData.length,
+      //   totalQuantity: totalQuantitySum
+      // })
 
       // Store the raw data in cache with correct total quantity
       globalCache = {
@@ -472,11 +475,11 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
   // Add function to update views from cache
   const updateViewsFromCache = useCallback(() => {
     if (!globalCache) {
-      console.log('updateViewsFromCache: No global cache available');
+      // console.log('updateViewsFromCache: No global cache available');
       return;
     }
 
-    console.log('updateViewsFromCache: Starting update with cache size:', globalCache.minis.length);
+    // console.log('updateViewsFromCache: Starting update with cache size:', globalCache.minis.length);
 
     // Calculate total counts first (unfiltered)
     const totalCount = globalCache.minis.length;
@@ -490,38 +493,38 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     
     // Apply all filters in sequence
     if (internalSearchTerm) {
-      console.log('Applying filters:', internalSearchTerm);
+      // console.log('Applying filters:', internalSearchTerm);
       
       // Split the search term into individual filters
       const filterTerms = internalSearchTerm.split(' AND ').map(term => term.trim()).filter(Boolean);
-      console.log('Filter terms:', filterTerms);
+      // console.log('Filter terms:', filterTerms);
 
       // Apply each filter term sequentially
       filterTerms.forEach(term => {
         if (term.startsWith('name:')) {
           const name = term.replace('name:', '').trim().toLowerCase();
-          console.log('Applying name filter:', name);
+          // console.log('Applying name filter:', name);
           filteredData = filteredData.filter(mini => 
             mini.name.toLowerCase().includes(name)
           );
         }
         else if (term.startsWith('type:')) {
           const type = term.replace('type:', '').trim().toLowerCase();
-          console.log('Applying type filter:', type);
+          // console.log('Applying type filter:', type);
           filteredData = filteredData.filter(mini => 
             mini.types?.some(t => !t.proxy_type && t.type.name.toLowerCase().includes(type))
           );
         }
         else if (term.startsWith('alltype:')) {
           const type = term.replace('alltype:', '').trim().toLowerCase();
-          console.log('Applying alltype filter:', type);
+          // console.log('Applying alltype filter:', type);
           filteredData = filteredData.filter(mini => 
             mini.types?.some(t => t.type.name.toLowerCase().includes(type))
           );
         }
         else if (term.startsWith('productset:')) {
           const productSet = term.replace('productset:', '').trim().toLowerCase();
-          console.log('Applying productset filter:', productSet);
+          // console.log('Applying productset filter:', productSet);
           filteredData = filteredData.filter(mini => 
             mini.product_sets?.name?.toLowerCase().includes(productSet) ||
             mini.product_sets?.product_line?.name?.toLowerCase().includes(productSet) ||
@@ -530,28 +533,28 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         }
         else if (term.startsWith('paintedby:')) {
           const paintedBy = term.replace('paintedby:', '').trim().toLowerCase();
-          console.log('Applying paintedby filter:', paintedBy);
+          // console.log('Applying paintedby filter:', paintedBy);
           filteredData = filteredData.filter(mini => 
             mini.painted_by?.painted_by_name.toLowerCase().includes(paintedBy)
           );
         }
         else if (term.startsWith('tags:')) {
           const tags = term.replace('tags:', '').split(',').map(t => t.trim().toLowerCase());
-          console.log('Applying tags filter:', tags);
+          // console.log('Applying tags filter:', tags);
           filteredData = filteredData.filter(mini => 
             tags.every(tag => mini.tags?.some(t => t.tag?.name.toLowerCase() === tag))
           );
         }
         
-        console.log('After applying filter:', term, 'count:', filteredData.length);
+        // console.log('After applying filter:', term, 'count:', filteredData.length);
       });
     }
 
     // Apply missing images filter last
     if (showMissingImages) {
-      console.log('Applying missing images filter');
+      // console.log('Applying missing images filter');
       filteredData = filteredData.filter(mini => !mini.has_image);
-      console.log('After missing images filter count:', filteredData.length);
+      // console.log('After missing images filter count:', filteredData.length);
     }
 
     // Sort filtered data
@@ -564,12 +567,12 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       return acc + (isNaN(quantity) ? 0 : quantity);
     }, 0);
 
-    console.log('Final counts:', {
-      total: totalCount,
-      filtered: filteredCount,
-      totalQuantity,
-      filteredQuantity
-    });
+    // console.log('Final counts:', {
+    //   total: totalCount,
+    //   filtered: filteredCount,
+    //   totalQuantity,
+    //   filteredQuantity
+    // });
 
     // Update state
     setTotalMinis(totalCount);
@@ -616,7 +619,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
       // Use updateViewsFromCache to handle filtering and pagination
       if (globalCache) {
-        console.log('loadData: Calling updateViewsFromCache');
+        // console.log('loadData: Calling updateViewsFromCache');
         updateViewsFromCache();
       }
 
@@ -750,6 +753,11 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
   // Update handleAdd to be the single source of truth for inserts
   const handleAdd = async (miniatureData: Partial<Mini>) => {
+    if (!user?.id) {
+      console.error('No user ID available for audit logging');
+      throw new Error('No user ID available');
+    }
+
     console.log('handleAdd: Starting add operation');
     // Create a temporary ID for optimistic update
     const tempId = -Date.now();
@@ -814,7 +822,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       console.log('handleAdd: Set ourChangeRef to temp ID:', tempId);
 
       // Perform the single API call
-      const newMini = await createMiniature(transformedData);
+      const newMini = await createMiniature(transformedData, user.id);
       console.log('handleAdd: Created mini with real ID:', newMini.id);
 
       // Update flag with real ID
@@ -874,6 +882,11 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
   // Update handleEdit to use updateViewsFromCache
   const handleEdit = async (miniId: number, miniatureData: Partial<Mini>) => {
+    if (!user?.id) {
+      console.error('No user ID available for audit logging');
+      throw new Error('No user ID available');
+    }
+
     const currentMini = minis.find(m => m.id === miniId);
     if (!currentMini) throw new Error('Mini not found');
 
@@ -914,7 +927,7 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
         }))
       };
 
-      await updateMiniature(miniId, transformedData);
+      await updateMiniature(miniId, transformedData, user.id);
     } catch (error) {
       // Revert cache update on error
       if (globalCache) {

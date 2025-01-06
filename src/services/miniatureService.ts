@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseMonitor'
+import { AuditService } from './auditService'
 
 export interface MiniatureType {
   type_id: number
@@ -174,9 +175,9 @@ export const deleteMiniatureImage = async (miniId: number) => {
   return await updateHasImage(miniId, false)
 }
 
-export async function createMiniature(data: Partial<MiniatureData>) {
+export async function createMiniature(data: Partial<MiniatureData>, userId: string) {
   try {
-    // First create the miniature without types to get its ID
+    // First create the miniature basic data
     const miniatureData = {
       name: data.name,
       description: data.description,
@@ -188,6 +189,8 @@ export async function createMiniature(data: Partial<MiniatureData>) {
       material_id: data.material_id
     }
 
+    // console.log('Creating miniature with data:', miniatureData);
+
     const { data: newMini, error: miniError } = await supabase
       .from('minis')
       .insert(miniatureData)
@@ -196,7 +199,19 @@ export async function createMiniature(data: Partial<MiniatureData>) {
 
     if (miniError) throw miniError
 
-    // Then create the type relationships with the new mini ID
+    // console.log('Successfully created miniature:', newMini);
+
+    // Log the creation to audit logs
+    await AuditService.logMiniatureCreate(
+      userId,
+      {
+        ...newMini,
+        types: data.types || [],
+        tags: data.tags || []
+      }
+    )
+
+    // Then create type relationships
     if (data.types && data.types.length > 0) {
       const typeRelations = data.types.map((t: MiniatureType) => ({
         mini_id: newMini.id,
@@ -232,8 +247,45 @@ export async function createMiniature(data: Partial<MiniatureData>) {
   }
 }
 
-export async function updateMiniature(miniId: number, data: Partial<MiniatureData>) {
+export async function updateMiniature(miniId: number, data: Partial<MiniatureData>, userId: string) {
   try {
+    // console.log('Updating miniature:', { miniId, data });
+
+    // Get the original miniature data for audit logging
+    const { data: originalMini, error: fetchError } = await supabase
+      .from('minis')
+      .select(`
+        id,
+        name,
+        description,
+        location,
+        quantity,
+        painted_by_id,
+        base_size_id,
+        product_set_id,
+        material_id,
+        types:mini_to_types(
+          type_id,
+          proxy_type,
+          type:mini_types(
+            id,
+            name
+          )
+        ),
+        tags:mini_to_tags(
+          tag:tags(
+            id,
+            name
+          )
+        )
+      `)
+      .eq('id', miniId)
+      .single()
+
+    if (fetchError) throw fetchError
+
+    // console.log('Original miniature data:', originalMini);
+
     // First update the miniature basic data
     const miniatureData = {
       name: data.name,
@@ -252,6 +304,30 @@ export async function updateMiniature(miniId: number, data: Partial<MiniatureDat
       .eq('id', miniId)
 
     if (miniError) throw miniError
+
+    // console.log('Successfully updated miniature data');
+
+    // Log the update to audit logs
+    const updatedData = {
+      ...originalMini,
+      ...miniatureData,
+      types: data.types || originalMini.types,
+      tags: data.tags || originalMini.tags
+    };
+
+    // console.log('Creating audit log for update with data:', {
+    //   userId,
+    //   miniId,
+    //   originalMini,
+    //   updatedData
+    // });
+
+    await AuditService.logMiniatureUpdate(
+      userId,
+      miniId,
+      originalMini,
+      updatedData
+    )
 
     // Then handle types - first delete existing relationships
     const { error: deleteTypesError } = await supabase

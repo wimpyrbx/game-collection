@@ -1,73 +1,51 @@
-import { useState } from 'react';
-import type { Mini } from '../types/mini';
-import type { MiniatureData } from '../services/miniatureService';
-import { createMiniature, updateMiniature, deleteMiniature, updateMiniatureInUse, getMiniature } from '../services/miniatureService';
+import { useCallback, useRef, useState } from 'react'
+import { createMiniature, updateMiniature } from '../services/miniatureService'
+import type { Mini } from '../types/mini'
+import type { MiniatureData } from '../services/miniatureService'
+import { useAuth } from '../contexts/AuthContext'
 
 export function useOptimisticMinis() {
-  const [minis, setMinis] = useState<Mini[]>([]);
-  const [totalMinis, setTotalMinis] = useState(0);
-  const [totalQuantity, setTotalQuantity] = useState(0);
+  const [optimisticMinis, setOptimisticMinis] = useState<Mini[]>([])
+  const [error, setError] = useState<Error | null>(null)
+  const optimisticIdCounter = useRef(-1)
+  const { user } = useAuth()
 
-  const optimisticallyUpdateMinis = (updatedMini: Mini) => {
-    setMinis(prevMinis => {
-      const index = prevMinis.findIndex(m => m.id === updatedMini.id);
-      if (index === -1) return prevMinis;
-      const newMinis = [...prevMinis];
-      newMinis[index] = updatedMini;
-      return newMinis;
-    });
-  };
+  const handleAdd = useCallback(async (miniatureData: Partial<Mini>) => {
+    if (!user?.id) {
+      console.error('No user ID available for audit logging')
+      throw new Error('No user ID available')
+    }
 
-  const optimisticallyAddMini = (newMini: Mini) => {
-    setMinis(prevMinis => {
-      // Insert the new mini in the correct alphabetical position
-      const index = prevMinis.findIndex(m => m.name.toLowerCase() > newMini.name.toLowerCase());
-      const newMinis = [...prevMinis];
-      if (index === -1) {
-        newMinis.push(newMini);
-      } else {
-        newMinis.splice(index, 0, newMini);
-      }
-      return newMinis;
-    });
-    setTotalMinis(prev => prev + 1);
-    setTotalQuantity(prev => prev + (newMini.quantity || 0));
-  };
+    // Create a temporary ID for optimistic update
+    const tempId = optimisticIdCounter.current
+    optimisticIdCounter.current -= 1
 
-  const optimisticallyDeleteMini = (miniId: number, quantity: number) => {
-    setMinis(prevMinis => prevMinis.filter(m => m.id !== miniId));
-    setTotalMinis(prev => prev - 1);
-    setTotalQuantity(prev => prev - quantity);
-  };
-
-  const optimisticallyUpdateInUse = (miniId: number, inUse: boolean) => {
-    setMinis(prevMinis => {
-      const index = prevMinis.findIndex(m => m.id === miniId);
-      if (index === -1) return prevMinis;
-      const newMinis = [...prevMinis];
-      newMinis[index] = {
-        ...newMinis[index],
-        in_use: inUse ? new Date().toISOString() : null
-      };
-      return newMinis;
-    });
-  };
-
-  const handleAdd = async (miniatureData: Partial<Mini>) => {
-    const tempId = -Date.now(); // Temporary negative ID
     const tempMini: Mini = {
       ...miniatureData as Mini,
       id: tempId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      in_use: null
-    };
+      in_use: null,
+      painted_by: {
+        id: miniatureData.painted_by_id || 0,
+        painted_by_name: ''
+      },
+      base_sizes: {
+        id: miniatureData.base_size_id || 0,
+        base_size_name: ''
+      },
+      product_sets: miniatureData.product_set_id ? {
+        id: miniatureData.product_set_id,
+        name: ''
+      } : undefined,
+      has_image: false
+    }
 
     try {
-      // Optimistically update UI
-      optimisticallyAddMini(tempMini);
+      // Add to optimistic state
+      setOptimisticMinis(prev => [...prev, tempMini])
 
-      // Transform data to match MiniatureData type
+      // Transform data for API
       const transformedData: Partial<MiniatureData> = {
         name: miniatureData.name,
         description: miniatureData.description,
@@ -85,43 +63,38 @@ export function useOptimisticMinis() {
           id: t.tag.id,
           name: t.tag.name
         }))
-      };
-
-      // Perform actual API call
-      const newMini = await createMiniature(transformedData);
-
-      // Update with real data
-      if (newMini) {
-        const realMini = await getMiniature(newMini.id);
-        if (realMini) {
-          optimisticallyUpdateMinis(realMini);
-        }
       }
 
-      return newMini;
-    } catch (error) {
-      // Revert optimistic update on error
-      optimisticallyDeleteMini(tempId, tempMini.quantity || 0);
-      throw error;
-    }
-  };
+      // Perform API call
+      const newMini = await createMiniature(transformedData, user.id)
 
-  const handleEdit = async (miniId: number, miniatureData: Partial<Mini>) => {
-    const currentMini = minis.find(m => m.id === miniId);
-    if (!currentMini) throw new Error('Mini not found');
+      // Update optimistic state with real data
+      setOptimisticMinis(prev =>
+        prev.map(mini => mini.id === tempId ? { ...mini, id: newMini.id } : mini)
+      )
+
+      return newMini
+    } catch (error) {
+      // Remove failed entry from optimistic state
+      setOptimisticMinis(prev => prev.filter(mini => mini.id !== tempId))
+      setError(error instanceof Error ? error : new Error('Unknown error'))
+      throw error
+    }
+  }, [])
+
+  const handleEdit = useCallback(async (miniId: number, miniatureData: Partial<Mini>) => {
+    if (!user?.id) {
+      console.error('No user ID available for audit logging')
+      throw new Error('No user ID available')
+    }
 
     try {
-      // Create optimistic update
-      const optimisticMini: Mini = {
-        ...currentMini,
-        ...miniatureData as Partial<Mini>,
-        updated_at: new Date().toISOString()
-      };
+      // Update optimistic state
+      setOptimisticMinis(prev =>
+        prev.map(mini => mini.id === miniId ? { ...mini, ...miniatureData } : mini)
+      )
 
-      // Optimistically update UI
-      optimisticallyUpdateMinis(optimisticMini);
-
-      // Transform data to match MiniatureData type
+      // Transform data for API
       const transformedData: Partial<MiniatureData> = {
         name: miniatureData.name,
         description: miniatureData.description,
@@ -139,68 +112,21 @@ export function useOptimisticMinis() {
           id: t.tag.id,
           name: t.tag.name
         }))
-      };
-
-      // Perform actual API call
-      await updateMiniature(miniId, transformedData);
-
-      // Fetch real data to ensure consistency
-      const updatedMini = await getMiniature(miniId);
-      if (updatedMini) {
-        optimisticallyUpdateMinis(updatedMini);
       }
+
+      // Perform API call
+      await updateMiniature(miniId, transformedData, user.id)
     } catch (error) {
       // Revert optimistic update on error
-      optimisticallyUpdateMinis(currentMini);
-      throw error;
+      setError(error instanceof Error ? error : new Error('Unknown error'))
+      throw error
     }
-  };
-
-  const handleDelete = async (miniId: number) => {
-    const miniToDelete = minis.find(m => m.id === miniId);
-    if (!miniToDelete) throw new Error('Mini not found');
-
-    try {
-      // Optimistically update UI
-      optimisticallyDeleteMini(miniId, miniToDelete.quantity || 0);
-
-      // Perform actual API call
-      await deleteMiniature(miniId);
-    } catch (error) {
-      // Revert optimistic update on error
-      optimisticallyAddMini(miniToDelete);
-      throw error;
-    }
-  };
-
-  const handleUpdateInUse = async (miniId: number, inUse: boolean) => {
-    try {
-      // Optimistically update UI
-      optimisticallyUpdateInUse(miniId, inUse);
-
-      // Perform actual API call
-      await updateMiniatureInUse(miniId, inUse);
-    } catch (error) {
-      // Revert optimistic update on error
-      optimisticallyUpdateInUse(miniId, !inUse);
-      throw error;
-    }
-  };
+  }, [])
 
   return {
-    minis,
-    setMinis,
-    totalMinis,
-    setTotalMinis,
-    totalQuantity,
-    setTotalQuantity,
+    optimisticMinis,
+    error,
     handleAdd,
-    handleEdit,
-    handleDelete,
-    handleUpdateInUse,
-    optimisticallyUpdateMinis,
-    optimisticallyAddMini,
-    optimisticallyDeleteMini,
-    optimisticallyUpdateInUse
-  };
+    handleEdit
+  }
 } 
