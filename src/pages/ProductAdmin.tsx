@@ -27,7 +27,23 @@ interface ProductSet {
   product_line_id: number
 }
 
+// Add new interfaces for hover state
+interface HoverPosition {
+  x: number
+  y: number
+  show: boolean
+  company: string | null
+}
+
 export default function ProductAdmin() {
+  // Add hover state
+  const [hoverPosition, setHoverPosition] = useState<HoverPosition>({
+    x: 0,
+    y: 0,
+    show: false,
+    company: null
+  })
+
   // Consolidated state
   const [state, setState] = useState<{
     companies: Company[]
@@ -426,8 +442,61 @@ export default function ProductAdmin() {
     }
   }
 
+  // Add mouse move handler
+  const handleMouseMove = (e: React.MouseEvent, companyName: string) => {
+    // Get the target element's bounding rect to account for any offsets
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    // Calculate position relative to the element
+    const x = e.clientX - rect.left
+    const sidebarWidth = 350
+    
+    setHoverPosition({
+      x: rect.left + x - sidebarWidth / 2, // Subtract sidebar width from x position
+      y: e.clientY - 65,
+      show: true,
+      company: companyName
+    })
+  }
+
+  // Add mouse leave handler
+  const handleMouseLeave = () => {
+    setHoverPosition({
+      x: 0,
+      y: 0,
+      show: false,
+      company: null
+    })
+  }
+
   return (
     <div className="space-y-8">
+      {/* Hover Image - Move to root level */}
+      <div 
+        className="fixed pointer-events-none z-50 w-[100px] h-[100px] items-center justify-center"
+        style={{ 
+          position: 'absolute',
+          left: `${hoverPosition.x}px`,
+          top: `${hoverPosition.y}px`,
+          opacity: hoverPosition.show ? 1 : 0,
+          transition: 'opacity 0.5s ease-out ease-in'
+        }}
+      >
+        {hoverPosition.company && (
+          <div className="flex h-full items-center justify-center">
+            <img
+              key={hoverPosition.company}
+              src={`/miniatures/images/product_companies/${hoverPosition.company.toLowerCase()}.webp`}
+              alt={hoverPosition.company}
+              className="max-w-[100px] max-h-[100px] shadow-xl"
+              onError={(e) => {
+              const target = e.target as HTMLImageElement
+              target.style.display = 'none'
+            }}
+            />
+          </div>
+        )}
+      </div>
+
       <PageHeader bgColor="none">
         <PageHeaderTextGroup>
           <PageHeaderText>Product Admin</PageHeaderText>
@@ -458,6 +527,7 @@ export default function ProductAdmin() {
         <div className="col-span-4">
           <UI.AdminTableSection
             title="Companies"
+            headerSubText={`There is a total of ${state.totals.companies} companies`}
             icon={FaBuilding}
             iconColor="text-blue-500"
             items={state.companies}
@@ -488,6 +558,8 @@ export default function ProductAdmin() {
               onPageChange: companyPagination.setCurrentPage
             }}
             getItemName={(item) => item.name}
+            onItemMouseMove={(e, item) => handleMouseMove(e, item.name)}
+            onItemMouseLeave={handleMouseLeave}
           />
         </div>
 

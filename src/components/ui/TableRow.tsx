@@ -1,11 +1,13 @@
 import { FaEdit, FaTrash } from 'react-icons/fa'
 
 interface TableRowProps {
-  title: string
+  title: string | React.ReactNode
   isSelected?: boolean
   onSelect?: () => void
   onEdit?: () => void
   onDelete?: () => void
+  onMouseMove?: (e: React.MouseEvent) => void
+  onMouseLeave?: () => void
 }
 
 export function TableRow({
@@ -13,7 +15,9 @@ export function TableRow({
   isSelected = false,
   onSelect,
   onEdit,
-  onDelete
+  onDelete,
+  onMouseMove,
+  onMouseLeave
 }: TableRowProps) {
   return (
     <div
@@ -21,6 +25,7 @@ export function TableRow({
         isSelected ? 'bgSelected' : 'bgRow'
       }`}
       onClick={onSelect}
+      onMouseMove={onMouseMove}
     >
       <div className="text-gray-300 text-sm">{title}</div>
       <div className="flex gap-1">

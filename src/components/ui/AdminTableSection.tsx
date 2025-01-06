@@ -32,8 +32,10 @@ interface AdminTableSectionProps<T> {
   useTable?: boolean
   columnHeaders?: string[]
   getItemColumns?: (item: T) => string[]
-  getItemName?: (item: T) => string
+  getItemName?: (item: T) => string | React.ReactNode
   headerButtons?: React.ReactNode
+  onItemMouseMove?: (e: React.MouseEvent, item: T) => void
+  onItemMouseLeave?: () => void
 }
 
 export default function AdminTableSection<T extends { id: number }>({
@@ -58,7 +60,9 @@ export default function AdminTableSection<T extends { id: number }>({
   columnHeaders = [],
   getItemColumns,
   getItemName,
-  headerButtons
+  headerButtons,
+  onItemMouseMove,
+  onItemMouseLeave
 }: AdminTableSectionProps<T>) {
   return (
     <div className="flex flex-col gap-2">
@@ -110,7 +114,10 @@ export default function AdminTableSection<T extends { id: number }>({
             </div>
           )}
 
-          <div className={loading ? 'opacity-50 pointer-events-none' : ''}>
+          <div 
+            className={loading ? 'opacity-50 pointer-events-none' : ''}
+            onMouseLeave={onItemMouseLeave}
+          >
             {items.length === 0 ? (
               <UI.EmptyTableState icon={<Icon />} message={emptyMessage} />
             ) : useTable && columnHeaders.length > 0 && getItemColumns ? (
@@ -186,6 +193,8 @@ export default function AdminTableSection<T extends { id: number }>({
                   onSelect={onSelect ? () => onSelect(item) : undefined}
                   onEdit={onEdit ? () => onEdit(item) : undefined}
                   onDelete={onDelete ? () => onDelete(item) : undefined}
+                  onMouseMove={onItemMouseMove ? (e) => onItemMouseMove(e, item) : undefined}
+                  onMouseLeave={onItemMouseLeave}
                 />
               ))
             )}

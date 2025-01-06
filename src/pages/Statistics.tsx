@@ -476,18 +476,18 @@ function Statistics() {
                   <YAxis stroke="#94A3B8" />
                   <Tooltip content={<CustomTooltip />} />
                   <Bar dataKey="miniatures_added" name="Miniatures Added" fill="#15803D" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
+        </div>
 
-          {/* Cumulative Miniatures Chart */}
+        {/* Cumulative Miniatures Chart */}
           <div className="bg-gray-800/50 px-2 py-4 rounded-lg border border-gray-700">
             <h2 className="text-xl font-semibold mb-4 text-cyan-100 px-2">Total Unique Miniatures Over Time</h2>
             <div className="h-[150px]">
               <ResponsiveContainer width="100%" height={150}>
                 <AreaChart data={cumulativeStats} margin={{ top: 20, right: 20, left: -20, bottom: 15 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#1F2937" />
                   <XAxis 
                     dataKey="date" 
                     stroke="#94A3B8"
@@ -496,60 +496,60 @@ function Statistics() {
                     height={40}
                     tickFormatter={(date) => format(parseISO(date), 'MMM d')}
                   />
-                  <YAxis stroke="#94A3B8" />
-                  <Tooltip content={<CustomTooltip />} />
-                  <Area 
-                    type="monotone" 
-                    dataKey="total_miniatures" 
+                <YAxis stroke="#94A3B8" />
+                <Tooltip content={<CustomTooltip />} />
+                <Area 
+                  type="monotone" 
+                  dataKey="total_miniatures" 
                     name="Total Unique Miniatures"
-                    stroke="#0F766E"
-                    fill="#0F766E"
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                    activeDot={{ 
-                      stroke: '#134E4A',
-                      fill: '#134E4A',
-                      r: 6,
-                      strokeWidth: 2
-                    }}
-                    dot={false}
-                    isAnimationActive={false}
-                  />
-                  <defs>
-                    <style>
-                      {`
-                        .recharts-area-area {
-                          fill: #0F766E !important;
-                          stroke: #0F766E !important;
-                        }
-                        .recharts-area-area:hover {
-                          fill: #0A4F5A !important;
-                          stroke: #0A4F5A !important;
-                        }
-                        .recharts-area-curve {
-                          stroke: #0F766E !important;
-                        }
-                        .recharts-area-curve:hover {
-                          stroke: #0A4F5A !important;
-                        }
-                        .recharts-active-dot {
-                          fill: #134E4A !important;
-                          stroke: #134E4A !important;
-                        }
-                        .recharts-tooltip-cursor {
-                          fill: #334455 !important;
-                          stroke: #223344 !important;
-                        }
-                      `}
-                    </style>
-                  </defs>
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                  stroke="#0F766E"
+                  fill="#0F766E"
+                  fillOpacity={0.2}
+                  strokeWidth={2}
+                  activeDot={{ 
+                    stroke: '#134E4A',
+                    fill: '#134E4A',
+                    r: 6,
+                    strokeWidth: 2
+                  }}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+                <defs>
+                  <style>
+                    {`
+                      .recharts-area-area {
+                        fill: #0F766E !important;
+                        stroke: #0F766E !important;
+                      }
+                      .recharts-area-area:hover {
+                        fill: #0A4F5A !important;
+                        stroke: #0A4F5A !important;
+                      }
+                      .recharts-area-curve {
+                        stroke: #0F766E !important;
+                      }
+                      .recharts-area-curve:hover {
+                        stroke: #0A4F5A !important;
+                      }
+                      .recharts-active-dot {
+                        fill: #134E4A !important;
+                        stroke: #134E4A !important;
+                      }
+                      .recharts-tooltip-cursor {
+                        fill: #334455 !important;
+                        stroke: #223344 !important;
+                      }
+                    `}
+                  </style>
+                </defs>
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </div>
+      </div>
 
-        {/* Hourly Activity Chart */}
+      {/* Hourly Activity Chart */}
         <div className="bg-gray-800/50 px-2 py-4 rounded-lg border border-gray-700">
           <h2 className="text-xl font-semibold mb-4 text-cyan-100 px-2">Log Entries by Hour</h2>
           <div className="h-[150px]">
@@ -574,38 +574,38 @@ function Statistics() {
                 />
               </BarChart>
             </ResponsiveContainer>
-          </div>
         </div>
+      </div>
 
-        {/* Distribution Charts */}
+      {/* Distribution Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
-          {/* Base Size Distribution */}
+        {/* Base Size Distribution */}
           <div className="bg-gray-800/50 px-2 py-4 rounded-lg border border-gray-700 relative">
             <h2 className="text-xl font-semibold mb-4 text-cyan-100 px-2">Base Sizes</h2>
-            <div className="absolute top-4 right-4 text-cyan-100">
-              Total: {calculateTotal(baseSizeDistribution)}
-            </div>
+          <div className="absolute top-4 right-4 text-cyan-100">
+            Total: {calculateTotal(baseSizeDistribution)}
+          </div>
             <div className="h-[150px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                  <Pie
-                    data={baseSizeDistribution}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
+                <Pie
+                  data={baseSizeDistribution}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
                     outerRadius={70}
                     label={false}
                     labelLine={false}
-                  >
-                    {baseSizeDistribution.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomPieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+                >
+                  {baseSizeDistribution.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomPieTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
             <div className="mt-2">
               <table className="w-full text-sm">
                 <thead>
@@ -631,31 +631,31 @@ function Statistics() {
                 </tbody>
               </table>
             </div>
-          </div>
+        </div>
 
-          {/* Painted By Distribution */}
+        {/* Painted By Distribution */}
           <div className="bg-gray-800/50 px-2 py-4 rounded-lg border border-gray-700 relative">
             <h2 className="text-xl font-semibold mb-4 text-cyan-100 px-2">Painted By</h2>
-            <div className="absolute top-4 right-4 text-cyan-100">
+          <div className="absolute top-4 right-4 text-cyan-100">
               Total Entries: {calculateTotal(paintedByDistribution)}
-            </div>
+          </div>
             <div className="h-[150px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                  <Pie
-                    data={paintedByDistribution}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
+                <Pie
+                  data={paintedByDistribution}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
                     outerRadius={70}
                     label={false}
                     labelLine={false}
-                  >
-                    {paintedByDistribution.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
+                >
+                  {paintedByDistribution.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
                   <Tooltip content={({ active, payload }) => {
                     if (active && payload && payload.length) {
                       const name = String(payload[0].name);
@@ -678,9 +678,9 @@ function Statistics() {
                     }
                     return null;
                   }} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
             <div className="mt-2">
               <table className="w-full text-sm">
                 <thead>
@@ -711,34 +711,34 @@ function Statistics() {
                 </tbody>
               </table>
             </div>
-          </div>
+        </div>
 
-          {/* Type Distribution */}
+        {/* Type Distribution */}
           <div className="bg-gray-800/50 px-2 py-4 rounded-lg border border-gray-700 relative">
             <h2 className="text-xl font-semibold mb-4 text-cyan-100 px-2">Main Types</h2>
-            <div className="absolute top-4 right-4 text-cyan-100">
+          <div className="absolute top-4 right-4 text-cyan-100">
               Total: {totalTypeCount} types
-            </div>
+          </div>
             <div className="h-[150px]">
-              <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%">
                 <PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                  <Pie
-                    data={typeDistribution}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
+                <Pie
+                  data={typeDistribution}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
                     outerRadius={70}
                     label={false}
                     labelLine={false}
-                  >
-                    {typeDistribution.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip content={<CustomPieTooltip />} />
-                </PieChart>
-              </ResponsiveContainer>
+                >
+                  {typeDistribution.map((_, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<CustomPieTooltip />} />
+              </PieChart>
+            </ResponsiveContainer>
             </div>
             <div className="mt-2">
               <table className="w-full text-sm">
