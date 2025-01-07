@@ -717,7 +717,7 @@ function Statistics() {
           <div className="bg-gray-800/50 px-2 py-4 rounded-lg border border-gray-700 relative">
             <h2 className="text-xl font-semibold mb-4 text-cyan-100 px-2">Main Types</h2>
           <div className="absolute top-4 right-4 text-cyan-100">
-              Total: {totalTypeCount} types
+              Total: {totalTypeCount} main types in use
           </div>
             <div className="h-[150px]">
             <ResponsiveContainer width="100%" height="100%">

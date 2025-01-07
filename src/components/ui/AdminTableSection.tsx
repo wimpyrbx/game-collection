@@ -16,7 +16,7 @@ interface AdminTableSectionProps<T> {
   addButtonDisabled?: boolean
   emptyMessage?: string
   headerSubText?: string
-  headerItalicText?: string
+  headerItalicText?: string | React.ReactNode
   searchProps?: {
     value: string
     onChange: (value: string) => void

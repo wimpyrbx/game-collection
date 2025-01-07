@@ -26,6 +26,7 @@ export function TableRow({
       }`}
       onClick={onSelect}
       onMouseMove={onMouseMove}
+      onMouseLeave={onMouseLeave}
     >
       <div className="text-gray-300 text-sm">{title}</div>
       <div className="flex gap-1">

@@ -469,7 +469,17 @@ export default function ProductAdmin() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="">
+      {/* Global styles for animations */}
+      <style>
+        {`
+          @keyframes scaleAnimation {
+            0%, 100% { transform: rotate(-4deg) scale(0.98); opacity: 0.5; }
+            50% { transform: rotate(2deg) scale(1.02); opacity: 0.75; }
+          }
+        `}
+      </style>
+
       {/* Hover Image - Move to root level */}
       <div 
         className="fixed pointer-events-none z-50 w-[100px] h-[100px] items-center justify-center"
@@ -565,6 +575,28 @@ export default function ProductAdmin() {
 
         {/* Product Lines Section */}
         <div className="col-span-4">
+          {state.selected.company && (
+            <div className="" style={{ float: 'right', marginTop: '-75px', marginRight: '225px' }}>
+              <img
+                key={state.selected.company.name}
+                src={`/miniatures/images/product_companies/${state.selected.company.name.toLowerCase()}.webp`}
+                alt={state.selected.company.name}
+                className="w-48 h-48 object-contain"
+                style={{ 
+                  position: 'absolute',
+                  animation: 'scaleAnimation 4s ease-in-out infinite'
+                }}
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.visibility = 'hidden'
+                }}
+                onLoad={(e) => {
+                  const target = e.target as HTMLImageElement
+                  target.style.visibility = 'visible'
+                }}
+              />
+            </div>
+          )}
           <UI.AdminTableSection
             title="Product Lines"
             icon={FaList}
@@ -634,7 +666,6 @@ export default function ProductAdmin() {
               modal: { type: 'addSet', isOpen: true }
             })) : undefined}
             addButtonDisabled={!state.selected.line}
-            addButtonLabel="+ Add"
             headerButtons={state.selected.line && (
               <UI.Button
                 variant="btnSuccess"
