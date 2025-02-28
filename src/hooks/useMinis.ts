@@ -253,7 +253,9 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
 
         // Apply search filters
         if (internalSearchTerm) {
+          console.log('Processing search term:', internalSearchTerm);
           const searchTerms = internalSearchTerm.split(' AND ')
+          console.log('Search terms:', searchTerms);
           filteredData = filteredData.filter((mini) => {
             return searchTerms.every(term => {
               if (term.startsWith('name:')) {
@@ -294,6 +296,22 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
                 return mini.types?.some(t => 
                   t.type.name.toLowerCase().includes(searchValue)
                 ) || false
+              }
+
+              if (term.startsWith('basesize:')) {
+                const baseSize = term.replace('basesize:', '').trim().toLowerCase();
+                return mini.base_sizes?.base_size_name.toLowerCase().includes(baseSize)
+              }
+
+              if (term.startsWith('character:')) {
+                const character = term.replace('character:', '').trim().toLowerCase();
+                
+                // Check if types contain any categories with the character name
+                return mini.types?.some(t => 
+                  t.type.categories?.some(c => 
+                    c.category?.name?.toLowerCase().includes(character)
+                  )
+                ) || false;
               }
 
               // If no prefix, search everywhere (fallback)
@@ -398,7 +416,9 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
       let filteredData = [...allData]
 
       if (internalSearchTerm) {
+        console.log('Processing search term:', internalSearchTerm);
         const searchTerms = internalSearchTerm.split(' AND ')
+        console.log('Search terms:', searchTerms);
         filteredData = filteredData.filter((mini) => {
           return searchTerms.every(term => {
             if (term.startsWith('name:')) {
@@ -439,6 +459,22 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
               return mini.types?.some(t => 
                 t.type.name.toLowerCase().includes(searchValue)
               ) || false
+            }
+
+            if (term.startsWith('basesize:')) {
+              const baseSize = term.replace('basesize:', '').trim().toLowerCase();
+              return mini.base_sizes?.base_size_name.toLowerCase().includes(baseSize)
+            }
+
+            if (term.startsWith('character:')) {
+              const character = term.replace('character:', '').trim().toLowerCase();
+              
+              // Check if types contain any categories with the character name
+              return mini.types?.some(t => 
+                t.type.categories?.some(c => 
+                  c.category?.name?.toLowerCase().includes(character)
+                )
+              ) || false;
             }
 
             // If no prefix, search everywhere (fallback)
@@ -543,6 +579,22 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
           // console.log('Applying tags filter:', tags);
           filteredData = filteredData.filter(mini => 
             tags.every(tag => mini.tags?.some(t => t.tag?.name.toLowerCase() === tag))
+          );
+        }
+        else if (term.startsWith('basesize:')) {
+          const baseSize = term.replace('basesize:', '').trim().toLowerCase();
+          filteredData = filteredData.filter(mini => 
+            mini.base_sizes?.base_size_name.toLowerCase().includes(baseSize)
+          );
+        }
+        else if (term.startsWith('character:')) {
+          const character = term.replace('character:', '').trim().toLowerCase();
+          filteredData = filteredData.filter(mini => 
+            mini.types?.some(t => 
+              t.type.categories?.some(c => 
+                c.category?.name?.toLowerCase().includes(character)
+              )
+            )
           );
         }
         
@@ -1174,6 +1226,34 @@ export function useMinis(pageSize: number = 10, searchTerm?: string | null) {
     setShowMissingImages(value)
     // Don't invalidate cache, we want to filter locally
   }, [])
+
+  const processSearchTerm = (searchTerm: string) => {
+    // ... existing code ...
+
+    // Add handling for base size filter
+    if (searchTerm.includes('basesize:')) {
+      const baseSizeRegex = /basesize:([^AND]+)/i;
+      const baseSizeMatch = searchTerm.match(baseSizeRegex);
+      if (baseSizeMatch && baseSizeMatch[1]) {
+        const baseSizeTerm = baseSizeMatch[1].trim();
+        // Add the filter to query
+        query = query.filter('base_sizes.base_size_name', 'ilike', `%${baseSizeTerm}%`);
+      }
+    }
+
+    // Add handling for character category filter
+    if (searchTerm.includes('character:')) {
+      const characterRegex = /character:([^AND]+)/i;
+      const characterMatch = searchTerm.match(characterRegex);
+      if (characterMatch && characterMatch[1]) {
+        const characterTerm = characterMatch[1].trim();
+        // Filter by character category
+        query = query.filter('character_categories.name', 'ilike', `%${characterTerm}%`);
+      }
+    }
+
+    // ... existing code ...
+  }
 
   return {
     minis,

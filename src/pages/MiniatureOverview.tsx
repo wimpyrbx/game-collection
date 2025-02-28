@@ -437,7 +437,11 @@ export default function MiniatureOverview() {
   const [immediateProductSetFilter, setImmediateProductSetFilter] = useState('')
   const [immediatePaintedByFilter, setImmediatePaintedByFilter] = useState('')
   const [immediateAllTypesFilter, setImmediateAllTypesFilter] = useState('')
+  const [immediateBaseSizeFilter, setImmediateBaseSizeFilter] = useState('')
+  const [immediateCharacterCategoryFilter, setImmediateCharacterCategoryFilter] = useState('')
   const [allTypesFilter, setAllTypesFilter] = useState('')
+  const [baseSizeFilter, setBaseSizeFilter] = useState('')
+  const [characterCategoryFilter, setCharacterCategoryFilter] = useState('')
   const [selectedTagFilters, setSelectedTagFilters] = useState<Array<{ id: number; name: string }>>([])
   const [tagInput, setTagInput] = useState('')
   const [availableTags, setAvailableTags] = useState<Array<{ id: number; name: string }>>([])
@@ -517,8 +521,29 @@ export default function MiniatureOverview() {
     []
   );
 
+  const debouncedSetBaseSizeFilter = useMemo(
+    () => debounce((value: string) => setBaseSizeFilter(value), 300),
+    []
+  );
+
+  const debouncedSetCharacterCategoryFilter = useMemo(
+    () => debounce((value: string) => setCharacterCategoryFilter(value), 300),
+    []
+  );
+
   // Combine filters into a single search string
   useEffect(() => {
+    console.log('Filters updated:', {
+      nameFilter,
+      typeFilter,
+      productSetFilter,
+      paintedByFilter, 
+      allTypesFilter,
+      baseSizeFilter,
+      characterCategoryFilter,
+      selectedTagFilters
+    });
+    
     const filters: string[] = [];
 
     // Only add filters that have values
@@ -537,6 +562,12 @@ export default function MiniatureOverview() {
     if (allTypesFilter?.trim()) {
       filters.push(`alltype:${allTypesFilter.trim()}`);
     }
+    if (baseSizeFilter?.trim()) {
+      filters.push(`basesize:${baseSizeFilter.trim()}`);
+    }
+    if (characterCategoryFilter?.trim()) {
+      filters.push(`character:${characterCategoryFilter.trim()}`);
+    }
     if (selectedTagFilters.length > 0) {
       filters.push(`tags:${selectedTagFilters.map(t => t.name).join(',')}`);
     }
@@ -554,7 +585,7 @@ export default function MiniatureOverview() {
     
     // Reset to first page when filters change
     setCurrentPage(1);
-  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, selectedTagFilters, setInternalSearchTerm, setCurrentPage]);
+  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, baseSizeFilter, characterCategoryFilter, selectedTagFilters, setInternalSearchTerm, setCurrentPage]);
 
   // Initialize default values for base size and painted by
   useEffect(() => {
@@ -941,7 +972,12 @@ export default function MiniatureOverview() {
   )
 
   // Add isFiltering calculation
-  const isFiltering = !!(nameFilter || typeFilter || productSetFilter || paintedByFilter || allTypesFilter || selectedTagFilters.length > 0 || showMissingImages);
+  const isFiltering = useMemo(() => {
+    return nameFilter || typeFilter || productSetFilter || paintedByFilter || 
+           allTypesFilter || baseSizeFilter || characterCategoryFilter || 
+           selectedTagFilters.length > 0 || showMissingImages;
+  }, [nameFilter, typeFilter, productSetFilter, paintedByFilter, allTypesFilter, 
+      baseSizeFilter, characterCategoryFilter, selectedTagFilters, showMissingImages]);
 
   // Early return while loading view mode to prevent flash
   if (viewModeLoading || !viewMode) {
@@ -1206,7 +1242,13 @@ export default function MiniatureOverview() {
                               {/* Base Size */}
                               <select
                                 value={defaultBaseSizeId || ''}
-                                onChange={(e) => setDefaultBaseSizeId(e.target.value ? Number(e.target.value) : null)}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  console.log('Base size changed:', value);
+                                  setImmediateBaseSizeFilter(value)
+                                  debouncedSetBaseSizeFilter(value)
+                                  setCurrentPage(1)
+                                }}
                                 className="w-32 text-xs bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 py-0 pb-0 h-10"
                               >
                                 {baseSizeOptions.map((size) => (
@@ -1287,7 +1329,7 @@ export default function MiniatureOverview() {
                         setCurrentPage(1)
                       }}
                       placeholder="Name..."
-                      className="w-[80px]"
+                      className="w-[70px]"
                     />
                     {immediateNameFilter && (
                       <button
@@ -1316,8 +1358,8 @@ export default function MiniatureOverview() {
                         debouncedSetTypeFilter(value)
                         setCurrentPage(1)
                       }}
-                      placeholder="Main type..."
-                      className="w-[80px]"
+                      placeholder="Main..."
+                      className="w-[70px]"
                     />
                     {immediateTypeFilter && (
                       <button
@@ -1333,7 +1375,7 @@ export default function MiniatureOverview() {
                     )}
                   </div>
                 </div>
-
+                
                 {/* Add All Types Filter */}
                 <div className="flex items-center">
                   <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">All Types:</label>
@@ -1347,7 +1389,7 @@ export default function MiniatureOverview() {
                         setCurrentPage(1)
                       }}
                       placeholder="All types..."
-                      className="w-[80px]"
+                      className="w-[70px]"
                     />
                     {immediateAllTypesFilter && (
                       <button
@@ -1414,6 +1456,59 @@ export default function MiniatureOverview() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Base Size Filter */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Base Size:</label>
+                  <select
+                    value={immediateBaseSizeFilter}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      console.log('Base size changed:', value);
+                      setImmediateBaseSizeFilter(value)
+                      debouncedSetBaseSizeFilter(value)
+                      setCurrentPage(1)
+                    }}
+                    className="w-[90px] bg-gray-700 border border-gray-600 text-gray-200 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 p-2.5 h-10"
+                  >
+                    <option value="">All</option>
+                    {baseSizeOptions.map((option) => (
+                      <option key={option.id} value={option.base_size_name}>
+                        {option.base_size_name.charAt(0).toUpperCase() + option.base_size_name.slice(1).toLowerCase()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Character Category Filter */}
+                <div className="flex items-center">
+                  <label className="text-sm font-medium text-gray-300 text-right pl-3 pr-3">Category:</label>
+                  <div className="relative">
+                    <UI.SearchInput
+                      value={immediateCharacterCategoryFilter}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        setImmediateCharacterCategoryFilter(value)
+                        debouncedSetCharacterCategoryFilter(value)
+                        setCurrentPage(1)
+                      }}
+                      placeholder="Category..."
+                      className="w-[100px]"
+                    />
+                    {immediateCharacterCategoryFilter && (
+                      <button
+                        onClick={() => {
+                          setImmediateCharacterCategoryFilter('')
+                          setCharacterCategoryFilter('')
+                          setCurrentPage(1)
+                        }}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                      >
+                        <FaTimesCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Add Tag Filter */}
@@ -1498,11 +1593,15 @@ export default function MiniatureOverview() {
                       setImmediateProductSetFilter('')
                       setImmediatePaintedByFilter('')
                       setImmediateAllTypesFilter('')
+                      setImmediateBaseSizeFilter('')
+                      setImmediateCharacterCategoryFilter('')
                       setNameFilter('')
                       setTypeFilter('')
                       setProductSetFilter('')
                       setPaintedByFilter('')
                       setAllTypesFilter('')
+                      setBaseSizeFilter('')
+                      setCharacterCategoryFilter('')
                       setSelectedTagFilters([])
                       setTagInput('')
                       setShowMissingImages(false)
@@ -1584,7 +1683,7 @@ export default function MiniatureOverview() {
                           key={mini.id} 
                           className="group relative w-full h-full bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]"
                           style={{ 
-                            transform: `rotate(0deg)`,
+                            transform: `rotate(${rotation}deg)`,
                             '--card-rotation': `${rotation}deg`
                           } as React.CSSProperties}
                           onMouseEnter={(e) => {

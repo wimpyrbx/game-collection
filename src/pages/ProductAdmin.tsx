@@ -491,20 +491,6 @@ export default function ProductAdmin() {
           transition: 'opacity 0.5s ease-out ease-in'
         }}
       >
-        {hoverPosition.company && (
-          <div className="flex h-full items-center justify-center">
-            <img
-              key={hoverPosition.company}
-              src={`/miniatures/images/product_companies/${hoverPosition.company.toLowerCase()}.webp`}
-              alt={hoverPosition.company}
-              className="max-w-[100px] max-h-[100px] shadow-xl"
-              onError={(e) => {
-              const target = e.target as HTMLImageElement
-              target.style.display = 'none'
-            }}
-            />
-          </div>
-        )}
       </div>
 
       <PageHeader bgColor="none">
@@ -575,28 +561,6 @@ export default function ProductAdmin() {
 
         {/* Product Lines Section */}
         <div className="col-span-4">
-          {state.selected.company && (
-            <div className="" style={{ float: 'right', marginTop: '-75px', marginRight: '225px' }}>
-              <img
-                key={state.selected.company.name}
-                src={`/miniatures/images/product_companies/${state.selected.company.name.toLowerCase()}.webp`}
-                alt={state.selected.company.name}
-                className="w-48 h-48 object-contain"
-                style={{ 
-                  position: 'absolute',
-                  animation: 'scaleAnimation 4s ease-in-out infinite'
-                }}
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.style.visibility = 'hidden'
-                }}
-                onLoad={(e) => {
-                  const target = e.target as HTMLImageElement
-                  target.style.visibility = 'visible'
-                }}
-              />
-            </div>
-          )}
           <UI.AdminTableSection
             title="Product Lines"
             icon={FaList}
