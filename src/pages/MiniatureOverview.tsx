@@ -533,16 +533,6 @@ export default function MiniatureOverview() {
 
   // Combine filters into a single search string
   useEffect(() => {
-    console.log('Filters updated:', {
-      nameFilter,
-      typeFilter,
-      productSetFilter,
-      paintedByFilter, 
-      allTypesFilter,
-      baseSizeFilter,
-      characterCategoryFilter,
-      selectedTagFilters
-    });
     
     const filters: string[] = [];
 
@@ -1244,7 +1234,6 @@ export default function MiniatureOverview() {
                                 value={defaultBaseSizeId || ''}
                                 onChange={(e) => {
                                   const value = e.target.value
-                                  console.log('Base size changed:', value);
                                   setImmediateBaseSizeFilter(value)
                                   debouncedSetBaseSizeFilter(value)
                                   setCurrentPage(1)
@@ -1329,7 +1318,7 @@ export default function MiniatureOverview() {
                         setCurrentPage(1)
                       }}
                       placeholder="Name..."
-                      className="w-[70px]"
+                      className="w-[100px]"
                     />
                     {immediateNameFilter && (
                       <button
@@ -1418,8 +1407,8 @@ export default function MiniatureOverview() {
                         debouncedSetProductSetFilter(value)
                         setCurrentPage(1)
                       }}
-                      placeholder="Product set..."
-                      className="w-[100px]"
+                      placeholder="Product..."
+                      className="w-[70px]"
                     />
                     {immediateProductSetFilter && (
                       <button
@@ -1465,7 +1454,6 @@ export default function MiniatureOverview() {
                     value={immediateBaseSizeFilter}
                     onChange={(e) => {
                       const value = e.target.value
-                      console.log('Base size changed:', value);
                       setImmediateBaseSizeFilter(value)
                       debouncedSetBaseSizeFilter(value)
                       setCurrentPage(1)
@@ -1494,7 +1482,7 @@ export default function MiniatureOverview() {
                         setCurrentPage(1)
                       }}
                       placeholder="Category..."
-                      className="w-[100px]"
+                      className="w-[70px]"
                     />
                     {immediateCharacterCategoryFilter && (
                       <button
@@ -1683,7 +1671,7 @@ export default function MiniatureOverview() {
                           key={mini.id} 
                           className="group relative w-full h-full bgCardBody rounded-lg border border-gray-700 shadow-md overflow-hidden cursor-pointer transition-all duration-300 ease-in-out hover:border-gray-500 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]"
                           style={{ 
-                            transform: `rotate(${rotation}deg)`,
+                            transform: 'rotate(0deg)',
                             '--card-rotation': `${rotation}deg`
                           } as React.CSSProperties}
                           onMouseEnter={(e) => {
